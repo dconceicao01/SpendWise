@@ -66,6 +66,7 @@ Esta documentação é uma base de engenharia, não um parecer jurídico nem uma
 - [Arquitetura, módulos e diagramas](docs/architecture.md)
 - [Privacidade, RGPD e segurança](docs/privacy-security.md)
 - [Desenvolvimento, revisão, testes e CI/CD](docs/workflow.md)
+- [Princípios de desenvolvimento, dependências e testes](docs/development-principles.md)
 - [Decisões de arquitetura](docs/adr/0001-stack-e-arquitetura.md)
 
 ## Roadmap inicial
