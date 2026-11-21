@@ -12,7 +12,7 @@ O backlog oficial está na [lista MVP do Slack](https://dcorggrupo.slack.com/lis
 |---|---|---|
 | Product Owner | Duarte (humano) | Aprovar regras de negócio, prioridades, funcionalidades e decisões de produto. |
 | Tech Lead / Platform | Codex, GPT-5.6-Terra | Coordenar dependências, propor decisões técnicas e preparar fundação, CI/CD e operação. Pedir aprovação para escolhas estruturais em aberto. |
-| Frontend Engineer | Codex, GPT-6-Luna; Ollama `qwen3.5:4b` como modelo local pretendido | React, TypeScript, UX, acessibilidade e integração com a API. O modelo Ollama ainda não está ligado à execução destes agentes. |
+| Frontend Engineer | Codex, GPT-6-Luna; Ollama `qwen3.5:4b` como modelo local pretendido | React Native, Expo, TypeScript, UX multiplataforma, acessibilidade e integração com a API para web, Android e iOS. O modelo Ollama ainda não está ligado à execução destes agentes. |
 | Backend Engineer | Codex, GPT-5.6-Terra; Ollama `gpt-oss:20b` apenas após avaliação de memória | Spring Boot, contratos API, domínio, autenticação e autorização. O modelo local de 20B é pesado para 16 GB de RAM e não é o executor ativo. |
 | Security & Privacy Reviewer | Codex, GPT-5.6-Terra | Revisão independente de auth, autorização, RLS, segredos, logs, privacidade e ameaças. Não substitui DPO/jurista nem aprovação humana. |
 | QA / Tester | Codex, GPT-6-Luna; Ollama `deepseek-r1:8b` para apoio a cenários | Estratégia de testes, casos negativos, acessibilidade, evidência de execução e validação de critérios. O modelo local ainda não está ligado à execução dos agentes. |

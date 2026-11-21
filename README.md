@@ -1,8 +1,8 @@
 # SpendWise
 
-O SpendWise é uma aplicação web para organizar objetivos de poupança, acompanhar depósitos e colaborar em poupanças partilhadas. O produto não movimenta dinheiro nem se liga a bancos no MVP: regista valores introduzidos pelos utilizadores.
+O SpendWise é uma aplicação multiplataforma para organizar objetivos de poupança, acompanhar depósitos e colaborar em poupanças partilhadas. O produto não movimenta dinheiro nem se liga a bancos no MVP: regista valores introduzidos pelos utilizadores.
 
-> **Estado:** documentação de produto e arquitetura inicial. A implementação ainda não começou. As decisões marcadas como “a confirmar” têm de ser fechadas antes da produção.
+> **Estado:** scaffold técnico inicial para web, Android e iOS. Os fluxos funcionais e as decisões marcadas como “a confirmar” têm de ser fechados antes da produção.
 
 ## Produto
 
@@ -18,13 +18,13 @@ O SpendWise é uma aplicação web para organizar objetivos de poupança, acompa
 
 ### Fora do MVP
 
-Integração bancária, iniciação de pagamentos, cartões, aconselhamento financeiro, modo empresarial e gamificação avançada. O suporte a web, Android e iOS faz parte do objetivo do produto; a estratégia de aplicação móvel está pendente de decisão. Qualquer funcionalidade que passe a iniciar pagamentos ou tratar dados de cartões exige uma nova análise regulatória e de segurança.
+Integração bancária, iniciação de pagamentos, cartões, aconselhamento financeiro, modo empresarial e gamificação avançada. O suporte a web, Android e iOS faz parte do objetivo do produto e será construído sobre uma aplicação universal Expo. Qualquer funcionalidade que passe a iniciar pagamentos ou tratar dados de cartões exige uma nova análise regulatória e de segurança.
 
 ## Stack decidida
 
 | Camada | Tecnologia | Responsabilidade |
 |---|---|---|
-| Web | React + TypeScript + Vite | Interface responsiva; Lovable pode acelerar protótipos e previews. |
+| Aplicação universal | React Native + Expo + TypeScript + Expo Router | Interface partilhada entre web, Android e iOS; adaptações por plataforma quando necessárias. |
 | API | Java + Spring Boot | Regras de domínio, autorização por recurso, validação, convites e relatórios. |
 | Identidade | Supabase Auth | Registo, sessão, recuperação de acesso e MFA. |
 | Dados | PostgreSQL gerido pelo Supabase | Dados de produto, migrações SQL versionadas e RLS. Região europeia a selecionar e confirmar no projeto. |
@@ -41,13 +41,13 @@ Lovable é uma ferramenta opcional de prototipagem e preview. O código versiona
 
 O MVP usa um monorepo com aplicações independentes por camada:
 
-- `frontend/` — React, TypeScript, Vite e pnpm (Node.js 24 LTS).
+- `frontend/` — React Native, Expo, Expo Router e TypeScript para web, Android e iOS; pnpm (Node.js 24 LTS).
 - `backend/` — API Java 21 com Spring Boot 3.5.x e Maven Wrapper.
 - `Database/` — configuração local Supabase e migrações versionadas (preparação em MVP-06).
 - `.github/workflows/` — CI de validação em pull requests, a criar na tarefa MVP-27; deploy fica fora do primeiro scaffold.
 - `docs/` — arquitetura, privacidade, fluxo e decisões.
 
-Consultar os READMEs de `frontend/` e `backend/` para os comandos locais. O ambiente Supabase local em `Database/` é tratado na tarefa MVP-06.
+Consultar os READMEs de `frontend/` e `backend/` para os comandos locais. O ambiente Supabase local em `Database/` usa Docker e é tratado na tarefa MVP-06.
 
 - **Local:** frontend, API e Supabase local; dados sintéticos.
 - **Staging:** projeto Supabase isolado, utilizadores de teste e dados sintéticos. Cada PR tem verificações automáticas e preview quando suportado.

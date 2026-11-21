@@ -11,15 +11,15 @@
 **/target/
 **/.mvn/wrapper/maven-wrapper.jar.sha256
 
-# Node / Vite
+# Node / Expo
 **/node_modules/
 **/dist/
 **/.vite/
 pnpm-debug.log*
 
 # Supabase local state
-supabase/.branches/
-supabase/.temp/
+Database/.branches/
+Database/.temp/
 
 # Editors and operating systems
 .idea/

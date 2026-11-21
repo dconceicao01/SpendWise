@@ -4,20 +4,21 @@
 
 ```mermaid
 flowchart LR
-  U[Utilizador] --> WEB[React + TypeScript]
-  WEB -->|Login e sessão| AUTH[Supabase Auth]
-  WEB -->|HTTPS + access JWT| API[API Spring Boot]
+  U[Utilizador] --> APP[Expo + React Native<br/>Web, Android e iOS]
+  APP -->|Login e sessão| AUTH[Supabase Auth]
+  APP -->|HTTPS + access JWT| API[API Spring Boot]
   API -->|Validar iss, exp, assinatura e claims via JWKS| AUTH
   API -->|Consultas como utilizador autenticado| DB[(PostgreSQL Supabase<br/>RLS)]
   API -->|Email transacional, quando ativado| MAIL[Fornecedor de email com DPA]
-  GH[GitHub Actions] -->|Deploy separado por ambiente| WEB
+  GH[GitHub Actions] -->|Build e deploy web| APP
+  GH -->|Build de apps móveis| STORE[Google Play / App Store]
   GH -->|Deploy Docker| API
   GH -->|Migrações aprovadas| DB
 ```
 
 ### Caminho de uma chamada autenticada
 
-1. O utilizador autentica-se pelo Supabase Auth. O frontend mantém a sessão com a biblioteca Supabase e não regista tokens em logs. A estratégia de armazenamento da sessão e a política CSP são requisitos de implementação e revisão.
+1. O utilizador autentica-se pelo Supabase Auth. A aplicação Expo mantém a sessão com armazenamento adequado a cada plataforma e não regista tokens em logs. A estratégia de armazenamento da sessão e a política CSP são requisitos de implementação e revisão.
 2. O frontend envia `Authorization: Bearer <access-token>` à API Spring por HTTPS.
 3. Spring Security valida assinatura, emissor, expiração e claims do token usando o JWKS do projeto Supabase. O `sub` validado é a identidade do ator. Nunca aceitar um `userId` do corpo como prova de identidade.
 4. A API verifica autorização de domínio em cada pedido: propriedade, participação, papel e operação permitida. Por exemplo, só `OWNER` altera membros e partilha; `VIEWER` não altera depósitos.
