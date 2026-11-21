@@ -1,7 +1,32 @@
 ﻿# Database
 
-Configuração local do Supabase, migrações PostgreSQL, seeds exclusivamente sintéticos e documentação operacional da base de dados.
+# Database
 
-A CLI Supabase local, as migrações PostgreSQL e os seeds sintéticos ficam nesta pasta. O runtime de containers escolhido para desenvolvimento local em Windows é Docker Desktop; a configuração será preparada na tarefa MVP-06 depois de validar o caminho personalizado (`Database/`) suportado pela versão estável da CLI.
+Configuração e migrações Supabase/PostgreSQL do SpendWise. A CLI fica fixada em `3.2.0` como dependência de desenvolvimento neste pacote; o diretório de trabalho personalizado permite manter tudo sob `Database/`.
 
-Não guardar credenciais, dados pessoais reais nem cópias de produção nesta pasta.
+## Preparação local
+
+Requisitos: Node.js 24 LTS, pnpm 12 e Docker Desktop em execução.
+
+Na pasta `Database/`:
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm config:validate
+pnpm db:start
+pnpm db:status
+```
+
+Para parar os containers: `pnpm db:stop`. A stack local contém serviços de desenvolvimento; não usar credenciais nem dados reais.
+
+## Migrações e seeds
+
+Criar migrações com a CLI, depois de o modelo de domínio ser aprovado:
+
+```powershell
+pnpm exec supabase migration new <nome-descritivo> --workdir .
+```
+
+O `seed.sql` só deve conter dados sintéticos. A definição de tabelas, grants, RLS e dados de seed aguarda a conclusão das decisões de produto e privacidade. Configuração local de Auth não deve ser copiada para um projeto de produção sem revisão.
+
+A CLI 3 usa a stack local por defeito; operações em projetos alojados precisam de `--remote` e aprovação. Não guardar tokens, passwords, chaves, dados pessoais reais nem cópias de produção nesta pasta.

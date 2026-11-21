@@ -21,6 +21,8 @@ Para executar os testes:
 .\mvnw.cmd verify
 ```
 
+Cada serviço/use case novo deve ter testes unitários para cenários válidos, inválidos e limites importantes, sem rede nem dependência de contexto Spring. Integração com Supabase/PostgreSQL, RLS e HTTP fica coberta por testes de integração separados. Ver os [princípios de desenvolvimento](../docs/development-principles.md).
+
 O endpoint de disponibilidade é `GET /api/v1/health` e devolve `{"status":"UP"}`. O contrato OpenAPI é servido em `/api-docs` e a interface local está em `/api-docs/ui`.
 
 ## Limites deste scaffold

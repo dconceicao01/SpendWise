@@ -1,0 +1,2 @@
+-- Apenas dados sintéticos de desenvolvimento serão adicionados aqui.
+-- O esquema e as regras de acesso aguardam aprovação do modelo de domínio.

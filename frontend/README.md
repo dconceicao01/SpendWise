@@ -2,6 +2,8 @@
 
 Aplicação universal em React Native + Expo e TypeScript para web, Android e iOS. O Expo Router mantém rotas comuns e permite adaptações por plataforma quando a experiência nativa o exigir.
 
+Os componentes devem manter interfaces pequenas: poucos parâmetros necessários, bons valores por defeito e composição clara. Consultar os [princípios de desenvolvimento](../docs/development-principles.md) antes de adicionar bibliotecas ou abstrações partilhadas.
+
 ## Requisitos
 
 - Node.js 24 LTS

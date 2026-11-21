@@ -18,8 +18,8 @@
 pnpm-debug.log*
 
 # Supabase local state
-Database/.branches/
-Database/.temp/
+Database/supabase/.branches/
+Database/supabase/.temp/
 
 # Editors and operating systems
 .idea/

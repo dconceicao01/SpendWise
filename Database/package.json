@@ -1,0 +1,18 @@
+{
+  "name": "spendwise-database",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@12.20.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "config:validate": "supabase config validate --workdir .",
+    "db:start": "supabase start --workdir .",
+    "db:stop": "supabase stop --workdir .",
+    "db:status": "supabase status --workdir ."
+  },
+  "devDependencies": {
+    "supabase": "3.2.0"
+  }
+}
