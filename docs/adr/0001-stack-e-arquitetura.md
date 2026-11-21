@@ -14,7 +14,7 @@ SpendWise é uma aplicação web de registo de poupanças e colaboração. Os ut
 - Identidade: Supabase Auth.
 - Base de dados: PostgreSQL no Supabase, migrações SQL versionadas e RLS.
 - A API é a única camada de domínio exposta. A identidade do utilizador chega por JWT verificado; autorização por recurso ocorre na API e é reforçada por RLS.
-- A conexão a dados deve preservar claims do utilizador e executar sob `authenticated` em contexto transacional ou passar o JWT à Supabase Data API. A implementação deve incluir testes de isolamento com pool de conexões; não pode usar `service_role`/superuser em pedidos comuns.
+- O Spring encaminha o JWT original do utilizador à Supabase Data API, com a publishable key, para executar leituras/escritas sob `authenticated` e RLS. Não há ligação JDBC privilegiada para o caminho normal de pedidos; não usar `service_role`/superuser em operações de utilizador.
 - GitHub e GitHub Actions para controlo de versão, PR, CI e promoção entre ambientes; Docker para API.
 - Supabase local, staging e produção são ambientes independentes. Produção usa região e plano aprovados após avaliação contratual e operacional.
 - Lovable é ferramenta opcional de prototipagem/preview. GitHub permanece fonte de verdade. Hosting de produção mantém-se por escolher.
@@ -23,7 +23,7 @@ SpendWise é uma aplicação web de registo de poupanças e colaboração. Os ut
 
 - O frontend é consistente com o fluxo React/Lovable, enquanto regras financeiras e autorização ficam no backend.
 - Spring Boot acrescenta manutenção de runtime Java e serviço de API, mas dá estrutura a validação, autorização e regras de domínio.
-- O caminho Spring → Postgres com RLS por utilizador requer um teste técnico inicial obrigatório. Se não for possível garantir isolamento transacional com as credenciais e pool escolhidos, usar a Data API com JWT por pedido em vez de contornar RLS.
+- A camada de repositório Spring usa chamadas HTTP à Data API; operações que exijam atomicidade entre várias alterações devem ser encapsuladas em RPCs Postgres `SECURITY INVOKER`, com grants/RLS e testes específicos.
 - São necessárias migrações e testes SQL para garantir a segurança do schema, especialmente membership e partilha.
 - Separar projetos Supabase reduz o risco de testes afetarem produção, mas exige gerir credenciais e migrações por ambiente.
 - A escolha de fornecedores não demonstra conformidade RGPD. É necessário completar análise jurídica, DPAs, avaliação de transferências, retenção, AIPD quando aplicável e operação de direitos/incidentes.

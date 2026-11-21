@@ -21,10 +21,10 @@ flowchart LR
 2. O frontend envia `Authorization: Bearer <access-token>` à API Spring por HTTPS.
 3. Spring Security valida assinatura, emissor, expiração e claims do token usando o JWKS do projeto Supabase. O `sub` validado é a identidade do ator. Nunca aceitar um `userId` do corpo como prova de identidade.
 4. A API verifica autorização de domínio em cada pedido: propriedade, participação, papel e operação permitida. Por exemplo, só `OWNER` altera membros e partilha; `VIEWER` não altera depósitos.
-5. O acesso à base de dados ocorre sob a identidade autenticada da chamada para que `auth.uid()` e RLS possam aplicar políticas por utilizador e grupo. A chamada usa mecanismo transacional suportado pelo Supabase (claims verificados na transação e papel `authenticated`) ou a Data API com o JWT do utilizador. A escolha concreta será comprovada por teste de integração. Não usar `service_role` como atalho para operações de utilizador.
+5. Para acesso a dados, o Spring encaminha o JWT original do utilizador à Supabase Data API, acompanhado da publishable key do projeto. Assim Supabase valida a chamada e aplica `authenticated`, `auth.uid()` e RLS. O Spring não liga diretamente ao PostgreSQL com credencial elevada para pedidos normais. Não usar `service_role` como atalho para operações de utilizador.
 6. Respostas e logs não incluem tokens, palavras-passe, convites secretos nem informação financeira que não seja necessária para diagnóstico.
 
-JWT é identidade autenticada, não autorização suficiente: os papéis e a pertença a poupanças são confirmados no servidor/base de dados. Nunca usar `user_metadata` editável pelo utilizador para decidir permissões; não confiar em IDs fornecidos pelo browser. O JWT deve ser validado por biblioteca de confiança e chaves rotativas via JWKS.
+JWT é identidade autenticada, não autorização suficiente: os papéis e a pertença a poupanças são confirmados no servidor/base de dados. Nunca usar `user_metadata` editável pelo utilizador para decidir permissões; não confiar em IDs fornecidos pelo browser. O JWT deve ser validado por biblioteca de confiança e chaves rotativas via JWKS. A publishable key pode estar no frontend/servidor; nunca enviar secret/service-role keys ao browser.
 
 ## Módulos de domínio
 

@@ -31,7 +31,7 @@ Integração bancária, iniciação de pagamentos, cartões, aconselhamento fina
 | Contrato API | REST + OpenAPI | Contratos versionados entre React e Spring. |
 | Entrega | GitHub + GitHub Actions + Docker | PRs, CI, publicação em staging e promoção controlada a produção. |
 
-O React chama a API Spring com um access token Supabase. O Spring valida assinatura e claims do JWT através do JWKS do projeto e aplica autorização de negócio. A API acede aos dados no contexto do utilizador, com políticas RLS como segunda barreira; a chave `service_role` não é usada no frontend nem nas operações normais da API. Ver [arquitetura](docs/architecture.md).
+O React chama a API Spring com um access token Supabase. O Spring valida assinatura e claims do JWT através do JWKS do projeto e aplica autorização de negócio. Para ler/escrever dados, o Spring encaminha o JWT original à Supabase Data API, que aplica RLS com a identidade do utilizador; a chave `service_role` não é usada no frontend nem nas operações normais da API. Ver [arquitetura](docs/architecture.md).
 
 Lovable é uma ferramenta opcional de prototipagem e preview. O código versionado no GitHub é a fonte de verdade. O fornecedor e a região europeia de alojamento para produção continuam por escolher; a decisão tem de incluir DPA, localização de dados, subprocessadores, backups e recuperação. Não publicar dados reais em previews.
 
