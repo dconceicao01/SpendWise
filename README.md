@@ -18,7 +18,7 @@ O SpendWise é uma aplicação web para organizar objetivos de poupança, acompa
 
 ### Fora do MVP
 
-Integração bancária, iniciação de pagamentos, cartões, aconselhamento financeiro, modo empresarial, gamificação avançada e app mobile nativa. Qualquer funcionalidade que passe a iniciar pagamentos ou tratar dados de cartões exige uma nova análise regulatória e de segurança.
+Integração bancária, iniciação de pagamentos, cartões, aconselhamento financeiro, modo empresarial e gamificação avançada. O suporte a web, Android e iOS faz parte do objetivo do produto; a estratégia de aplicação móvel está pendente de decisão. Qualquer funcionalidade que passe a iniciar pagamentos ou tratar dados de cartões exige uma nova análise regulatória e de segurança.
 
 ## Stack decidida
 
@@ -36,6 +36,18 @@ O React chama a API Spring com um access token Supabase. O Spring valida assinat
 Lovable é uma ferramenta opcional de prototipagem e preview. O código versionado no GitHub é a fonte de verdade. O fornecedor e a região europeia de alojamento para produção continuam por escolher; a decisão tem de incluir DPA, localização de dados, subprocessadores, backups e recuperação. Não publicar dados reais em previews.
 
 ## Ambientes e entrega
+
+### Estrutura do repositório
+
+O MVP usa um monorepo com aplicações independentes por camada:
+
+- `frontend/` — React, TypeScript, Vite e pnpm (Node.js 24 LTS).
+- `backend/` — API Java 21 com Spring Boot 3.5.x e Maven Wrapper.
+- `Database/` — configuração local Supabase e migrações versionadas (preparação em MVP-06).
+- `.github/workflows/` — CI de validação em pull requests, a criar na tarefa MVP-27; deploy fica fora do primeiro scaffold.
+- `docs/` — arquitetura, privacidade, fluxo e decisões.
+
+Consultar os READMEs de `frontend/` e `backend/` para os comandos locais. O ambiente Supabase local em `Database/` é tratado na tarefa MVP-06.
 
 - **Local:** frontend, API e Supabase local; dados sintéticos.
 - **Staging:** projeto Supabase isolado, utilizadores de teste e dados sintéticos. Cada PR tem verificações automáticas e preview quando suportado.

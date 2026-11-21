@@ -1,0 +1,28 @@
+# Secrets and local environment files
+.tools/
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Java / Maven
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar.sha256
+
+# Node / Vite
+**/node_modules/
+**/dist/
+**/.vite/
+pnpm-debug.log*
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Editors and operating systems
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
