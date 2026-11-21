@@ -4,21 +4,29 @@
 
 ```mermaid
 flowchart LR
-  ISSUE[Requisito / issue] --> BR[Branch curta]
-  BR --> PR[Pull request]
+  ISSUE[Requisito / issue] --> BR[feature/fix branch criada a partir de develop]
+  BR --> PR[Pull request para develop]
   PR --> BOT[CI automática]
   BOT --> REVIEW[Code reviewer]
   REVIEW --> QA[Tester / QA em staging]
-  QA -->|Passa| MERGE[Merge protegido]
+  QA -->|Passa| DEV[develop protegido]
   QA -->|Falha| BR
-  MERGE --> DEPLOY[Deploy staging / release]
-  DEPLOY --> APPROVE[Aprovação de produção]
-  APPROVE --> PROD[Produção]
+  DEV --> REL[release/1.0.0]
+  REL --> PRMAIN[Pull request para main]
+  PRMAIN -->|Checks e aprovação| MAIN[main protegido]
+  MAIN --> TAG[Tag v1.0.0]
+  TAG --> PROD[Produção]
+  REL --> BACKMERGE[Correções de release regressam a develop]
+  MAIN --> HOTFIX[hotfix/*]
+  HOTFIX --> PRMAIN
 ```
 
 ### Branches e revisão
 
-- `main` protegida; alterações via PR e checks obrigatórios. Branches pequenas, por exemplo `feature/...`, `fix/...`, `docs/...`.
+- **Gitflow:** `main` representa produção e `develop` integra a próxima release. Ambas são protegidas; sem pushes diretos.
+- Criar branches curtas `feature/...`, `fix/...` ou `docs/...` a partir de `develop`; abrir PR de volta para `develop`. Branches de agentes podem usar `codex/...`, mantendo o mesmo destino e gates.
+- Criar `release/X.Y.Z` a partir de `develop` quando o escopo estiver congelado. Aí entram apenas correções de estabilização. Depois da aprovação, abrir PR para `main`, criar a tag `vX.Y.Z` no merge e devolver todas as correções da release a `develop`.
+- Criar `hotfix/X.Y.Z` a partir de `main` para uma correção urgente em produção; após revisão, integrar em `main` e `develop` e em qualquer release ainda ativa.
 - PR contém objetivo, risco, como validar, migrações, impacto em dados pessoais e passos de rollback. Não incluir dados reais em screenshots, fixtures ou issue.
 - Code reviewer revê autorização, RLS, migrações, exposição de segredos, logging, privacidade e erros; reviewer automático é apoio, nunca aprovação final para segurança.
 - Tester independente do autor confirma critérios de aceitação em staging e regista resultado. Bugs bloqueadores regressam ao PR.
