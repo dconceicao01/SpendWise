@@ -29,7 +29,9 @@ pnpm ios
 Para verificar tipos e exportar a versão web:
 
 ```powershell
+pnpm lint
 pnpm typecheck
+pnpm format:check
 pnpm build:web
 ```
 
