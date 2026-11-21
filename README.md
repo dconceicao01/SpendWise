@@ -1,95 +1,69 @@
-## 📄 Documentação – “SpendWise” (objetivo, módulos, requisitos, roadmap)
+# SpendWise
 
-# SpendWise – Documentação do Projeto
+O SpendWise é uma aplicação web para organizar objetivos de poupança, acompanhar depósitos e colaborar em poupanças partilhadas. O produto não movimenta dinheiro nem se liga a bancos no MVP: regista valores introduzidos pelos utilizadores.
 
-## 1. Objetivo geral
-Aplicação cross‑platform de gestão de poupanças que permite ao utilizador criar, editar e eliminar “poupanças” com ou sem meta, definir categorias e percentagens de alocação, partilhar a gestão com outras pessoas e visualizar progresso em dashboard.
+> **Estado:** documentação de produto e arquitetura inicial. A implementação ainda não começou. As decisões marcadas como “a confirmar” têm de ser fechadas antes da produção.
 
-## 2. Módulos principais (MVP)
+## Produto
 
-| Módulo | Casos de uso principais |
-|--------|------------------------|
-| **Autenticação & Perfil** | Login/Logout, recuperação de palavra-passo, definição de nome/photo, definição de “on‑board” inicial. |
-| **Poupanças** | Criar/editar/apagar poupança. Definir nome, meta opcional, frequência de recorrência (mensal, semanal, nenhum). Marcar como partilhada ou privada. |
-| **Categorias & Alocação (% )** | Dentro de cada poupança, criar categorias (ex: “Moradia”, “Lazer”, “Imprevistos”). Definir percentagem fixa por depósito recorrente. Editar percentagem (a soma deve dar 100%). Visualizar distribuição por gráfico de pizza. |
-| **Partilha entre Utilizadores** | Owner convida outros utilizadores por e‑mail/link. Papéis: `OWNER`, `CONTRIBUTOR`, `VIEWER`. Cada contribuidor pode definir a sua percentagem de entrada fixa (ex: casal 500€ cada). Recorrência partilhada gera movimentos automáticos por utilizador. |
-| **Depósitos & Histórico** | Adicionar depósito manual ou automático. Histórico temporal por poupança. Relatório mensal: total metido, percentagens por categoria, progresso da meta. |
-| **Dashboard** | resumo rápido: total poupado este mês, total gasto, saldo atual em todas as poupanças. Barras por meta com % atingido. Gráfico de pizza da distribuição deste mês. “Streak/consistência”: quantos meses seguidos tem entrado dinheiro. Últimos 5 depósitos. |
+### Módulos do MVP
 
-## 3. Requisitos funcionais
+1. **Conta e perfil** — registo, início e saída de sessão, recuperação de acesso, perfil mínimo e eliminação de conta.
+2. **Poupanças** — criação, edição, arquivo/eliminação, objetivo opcional, moeda, privacidade e frequência pretendida.
+3. **Categorias e alocações** — categorias por poupança e distribuição percentual que totaliza 100%; cada depósito guarda uma cópia dos valores usados naquele momento.
+4. **Partilha** — convites, membros e permissões `OWNER`, `CONTRIBUTOR` e `VIEWER`; cada membro só vê os dados a que a poupança partilhada lhe dá acesso.
+5. **Depósitos e histórico** — registo manual, histórico cronológico e relatórios. Depósitos “recorrentes” são lembretes no MVP, não débitos bancários automáticos.
+6. **Dashboard** — saldos registados, progresso de objetivos, contribuições e atividade recente.
+7. **Privacidade e suporte** — exportação, correção e pedidos de apagamento de dados, gestão de consentimentos quando aplicável e canal de contacto.
 
-- **FR1:** Utilizador pode criar uma poupança com nome, meta opcional e frequência.
-- **FR2:** Cada poupança tem um conjunto de categorias, cada uma com percentagem fixa (soma 100%).
-- **FR3:** Quando há entrada recorrente, o sistema gera o movimento pelo valor total e particiona pelas categorias segundo as percentagens definidas.
-- **FR4:** Partilha: owner convida utilizadores; cada um define a sua percentagem de contribuição fixa (se for o caso).
-- **FR5:** Dashboard agrega estatísticas de todas as poupanças do utilizador/grupo.
-- **FR6:** Notificações opcionais “é dia de depositar” ou “meta atingida”.
+### Fora do MVP
 
-## 4. Requisitos não‑funcionais
+Integração bancária, iniciação de pagamentos, cartões, aconselhamento financeiro, modo empresarial, gamificação avançada e app mobile nativa. Qualquer funcionalidade que passe a iniciar pagamentos ou tratar dados de cartões exige uma nova análise regulatória e de segurança.
 
-- **Performance:** tempo de resposta < 200 ms para operações de leitura (listagem de poupanças, progresso).
-- **Segurança:** autenticação baseada em Auth.js (NextAuth) / OAuth ou e‑mail + password. Dados sensíveis encriptados ao repouso (PostgreSQL).
-- **Cross‑platform:** uma única codebase (ex: NestJS API + Flutter front‑end) que compiles para web e mobile.
-- **Deploy:** Vercel (web) + Expo (mobile) com pipelines CI/CD e rollback seguro.
+## Stack decidida
 
-## 5. Roadmap evolutivo (futuras versões)
+| Camada | Tecnologia | Responsabilidade |
+|---|---|---|
+| Web | React + TypeScript + Vite | Interface responsiva; Lovable pode acelerar protótipos e previews. |
+| API | Java + Spring Boot | Regras de domínio, autorização por recurso, validação, convites e relatórios. |
+| Identidade | Supabase Auth | Registo, sessão, recuperação de acesso e MFA. |
+| Dados | PostgreSQL gerido pelo Supabase | Dados de produto, migrações SQL versionadas e RLS. Região europeia a selecionar e confirmar no projeto. |
+| Contrato API | REST + OpenAPI | Contratos versionados entre React e Spring. |
+| Entrega | GitHub + GitHub Actions + Docker | PRs, CI, publicação em staging e promoção controlada a produção. |
 
-1. **Integração bancária** – importação automática de transacções via Yodlee/Plaid ou APIs abertas dos bancos portugueses.
-2. **Gamificação** – badges por consistência, streaks, desafios de poupança, rankings familiares.
-3. **Modo “Splitwise”** – separação de compras em grupos de amigos, divisão de despesas partilhadas.
-4. **Modo empresa** – controlo de despesas internas, orçamentos departamentais, relatórios corporativos.
-5. **Relatórios avançados** – projections de cash‑flow, análise de hábitos de gasto, sugestões de cortes.
+O React chama a API Spring com um access token Supabase. O Spring valida assinatura e claims do JWT através do JWKS do projeto e aplica autorização de negócio. A API acede aos dados no contexto do utilizador, com políticas RLS como segunda barreira; a chave `service_role` não é usada no frontend nem nas operações normais da API. Ver [arquitetura](docs/architecture.md).
 
-## 6. Stack tecnológica sugerida
+Lovable é uma ferramenta opcional de prototipagem e preview. O código versionado no GitHub é a fonte de verdade. O fornecedor e a região europeia de alojamento para produção continuam por escolher; a decisão tem de incluir DPA, localização de dados, subprocessadores, backups e recuperação. Não publicar dados reais em previews.
 
-Ainda por definir
+## Ambientes e entrega
 
-## 7. Informações Adicionais
+- **Local:** frontend, API e Supabase local; dados sintéticos.
+- **Staging:** projeto Supabase isolado, utilizadores de teste e dados sintéticos. Cada PR tem verificações automáticas e preview quando suportado.
+- **Produção:** projeto Supabase separado, segredos separados, acesso operacional restrito, backups e promoção aprovada.
 
-### 4. Exigências legais / segurança
+Não copiar dados de produção para staging. Alterações ao esquema são migrações versionadas e verificadas antes de produção. Ver [fluxo de trabalho](docs/workflow.md).
 
-| Requisito | Observação |
-|-----------|------------|
-| GDPR | Consentimento explícito, política de privacidade, dados armazenados em EU. |
-| PCI‑DSS | Não aplicável no MVP (sem cartão). |
-| MFA | Suporte opcional (TOTP, Google Auth). |
-| Criptografia | HTTPS (TLS 1.3), JWT assinado, dados sensíveis salvos em campo criptografado no Supabase. |
+## Segurança e privacidade
 
-### 5. Integrações bancárias
+Privacidade por defeito, minimização de dados, autenticação forte, autorização por poupança, RLS em todas as tabelas expostas, registos sem segredos ou valores financeiros desnecessários, gestão de vulnerabilidades, exportação/eliminação e resposta a incidentes fazem parte dos requisitos do produto. Os controlos e as obrigações operacionais estão em [privacidade e segurança](docs/privacy-security.md).
 
-- No MVP: **Nenhuma**.  
-- Arquitetura preparada para **OAuth 2.0 + Webhooks** no futuro.
+Esta documentação é uma base de engenharia, não um parecer jurídico nem uma declaração de conformidade. Antes do lançamento, o responsável pelo tratamento deve validar base legal por finalidade, avisos de privacidade, prazos de conservação, contratos com subcontratantes, transferências internacionais, necessidade de AIPD/DPO e os direitos dos titulares com apoio jurídico/DPO.
 
-### 6. Tamanho da base de utilizadores
+## Documentação
 
-- Supabase Free tier: ~500 GB de armazenamento, 1 TB de tráfego por mês.  
-- Estimação: 5 000‑10 000 registos de utilizador na fase inicial.
+- [Arquitetura, módulos e diagramas](docs/architecture.md)
+- [Privacidade, RGPD e segurança](docs/privacy-security.md)
+- [Desenvolvimento, revisão, testes e CI/CD](docs/workflow.md)
+- [Decisões de arquitetura](docs/adr/0001-stack-e-arquitetura.md)
 
-### 7. Orçamento / prazos
+## Roadmap inicial
 
-- Preferência por **open‑source**: Go (backend), React/Next.js (frontend), Supabase (Postgres + Auth), Terraform, Docker, GitHub Actions.  
-- Sem prazo rígido; ciclos de sprint de 2 semanas.
+1. Validar modelo de domínio, partilha e permissões.
+2. Criar projetos Supabase local/staging/produção e migrações RLS testadas.
+3. Construir autenticação, poupanças, categorias e depósitos.
+4. Construir partilha, dashboard, exportação e eliminação de conta.
+5. Completar avaliação de privacidade, segurança, recuperação e operação antes do lançamento.
 
-### 8. Métricas de sucesso (KPIs)
+## Equipa de trabalho
 
-| KPI | Como medir | Meta inicial |
-|-----|------------|--------------|
-| Retenção (Day 30) | % de usuários ativos no dia 30 | 30 % |
-| Engajamento médio | Sessões por utilizador/dia | 2 |
-| Conformidade GDPR | Número de incidentes de privacidade | 0 |
-| Tempo de resposta API | 95 % de requests < 200 ms | 95 % |
-| Taxa de churn | % de utilizadores que cancelam | < 5 % |
-
-### 9. Equipa técnica recomendada (número de agentes)
-
-| Papel | Responsabilidade principal | Número de pessoas |
-|-------|----------------------------|-------------------|
-| **Product Owner (PO)** | Definir backlog, prioridades, métricas | 1 |
-| **UI/UX Designer** | Wireframes, alta fidelidade, prototipagem | 1 |
-| **Front‑end Lead (React/Next.js)** | Arquitetura UI, integração com API | 1 |
-| **Mobile Lead (React‑Native/Flutter)** | Arquitetura mobile, integração | 1 |
-| **Back‑end Lead (Go)** | API, lógica de negócio, integração Supabase | 1 |
-| **DevOps / SRE** | Terraform, CI/CD (GitHub Actions), infra Docker, monitoring (Prometheus/Grafana) | 1 |
-| **QA / Test Engineer** | Testes unitários, integração, CI lint | 1 |
-| **Security / Compliance Engineer** | Revisões de código, testes de penetração, GDPR | 1 |
-| **Data Analyst / BI** | Dashboard, métricas, relatórios | 1 (opcional, pode ser terceirizado) |
+Produto/UX, desenvolvimento full-stack, especialista de dados/segurança, **code reviewer** e **tester/QA**. O reviewer e o tester podem ser agentes especializados, mas decisões de acesso a dados, privacidade e produção requerem revisão humana responsável.

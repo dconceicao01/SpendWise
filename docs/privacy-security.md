@@ -1,0 +1,73 @@
+# Privacidade, RGPD e segurança
+
+## Princípio de implementação
+
+O SpendWise trata dados de conta e informação sobre hábitos/objetivos e valores de poupança. Tratar estes dados como confidenciais e de impacto potencialmente elevado, mesmo sem integração bancária. Aplicar minimização, finalidade explícita, privacidade por defeito, controlo de acesso e segurança desde a conceção.
+
+Esta página traduz requisitos em controlos de produto e engenharia; não certifica conformidade. A entidade que operar o serviço tem de identificar o responsável pelo tratamento, finalidades e bases legais, informar as pessoas, estabelecer contratos, atender direitos e avaliar riscos reais. Obter revisão jurídica/DPO antes de produção.
+
+## Matriz de controlo
+
+| Área | Requisito de produto/engenharia | Evidência antes de produção |
+|---|---|---|
+| Finalidade e base legal | Registar finalidade e base legal para cada operação. Consentimento é usado quando essa é a base adequada e deve ser específico, informado e revogável; não marcar todo o tratamento como “consentimento”. | Registo de atividades, mapa de dados, avisos e consentimentos versionados. |
+| Minimização e privacidade por defeito | Recolher só e-mail e nome opcional necessários; poupanças são privadas por defeito; partilha só após convite aceite; não pedir dados bancários/cartões no MVP. | Inventário de campos, definições de privacidade e revisão dos ecrãs/formulários. |
+| Transparência | Informar identidade/contacto do responsável, finalidades, bases legais, destinatários/subprocessadores, transferências, prazos de retenção, direitos e como reclamar junto da autoridade competente. | Aviso de privacidade revisto juridicamente e acessível no registo e na aplicação. |
+| Direitos das pessoas | Fluxo autenticado para acesso/exportação, retificação, apagamento, limitação/oposição quando aplicáveis e retirada de consentimento; verificar identidade de modo proporcional e registar atendimento. | Testes de exportação/eliminação, procedimento operacional, SLA interno e registo de pedidos. |
+| Retenção | Definir prazo por categoria de dados e finalidade. Eliminar ou anonimizar quando já não necessário; documentar exceções legais. Definir quando cópias de segurança expiram e o que significa eliminação nelas. | Tabela de retenção aprovada, tarefas de limpeza e teste de restauro/expiração. |
+| Segurança (Art. 32) | Criptografia em trânsito, cifragem em repouso fornecida pelo serviço e verificada no plano contratado, RBAC/RLS, MFA para operadores, segredos rotacionáveis, patching, revisão, testes e recuperação. | Threat model, resultados de testes, configuração e plano de continuidade. |
+| Subcontratantes e transferências | Rever DPA, subprocessadores, suporte, localização de dados/backups e mecanismo de transferência internacional de cada fornecedor. A preferência por região UE não substitui esta avaliação. | Inventário de fornecedores, DPAs e avaliação de transferências/contratos. |
+| Incidentes | Plano para detetar, conter, investigar, preservar evidência, avaliar risco, documentar decisões e comunicar. O responsável notifica a autoridade quando exigido, sem demora injustificada e, quando viável, até 72 horas após conhecimento; alto risco pode exigir comunicação aos titulares. | Runbook, responsáveis e contactos, exercício de tabletop e modelo de registo. |
+| AIPD/DPO | Avaliar e documentar se o tratamento é suscetível de alto risco e se é necessária AIPD; avaliar nomeação de DPO conforme critérios legais, sem assumir que é sempre obrigatória. | Avaliação assinada pelo responsável e consulta jurídica/DPO. |
+| Cookies e métricas | Não instalar analytics/publicidade não essencial antes de avaliar consentimento e obrigações ePrivacy. Preferir métricas agregadas sem identificadores quando possível. | Inventário de cookies/SDKs e mecanismos de consentimento aplicáveis. |
+| Cartões/pagamentos | MVP não processa cartões nem inicia pagamentos. Rever PCI DSS e regulação de serviços de pagamento se o âmbito mudar; não declarar “não aplicável” sem confirmar fluxo real e responsabilidades. | Escopo de dados/fluxos revisto a cada nova integração. |
+
+## Modelo de autorização
+
+- Cada tabela em schema exposto tem RLS ativa, grants mínimos e políticas `SELECT`, `INSERT`, `UPDATE` e `DELETE` definidas por modelo de ameaça.
+- A API valida o JWT Supabase e faz autorização do recurso; RLS aplica uma segunda barreira por `auth.uid()` e pertença a `savings_members`.
+- A ligação de dados opera com claims verificados e contexto de transação `authenticated` ou passa o JWT à Data API. Testar que contexto não vaza entre conexões pooled. **Não** operar pedidos comuns com `service_role`, superuser ou papel que contorne RLS.
+- `OWNER`, `CONTRIBUTOR`, `VIEWER` são papéis locais à poupança. Guardar a relação no banco e validar sempre o papel atual; não confiar em role fornecida pelo cliente nem em `user_metadata` de JWT.
+- Convites têm token imprevisível, guardar apenas hash, validade limitada, uso único, revogação, rate limiting e resposta que não revele se um e-mail já tem conta.
+- Views são avaliadas quanto a `security_invoker`/RLS e grants; funções com `SECURITY DEFINER` são exceção, não padrão, e exigem `search_path` fixo, autorização explícita e revisão de segurança.
+- Testar cada política com utilizador A, utilizador B, membro removido, owner, contributor, viewer e visitante não autenticado. Testes cobrem leitura, escrita, alteração de proprietário/IDs e acesso a identificadores adivinhados (BOLA/IDOR).
+
+## Autenticação e sessão
+
+- Supabase Auth gere credenciais e recuperação; a aplicação nunca armazena palavras-passe.
+- Spring Security Resource Server valida assinatura usando JWKS oficial, `iss`, `exp` e restantes claims requeridas; rejeita token inválido/expirado. Não implementar criptografia JWT manualmente.
+- Chaves públicas de frontend são identificadores, não segredos; `service_role`/secret keys e passwords de banco são segredo de servidor. Nunca usar prefixo público para segredo.
+- MFA, recuperação de conta e sessão têm política explícita; exigir MFA em contas de operador/admin e avaliar MFA obrigatório para utilizadores consoante risco. MFA não substitui autorização.
+- Tokens não aparecem em URL, telemetria, crash reports nem logs. Proteger contra XSS com escaping, dependências controladas e CSP; escolher e testar armazenamento da sessão antes de ativar persistência longa.
+
+## Dados, auditoria e resposta
+
+1. Classificar dados e limitar payloads recolhidos/observados.
+2. A auditoria regista quem fez que ação, quando e sobre que identificador interno; limitar dados pessoais e acesso ao registo.
+3. Não enviar nomes, saldos, categorias ou conteúdo de poupanças a ferramentas de IA, analytics ou logs sem finalidade, base legal, contrato e avaliação documentados.
+4. Ao receber alerta, preservar logs relevantes, conter acesso, determinar categorias e pessoas afetadas, avaliar risco para direitos/liberdades e documentar decisão de notificação. Subcontratantes devem avisar o operador sem demora contratualmente definida.
+5. Não apagar evidência do incidente ao executar remediação; registar decisão, responsável, horários e ações.
+
+## Checklist de lançamento
+
+- [ ] Responsável, contacto de privacidade e apoio definidos.
+- [ ] Mapa de dados, finalidade/base legal, avisos, consentimentos e retenção aprovados.
+- [ ] AIPD/DPIA e necessidade de DPO avaliadas e documentadas.
+- [ ] DPA/subprocessadores/região/backups/transferências aprovados para cada fornecedor.
+- [ ] RLS e grants testados para todas as tabelas, views, funções e storage expostos.
+- [ ] JWT, MFA/admin, sessão, rate limits, CORS, CSP, TLS e segredo revistos.
+- [ ] Exportação, correção, apagamento, revogação de convite e encerramento de conta testados.
+- [ ] Backups restaurados num exercício; retenção e RPO/RTO aprovados.
+- [ ] Plano de resposta a incidentes com janela de 72 horas, contactos e simulação.
+- [ ] Code reviewer e tester aprovam release; revisão humana aprova riscos e migrações.
+
+## Referências oficiais
+
+- [Regulamento (UE) 2016/679 — RGPD, EUR-Lex](https://eur-lex.europa.eu/eli/reg/2016/679)
+- [EDPB — Orientações 4/2019, proteção de dados desde a conceção e por defeito](https://www.edpb.europa.eu/our-work-tools/our-documents/guidelines/guidelines-42019-article-25-data-protection-design-and_en)
+- [EDPB — Orientações 9/2022, notificação de violações](https://www.edpb.europa.eu/our-work-tools/our-documents/guidelines/guidelines-92022-personal-data-breach-notification-under_en)
+- [Comissão Europeia — obrigações de proteção de dados](https://commission.europa.eu/law/law-topic/data-protection/information-business-and-organisations/obligations_en)
+- [CNPD Portugal](https://www.cnpd.pt/)
+- [Supabase — Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Supabase — JWT](https://supabase.com/docs/guides/auth/jwts)
+- [Supabase — ligação a PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres)
