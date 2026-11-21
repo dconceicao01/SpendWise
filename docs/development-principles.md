@@ -27,6 +27,15 @@ Estas regras aplicam-se ao frontend e ao backend. A escolha de uma biblioteca n�
 - Cobrir integração Spring, PostgreSQL, RLS e contratos em testes de integração separados. Testes unitários não substituem esses testes de segurança.
 - Preferir tipos explícitos, validação à entrada, erros de domínio claros e transações apenas onde o caso de uso exige atomicidade.
 
+## Contratos, dados e segurança
+
+- Rever o contrato OpenAPI de uma funcionalidade antes de implementar o frontend e o backend em paralelo. Não introduzir geração automática de clientes sem avaliar tipos, compatibilidade multiplataforma e manutenção.
+- Aplicar negação por defeito e privilégio mínimo. Cada política RLS deve ter casos de teste permitidos e negados para utilizador anónimo, owner, contributor, viewer e utilizador sem pertença, conforme a operação.
+- Migrações são append-only depois de aplicadas. Alterações de produção seguem expand/contract para permitir que versões antigas e novas da API convivam durante a promoção.
+- Logs estruturados incluem contexto técnico e correlação, mas omitem tokens, e-mails, IDs pessoais e valores financeiros salvo necessidade documentada e aprovada.
+- Acessibilidade é critério de aceitação: semântica e navegação por teclado na web; leitor de ecrã, áreas de toque e convenções nativas em Android/iOS.
+- Manter testes unitários rápidos e determinísticos, testes de integração nos limites de persistência/segurança e um conjunto pequeno de fluxos E2E críticos. Não usar E2E para substituir testes de autorização ou de domínio.
+
 ## Pull requests
 
 Cada PR declara dependências/licenças novas, impacto em dados pessoais, decisões de segurança e os comandos de validação executados. Código de autorização, migrações, Auth ou RLS precisa de revisão independente e evidência de testes positivos e negativos.
