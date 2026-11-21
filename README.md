@@ -43,3 +43,53 @@ Aplicação cross‑platform de gestão de poupanças que permite ao utilizador 
 ## 6. Stack tecnológica sugerida
 
 Ainda por definir
+
+## 7. Informações Adicionais
+
+### 4. Exigências legais / segurança
+
+| Requisito | Observação |
+|-----------|------------|
+| GDPR | Consentimento explícito, política de privacidade, dados armazenados em EU. |
+| PCI‑DSS | Não aplicável no MVP (sem cartão). |
+| MFA | Suporte opcional (TOTP, Google Auth). |
+| Criptografia | HTTPS (TLS 1.3), JWT assinado, dados sensíveis salvos em campo criptografado no Supabase. |
+
+### 5. Integrações bancárias
+
+- No MVP: **Nenhuma**.  
+- Arquitetura preparada para **OAuth 2.0 + Webhooks** no futuro.
+
+### 6. Tamanho da base de utilizadores
+
+- Supabase Free tier: ~500 GB de armazenamento, 1 TB de tráfego por mês.  
+- Estimação: 5 000‑10 000 registos de utilizador na fase inicial.
+
+### 7. Orçamento / prazos
+
+- Preferência por **open‑source**: Go (backend), React/Next.js (frontend), Supabase (Postgres + Auth), Terraform, Docker, GitHub Actions.  
+- Sem prazo rígido; ciclos de sprint de 2 semanas.
+
+### 8. Métricas de sucesso (KPIs)
+
+| KPI | Como medir | Meta inicial |
+|-----|------------|--------------|
+| Retenção (Day 30) | % de usuários ativos no dia 30 | 30 % |
+| Engajamento médio | Sessões por utilizador/dia | 2 |
+| Conformidade GDPR | Número de incidentes de privacidade | 0 |
+| Tempo de resposta API | 95 % de requests < 200 ms | 95 % |
+| Taxa de churn | % de utilizadores que cancelam | < 5 % |
+
+### 9. Equipa técnica recomendada (número de agentes)
+
+| Papel | Responsabilidade principal | Número de pessoas |
+|-------|----------------------------|-------------------|
+| **Product Owner (PO)** | Definir backlog, prioridades, métricas | 1 |
+| **UI/UX Designer** | Wireframes, alta fidelidade, prototipagem | 1 |
+| **Front‑end Lead (React/Next.js)** | Arquitetura UI, integração com API | 1 |
+| **Mobile Lead (React‑Native/Flutter)** | Arquitetura mobile, integração | 1 |
+| **Back‑end Lead (Go)** | API, lógica de negócio, integração Supabase | 1 |
+| **DevOps / SRE** | Terraform, CI/CD (GitHub Actions), infra Docker, monitoring (Prometheus/Grafana) | 1 |
+| **QA / Test Engineer** | Testes unitários, integração, CI lint | 1 |
+| **Security / Compliance Engineer** | Revisões de código, testes de penetração, GDPR | 1 |
+| **Data Analyst / BI** | Dashboard, métricas, relatórios | 1 (opcional, pode ser terceirizado) |
