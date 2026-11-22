@@ -1,44 +1,348 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Linking from "expo-linking";
+import { useLocalSearchParams } from "expo-router";
+import { useAuth } from "@/auth/auth-context";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
-const platforms = ["Web", "Android", "iOS"];
+type AuthMode = "signIn" | "signUp" | "recover";
+
+const modeContent: Record<AuthMode, { title: string; button: string }> = {
+  signIn: { title: "Iniciar sessão", button: "Entrar" },
+  signUp: { title: "Criar conta", button: "Criar conta" },
+  recover: { title: "Recuperar acesso", button: "Enviar ligação" },
+};
 
 export default function HomeScreen() {
+  const { isLoading, session } = useAuth();
+  const { confirmed, authError, passwordChanged } = useLocalSearchParams<{
+    confirmed?: string;
+    authError?: string;
+    passwordChanged?: string;
+  }>();
+  const [mode, setMode] = useState<AuthMode>("signIn");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [isError, setIsError] = useState(false);
+  const routeNotice =
+    confirmed === "1"
+      ? "E-mail confirmado. Já podes iniciar sessão."
+      : authError === "1"
+        ? "A ligação expirou ou já foi utilizada. Pede uma nova ligação."
+        : passwordChanged === "1"
+          ? "Palavra-passe atualizada. Já podes iniciar sessão."
+          : "";
+  const visibleNotice = notice || routeNotice;
+  const visibleError = isError || authError === "1";
+
+  async function submitAuth() {
+    setNotice("");
+    setIsError(false);
+    setIsSubmitting(true);
+
+    try {
+      if (!supabase) return;
+
+      if (mode === "signIn") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (error) throw error;
+        return;
+      }
+
+      if (mode === "signUp") {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: { full_name: fullName.trim() },
+            emailRedirectTo: Linking.createURL("auth/callback"),
+          },
+        });
+        if (error) throw error;
+        setNotice(
+          "Se for possível criar a conta, receberás uma mensagem com os próximos passos.",
+        );
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: Linking.createURL("auth/callback", {
+            queryParams: { flow: "recovery" },
+          }),
+        },
+      );
+      if (error) throw error;
+      setNotice(
+        "Se existir uma conta para este endereço, receberás uma ligação de recuperação.",
+      );
+    } catch {
+      setIsError(true);
+      setNotice(
+        mode === "signIn"
+          ? "Não foi possível iniciar sessão. Confirma os dados e tenta novamente."
+          : mode === "signUp"
+            ? "Não foi possível concluir o registo. Confirma os dados e tenta novamente."
+            : "Não foi possível pedir a recuperação. Tenta novamente mais tarde.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+    setNotice("");
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setIsError(true);
+      setNotice("Não foi possível terminar a sessão. Tenta novamente.");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centered}>
+          <ActivityIndicator color="#35684b" />
+          <Text style={styles.loadingText}>A verificar sessão…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isSupabaseConfigured) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <Brand />
+          <Text style={styles.title}>Configuração necessária</Text>
+          <Text style={styles.description}>
+            Define o URL e a chave pública do Supabase no ficheiro local
+            <Text style={styles.code}> frontend/.env</Text> e reinicia a
+            aplicação.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (session) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <Brand />
+          <Text style={styles.title}>Sessão iniciada</Text>
+          <Text style={styles.description}>
+            A tua conta está autenticada. Os próximos módulos do MVP vão
+            aparecer aqui.
+          </Text>
+          <Text style={styles.email}>{session.user.email}</Text>
+          <PrimaryButton label="Terminar sessão" onPress={signOut} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <Text style={styles.eyebrow}>POUPAR EM CONJUNTO</Text>
-        <Text style={styles.title}>SpendWise</Text>
-        <Text style={styles.description}>
-          A base multiplataforma está pronta para começar a transformar
-          objetivos em progresso.
-        </Text>
-        <View
-          accessibilityLabel="Plataformas suportadas"
-          style={styles.platforms}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {platforms.map((platform) => (
-            <Text key={platform} style={styles.platform}>
-              {platform}
+          <View style={styles.content}>
+            <Brand />
+            <Text style={styles.title}>{modeContent[mode].title}</Text>
+            <Text style={styles.description}>
+              Organiza os teus objetivos e acompanha o orçamento por períodos. O
+              SpendWise não movimenta dinheiro.
             </Text>
-          ))}
-        </View>
-      </View>
+
+            <View style={styles.form}>
+              {mode === "signUp" && (
+                <>
+                  <Text style={styles.label}>Nome</Text>
+                  <TextInput
+                    accessibilityLabel="Nome"
+                    autoComplete="name"
+                    maxLength={120}
+                    onChangeText={setFullName}
+                    placeholder="Nome completo"
+                    style={styles.input}
+                    textContentType="name"
+                    value={fullName}
+                  />
+                </>
+              )}
+              <Text style={styles.label}>E-mail</Text>
+              <TextInput
+                accessibilityLabel="E-mail"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                placeholder="nome@exemplo.pt"
+                returnKeyType={mode === "recover" ? "done" : "next"}
+                style={styles.input}
+                textContentType="emailAddress"
+                value={email}
+              />
+
+              {mode !== "recover" && (
+                <>
+                  <Text style={styles.label}>Palavra-passe</Text>
+                  <TextInput
+                    accessibilityLabel="Palavra-passe"
+                    autoCapitalize="none"
+                    autoComplete={
+                      mode === "signUp" ? "new-password" : "password"
+                    }
+                    onChangeText={setPassword}
+                    onSubmitEditing={submitAuth}
+                    placeholder="Pelo menos 8 caracteres"
+                    returnKeyType="go"
+                    secureTextEntry
+                    style={styles.input}
+                    textContentType={
+                      mode === "signUp" ? "newPassword" : "password"
+                    }
+                    value={password}
+                  />
+                </>
+              )}
+
+              {visibleNotice ? (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={visibleError ? styles.error : styles.notice}
+                >
+                  {visibleNotice}
+                </Text>
+              ) : null}
+
+              <PrimaryButton
+                disabled={
+                  isSubmitting ||
+                  !email.trim() ||
+                  (mode === "signUp" && !fullName.trim()) ||
+                  (mode !== "recover" && !password) ||
+                  (mode === "signUp" && password.length < 8)
+                }
+                label={isSubmitting ? "A processar…" : modeContent[mode].button}
+                onPress={submitAuth}
+              />
+            </View>
+
+            <View style={styles.links}>
+              {mode === "signIn" && (
+                <>
+                  <TextLink
+                    label="Criar conta"
+                    onPress={() => changeMode("signUp")}
+                  />
+                  <TextLink
+                    label="Esqueci-me da palavra-passe"
+                    onPress={() => changeMode("recover")}
+                  />
+                </>
+              )}
+              {mode !== "signIn" && (
+                <TextLink
+                  label="Voltar a iniciar sessão"
+                  onPress={() => changeMode("signIn")}
+                />
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setNotice("");
+    setIsError(false);
+  }
+}
+
+function Brand() {
+  return (
+    <>
+      <Text style={styles.eyebrow}>POUPAR EM CONJUNTO</Text>
+      <Text style={styles.brand}>SpendWise</Text>
+    </>
+  );
+}
+
+function PrimaryButton({
+  disabled = false,
+  label,
+  onPress,
+}: {
+  disabled?: boolean;
+  label: string;
+  onPress: () => void | Promise<void>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.primaryButton, disabled && styles.disabledButton]}
+    >
+      <Text style={styles.primaryButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8}>
+      <Text style={styles.link}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  safeArea: { flex: 1, backgroundColor: "#f5f7f2" },
+  flex: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  centered: {
     flex: 1,
-    backgroundColor: "#f5f7f2",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
   },
-  container: {
+  content: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 28,
     paddingVertical: 48,
-    maxWidth: 760,
+    maxWidth: 560,
     width: "100%",
     alignSelf: "center",
   },
@@ -47,34 +351,60 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.8,
-    marginBottom: 12,
   },
-  title: {
+  brand: {
     color: "#18291f",
-    fontSize: 44,
+    fontSize: 34,
     fontWeight: "700",
-    letterSpacing: -1.5,
+    letterSpacing: -1,
+    marginTop: 6,
   },
+  title: { color: "#18291f", fontSize: 26, fontWeight: "700", marginTop: 34 },
   description: {
     color: "#4c5d52",
-    fontSize: 18,
-    lineHeight: 28,
-    marginTop: 16,
-    maxWidth: 520,
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 10,
   },
-  platforms: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 28,
-  },
-  platform: {
+  email: {
     color: "#234b34",
-    backgroundColor: "#e3eee5",
-    borderRadius: 999,
-    overflow: "hidden",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
+    marginTop: 24,
+    marginBottom: 20,
   },
+  loadingText: { color: "#4c5d52", fontSize: 14 },
+  code: { fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  form: { gap: 10, marginTop: 28 },
+  label: { color: "#26382d", fontSize: 14, fontWeight: "600", marginTop: 8 },
+  input: {
+    minHeight: 48,
+    borderColor: "#bdcbbf",
+    borderWidth: 1,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    color: "#18291f",
+    paddingHorizontal: 14,
+    fontSize: 16,
+  },
+  primaryButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#285c3c",
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    marginTop: 10,
+  },
+  disabledButton: { opacity: 0.55 },
+  primaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  links: { alignItems: "flex-start", gap: 18, marginTop: 22 },
+  link: {
+    color: "#285c3c",
+    fontSize: 15,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+  notice: { color: "#285c3c", fontSize: 14, lineHeight: 20, marginTop: 10 },
+  error: { color: "#a33024", fontSize: 14, lineHeight: 20, marginTop: 10 },
 });
