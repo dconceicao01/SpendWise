@@ -5,7 +5,7 @@
 
 ## Contexto
 
-SpendWise é uma aplicação de registo de poupanças e colaboração para web, Android e iOS. Os utilizadores introduzem valores manualmente; o MVP não inicia pagamentos nem se liga a bancos. Os dados são pessoais e devem ser tratados como confidenciais. O produto precisa de uma API de domínio e de ambientes de teste e produção isolados.
+SpendWise é uma aplicação multiplataforma de orçamentos por envelopes e colaboração para web, Android e iOS. Os utilizadores definem categorias e percentagens, registam rendimentos e despesas virtuais; num orçamento partilhado os rendimentos entram num fundo comum. O MVP não inicia pagamentos nem se liga a bancos. Os dados são pessoais e devem ser tratados como confidenciais. O produto precisa de uma API de domínio e de ambientes de teste e produção isolados.
 
 ## Decisão
 

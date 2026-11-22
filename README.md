@@ -1,19 +1,21 @@
 # SpendWise
 
-O SpendWise é uma aplicação multiplataforma para organizar objetivos de poupança, acompanhar depósitos e colaborar em poupanças partilhadas. O produto não movimenta dinheiro nem se liga a bancos no MVP: regista valores introduzidos pelos utilizadores.
+O SpendWise é uma aplicação multiplataforma de orçamentos por envelopes: cada utilizador define categorias e percentagens para distribuir rendimentos registados e acompanha despesas e saldos virtuais. Orçamentos podem ser individuais ou partilhados. Num orçamento partilhado, os rendimentos de todos os membros alimentam o mesmo fundo comum e são distribuídos pelas categorias e percentagens escolhidas pelo grupo. O produto não movimenta dinheiro nem se liga a bancos: os valores servem apenas para organização e acompanhamento.
 
 > **Estado:** scaffold técnico inicial para web, Android e iOS. Os fluxos funcionais e as decisões marcadas como “a confirmar” têm de ser fechados antes da produção.
+
+**Períodos do orçamento:** o utilizador define as datas de cada período. Cada período é independente: saldos positivos e negativos ficam no período onde ocorreram e não alteram o saldo inicial do seguinte. Rendimentos, despesas e ajustes ficam associados a um período. As estatísticas anuais podem agregar os movimentos pela data efetiva, mesmo quando um período atravessa dois anos; uma correção de despesa mantém a data e o período originais.
 
 ## Produto
 
 ### Módulos do MVP
 
 1. **Conta e perfil** — registo, início e saída de sessão, recuperação de acesso, perfil mínimo e eliminação de conta.
-2. **Poupanças** — criação, edição, arquivo/eliminação, objetivo opcional, moeda, privacidade e frequência pretendida.
-3. **Categorias e alocações** — categorias por poupança e distribuição percentual que totaliza 100%; cada depósito guarda uma cópia dos valores usados naquele momento.
-4. **Partilha** — convites, membros e permissões `OWNER`, `CONTRIBUTOR` e `VIEWER`; cada membro só vê os dados a que a poupança partilhada lhe dá acesso.
-5. **Depósitos e histórico** — registo manual, histórico cronológico e relatórios. Depósitos “recorrentes” são lembretes no MVP, não débitos bancários automáticos.
-6. **Dashboard** — saldos registados, progresso de objetivos, contribuições e atividade recente.
+2. **Orçamentos** — criação individual ou partilhada, moeda, membros e papéis `OWNER`, `CONTRIBUTOR` e `VIEWER`.
+3. **Categorias e alocações** — categorias criadas pelo utilizador e percentagens configuráveis que totalizam 100%; cada rendimento regista um snapshot da distribuição aplicada.
+4. **Rendimentos** — registo manual e agendamentos configuráveis pelo utilizador; cada entrada associa-se a um período e, em orçamentos partilhados, integra o fundo comum.
+5. **Despesas e ajustes** — movimentos associados ao período e à categoria; ajustes auditáveis preservam o histórico original.
+6. **Dashboard** — saldos virtuais por categoria, totais, atividade recente e estatísticas anuais agregadas. “Poupanças” pode ser apenas uma categoria definida pelo utilizador.
 7. **Privacidade e suporte** — exportação, correção e pedidos de apagamento de dados, gestão de consentimentos quando aplicável e canal de contacto.
 
 ### Fora do MVP
@@ -57,7 +59,7 @@ Não copiar dados de produção para staging. Alterações ao esquema são migra
 
 ## Segurança e privacidade
 
-Privacidade por defeito, minimização de dados, autenticação forte, autorização por poupança, RLS em todas as tabelas expostas, registos sem segredos ou valores financeiros desnecessários, gestão de vulnerabilidades, exportação/eliminação e resposta a incidentes fazem parte dos requisitos do produto. Os controlos e as obrigações operacionais estão em [privacidade e segurança](docs/privacy-security.md).
+Privacidade por defeito, minimização de dados, autenticação forte, autorização por orçamento, RLS em todas as tabelas expostas, registos sem segredos ou valores desnecessários, gestão de vulnerabilidades, exportação/eliminação e resposta a incidentes fazem parte dos requisitos do produto. Os controlos e as obrigações operacionais estão em [privacidade e segurança](docs/privacy-security.md).
 
 Esta documentação é uma base de engenharia, não um parecer jurídico nem uma declaração de conformidade. Antes do lançamento, o responsável pelo tratamento deve validar base legal por finalidade, avisos de privacidade, prazos de conservação, contratos com subcontratantes, transferências internacionais, necessidade de AIPD/DPO e os direitos dos titulares com apoio jurídico/DPO.
 
@@ -73,7 +75,7 @@ Esta documentação é uma base de engenharia, não um parecer jurídico nem uma
 
 1. Validar modelo de domínio, partilha e permissões.
 2. Criar projetos Supabase local/staging/produção e migrações RLS testadas.
-3. Construir autenticação, poupanças, categorias e depósitos.
+3. Construir autenticação, orçamentos, categorias, rendimentos, despesas e ajustes.
 4. Construir partilha, dashboard, exportação e eliminação de conta.
 5. Completar avaliação de privacidade, segurança, recuperação e operação antes do lançamento.
 
