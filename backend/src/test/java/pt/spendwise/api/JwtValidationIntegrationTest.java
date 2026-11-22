@@ -32,7 +32,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "SUPABASE_URL=http://127.0.0.1:54321",
+        "SUPABASE_PUBLISHABLE_KEY=test-publishable-key"
+})
 @AutoConfigureMockMvc
 class JwtValidationIntegrationTest {
 

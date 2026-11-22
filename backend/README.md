@@ -15,10 +15,14 @@ No PowerShell, a partir de `backend/`:
 
 ```powershell
 $env:SUPABASE_ISSUER_URI = "http://127.0.0.1:54321/auth/v1"
+$env:SUPABASE_URL = "http://127.0.0.1:54321"
+$env:SUPABASE_PUBLISHABLE_KEY = "<chave publishable do projeto>"
 .\mvnw.cmd spring-boot:run
 ```
 
 Spring Security Resource Server obtém as chaves públicas em `{SUPABASE_ISSUER_URI}/.well-known/jwks.json` e valida assinatura, `iss`, `exp` e `aud=authenticated`; tokens anónimos (`aud=anon`) são recusados. O projeto Supabase deve emitir tokens com uma chave de assinatura publicada no JWKS; uma chave legacy simétrica não satisfaz este fluxo. `GET /api/v1/health` é público; os restantes endpoints exigem Bearer JWT válido. Os erros de autenticação não incluem tokens nem claims na resposta. A API mantém erros técnicos independentes do idioma; a interface deve traduzir os códigos/estados para a língua selecionada pelo utilizador.
+
+Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados; não configurar nem encaminhar uma `service_role` key.
 
 Para executar os testes:
 
@@ -26,10 +30,18 @@ Para executar os testes:
 .\mvnw.cmd verify
 ```
 
+O teste opcional `SupabaseDataApiLocalIntegrationTest` comprova a passagem do JWT pelo cliente Java até ao gateway Supabase e o isolamento de perfis via RLS. Para o executar, inicia a stack local em `Database/`, define no processo atual `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SPENDWISE_LOCAL_SUPABASE_ADMIN_KEY` (a `SERVICE_ROLE_KEY` obtida do estado local apenas para criar/apagar utilizadores sintéticos) e corre:
+
+```powershell
+.\mvnw.cmd "-Dspendwise.local.supabase=true" "-Dtest=SupabaseDataApiLocalIntegrationTest" test
+```
+
+Este teste é opt-in e cria utilizadores `@example.invalid` e perfis sintéticos que são apagados no cleanup. Não usar uma chave de produção nem guardar a chave administrativa em ficheiros.
+
 Cada serviço/use case novo deve ter testes unitários para cenários válidos, inválidos e limites importantes, sem rede nem dependência de contexto Spring. Integração com Supabase/PostgreSQL, RLS e HTTP fica coberta por testes de integração separados. Ver os [princípios de desenvolvimento](../docs/development-principles.md).
 
 O endpoint de disponibilidade é `GET /api/v1/health` e devolve `{"status":"UP"}`. O contrato OpenAPI é servido em `/api-docs` e a interface local está em `/api-docs/ui`.
 
 ## Limites deste scaffold
 
-A API valida autenticação JWT Supabase, mas ainda não implementa autorização por membership, persistência, integração à Data API nem regras de domínio. Nas tarefas seguintes, a API usará o JWT do utilizador nas chamadas à Data API sob RLS. Não introduzir `service_role`, ligações privilegiadas à base de dados, segredos ou URLs de ambientes neste repositório.
+A API valida autenticação JWT Supabase e dispõe de um cliente de transporte para a Data API com o JWT original do utilizador; ainda não existem repositórios/use-cases de domínio, autorização por membership na camada Spring, nem endpoints funcionais de negócio. RLS continua a ser aplicada pela Data API. Não introduzir `service_role`, ligações privilegiadas à base de dados, segredos ou URLs de ambientes neste repositório.
