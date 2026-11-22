@@ -8,7 +8,9 @@ Os componentes devem manter interfaces pequenas: poucos parâmetros necessários
 
 Copiar `frontend/.env.example` para `frontend/.env` e preencher apenas `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` do projeto Supabase local. São valores públicos; nunca colocar uma `service_role` ou secret key em variáveis `EXPO_PUBLIC_*`. Reiniciar o Expo depois de alterar variáveis.
 
-O Supabase Auth usa PKCE, confirmação de e-mail e recuperação de palavra-passe. O URL `spendwise://auth/callback` deve constar na allowlist de redirects do Supabase Auth para Android/iOS. Para web, adicionar apenas o URL local/HTTPS de cada ambiente. A conta Supabase e o fornecedor de hosting ainda não estão ligados ao repositório, pelo que esta configuração externa é necessária para testar os e-mails e callbacks.
+O Supabase Auth usa PKCE, confirmação de e-mail e recuperação de palavra-passe. O URL `spendwise://auth/callback` deve constar na allowlist de redirects do Supabase Auth para Android/iOS. Para web, adicionar apenas o URL local/HTTPS de cada ambiente. A configuração local permite `http://localhost:8081/auth/callback` e `http://127.0.0.1:8081/auth/callback`. A conta Supabase e o fornecedor de hosting ainda não estão ligados ao repositório, pelo que esta configuração externa é necessária para testar os e-mails e callbacks.
+
+Para testar callbacks de e-mail no telemóvel, usar uma development build que inclua o scheme `spendwise`. O Expo Go usa um endereço `exp://` próprio e não recebe estes callbacks com scheme personalizado.
 
 Sessões móveis ficam em Expo SecureStore; sessões web em `sessionStorage` e terminam quando o separador fecha. A sessão web é acessível a JavaScript: manter CSP por cabeçalhos HTTP e prevenção de XSS. Consultar [privacidade e segurança](../docs/privacy-security.md) antes de configurar hosting.
 
