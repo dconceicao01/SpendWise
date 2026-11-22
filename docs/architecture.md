@@ -39,7 +39,7 @@ O redirect de confirmação e recuperação usa `spendwise://auth/callback` em a
 | Categorias e alocações | Membros ativos leem; OWNER cria/renomeia/arquiva categorias e gere rascunhos. RPCs `SECURITY INVOKER` derivam a membership de `auth.uid()` e criam/substituem itens de forma atómica. A ativação valida categorias ativas e soma de 100%, guarda `effective_from`; itens de versões ativas/retiradas são imutáveis. |
 | Rendimentos, despesas e ajustes | Membros ativos leem o fundo comum; OWNER/CONTRIBUTOR registam, sem atualizar/apagar movimentos. Rendimento usa `record_income`. |
 | Preferências de lembrete | Cada membro ativo lê e altera apenas a própria preferência. |
-| Convites | OWNER lê e gere metadados; a aceitação do destinatário é feita por token num fluxo dedicado do MVP-16. O hash do token não é legível pela Data API. |
+| Convites | OWNER cria e gere metadados; recebe um link de utilização única para copiar e partilhar. O segredo de 256 bits é descartável, apenas o SHA-256 é persistido e o token viaja no fragmento do URL. A RPC de aceitação valida email Auth confirmado, expiração e utilização única, e cria membership atomicamente. Aceitação: 5 tentativas/utilizador/15 min; criação: 10/orçamento/hora. Emails são removidos quando aceites/revogados e convites expirados são apagados 30 dias após a expiração. O hash do token não é legível pela Data API. |
 | Auditoria | Membros ativos leem o histórico; clientes não escrevem eventos diretamente. |
 | Membership removida e utilizador externo | Sem acesso aos dados do orçamento. Utilizadores anonimizados também não conseguem recuperar a associação anterior. |
 
