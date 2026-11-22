@@ -4,7 +4,7 @@ O SpendWise é uma aplicação multiplataforma de orçamentos por envelopes: cad
 
 > **Estado:** scaffold técnico inicial para web, Android e iOS. Os fluxos funcionais e as decisões marcadas como “a confirmar” têm de ser fechados antes da produção.
 
-**Períodos do orçamento:** o utilizador define as datas de cada período e escolhe na criação do orçamento se o saldo não gasto transita para o período seguinte. Rendimentos, despesas e ajustes ficam associados a um período. As estatísticas anuais agregam movimentos pela data efetiva, mesmo quando um período atravessa dois anos; uma correção de despesa mantém a data e o período originais.
+**Períodos do orçamento:** o utilizador define as datas de cada período e escolhe na criação do orçamento se o saldo positivo não gasto transita para o período seguinte. Défices nunca transitam: ficam no período onde ocorreram e podem aparecer nas estatísticas anuais. Rendimentos, despesas e ajustes ficam associados a um período. As estatísticas anuais agregam movimentos pela data efetiva, mesmo quando um período atravessa dois anos; uma correção de despesa mantém a data e o período originais.
 
 ## Produto
 
