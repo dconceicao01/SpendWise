@@ -4,6 +4,8 @@ O SpendWise é uma aplicação multiplataforma de orçamentos por envelopes: cad
 
 > **Estado:** scaffold técnico inicial para web, Android e iOS. Os fluxos funcionais e as decisões marcadas como “a confirmar” têm de ser fechados antes da produção.
 
+**Períodos do orçamento:** o utilizador define as datas de cada período e escolhe na criação do orçamento se o saldo não gasto transita para o período seguinte. Rendimentos, despesas e ajustes ficam associados a um período. As estatísticas anuais agregam movimentos pela data efetiva, mesmo quando um período atravessa dois anos; uma correção de despesa mantém a data e o período originais.
+
 ## Produto
 
 ### Módulos do MVP
@@ -11,9 +13,9 @@ O SpendWise é uma aplicação multiplataforma de orçamentos por envelopes: cad
 1. **Conta e perfil** — registo, início e saída de sessão, recuperação de acesso, perfil mínimo e eliminação de conta.
 2. **Orçamentos** — criação individual ou partilhada, moeda, membros e papéis `OWNER`, `CONTRIBUTOR` e `VIEWER`.
 3. **Categorias e alocações** — categorias criadas pelo utilizador e percentagens configuráveis que totalizam 100%; cada rendimento regista um snapshot da distribuição aplicada.
-4. **Rendimentos** — registo manual e agendamentos configuráveis pelo utilizador; em orçamentos partilhados, todas as entradas integram o fundo comum.
-5. **Despesas e ajustes** — despesas associadas a categorias e ajustes de contas auditáveis, sem apagar o histórico original.
-6. **Dashboard** — saldos virtuais por categoria, totais e atividade recente. “Poupanças” pode ser apenas uma categoria definida pelo utilizador.
+4. **Rendimentos** — registo manual e agendamentos configuráveis pelo utilizador; cada entrada associa-se a um período e, em orçamentos partilhados, integra o fundo comum.
+5. **Despesas e ajustes** — movimentos associados ao período e à categoria; ajustes auditáveis preservam o histórico original.
+6. **Dashboard** — saldos virtuais por categoria, totais, atividade recente e estatísticas anuais agregadas. “Poupanças” pode ser apenas uma categoria definida pelo utilizador.
 7. **Privacidade e suporte** — exportação, correção e pedidos de apagamento de dados, gestão de consentimentos quando aplicável e canal de contacto.
 
 ### Fora do MVP
