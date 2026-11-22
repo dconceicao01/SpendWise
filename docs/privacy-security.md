@@ -2,7 +2,7 @@
 
 ## Princípio de implementação
 
-O SpendWise trata dados de conta e informação sobre hábitos/objetivos e valores de poupança. Tratar estes dados como confidenciais e de impacto potencialmente elevado, mesmo sem integração bancária. Aplicar minimização, finalidade explícita, privacidade por defeito, controlo de acesso e segurança desde a conceção.
+O SpendWise trata dados de conta e informação sobre hábitos de orçamento e valores registados. Tratar estes dados como confidenciais, mesmo sem integração bancária. Aplicar minimização, finalidade explícita, privacidade por defeito, controlo de acesso e segurança desde a conceção.
 
 Esta página traduz requisitos em controlos de produto e engenharia; não certifica conformidade. A entidade que operar o serviço tem de identificar o responsável pelo tratamento, finalidades e bases legais, informar as pessoas, estabelecer contratos, atender direitos e avaliar riscos reais. Obter revisão jurídica/DPO antes de produção.
 
@@ -11,9 +11,9 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 | Área | Requisito de produto/engenharia | Evidência antes de produção |
 |---|---|---|
 | Finalidade e base legal | Registar finalidade e base legal para cada operação. Consentimento é usado quando essa é a base adequada e deve ser específico, informado e revogável; não marcar todo o tratamento como “consentimento”. | Registo de atividades, mapa de dados, avisos e consentimentos versionados. |
-| Minimização e privacidade por defeito | Recolher só e-mail e nome opcional necessários; poupanças são privadas por defeito; partilha só após convite aceite; não pedir dados bancários/cartões no MVP. | Inventário de campos, definições de privacidade e revisão dos ecrãs/formulários. |
+| Minimização e privacidade por defeito | Recolher e-mail e nome obrigatório; telefone é opcional e apenas necessário se for usado para MFA por SMS. Orçamentos são privados por defeito; partilha só após convite aceite; não pedir morada, dados bancários ou cartões no MVP sem finalidade aprovada. | Inventário de campos, definições de privacidade e revisão dos ecrãs/formulários. |
 | Transparência | Informar identidade/contacto do responsável, finalidades, bases legais, destinatários/subprocessadores, transferências, prazos de retenção, direitos e como reclamar junto da autoridade competente. | Aviso de privacidade revisto juridicamente e acessível no registo e na aplicação. |
-| Direitos das pessoas | Fluxo autenticado para acesso/exportação, retificação, apagamento, limitação/oposição quando aplicáveis e retirada de consentimento; verificar identidade de modo proporcional e registar atendimento. | Testes de exportação/eliminação, procedimento operacional, SLA interno e registo de pedidos. |
+| Direitos das pessoas | Fluxo autenticado para acesso/exportação, retificação, apagamento, limitação/oposição quando aplicáveis e retirada de consentimento; verificar identidade de modo proporcional e registar atendimento. Ao apagar conta, eliminar orçamento pessoal; nos partilhados, transferir propriedade quando necessário, retirar membership e pseudonimizar autoria, preservando o histórico comum acordado. Dados pseudonimizados continuam sujeitos a avaliação de finalidade e retenção. | Testes de exportação/eliminação, procedimento operacional, SLA interno e registo de pedidos. |
 | Retenção | Definir prazo por categoria de dados e finalidade. Eliminar ou anonimizar quando já não necessário; documentar exceções legais. Definir quando cópias de segurança expiram e o que significa eliminação nelas. | Tabela de retenção aprovada, tarefas de limpeza e teste de restauro/expiração. |
 | Segurança (Art. 32) | Criptografia em trânsito, cifragem em repouso fornecida pelo serviço e verificada no plano contratado, RBAC/RLS, MFA para operadores, segredos rotacionáveis, patching, revisão, testes e recuperação. | Threat model, resultados de testes, configuração e plano de continuidade. |
 | Subcontratantes e transferências | Rever DPA, subprocessadores, suporte, localização de dados/backups e mecanismo de transferência internacional de cada fornecedor. A preferência por região UE não substitui esta avaliação. | Inventário de fornecedores, DPAs e avaliação de transferências/contratos. |
@@ -25,9 +25,9 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 ## Modelo de autorização
 
 - Cada tabela em schema exposto tem RLS ativa, grants mínimos e políticas `SELECT`, `INSERT`, `UPDATE` e `DELETE` definidas por modelo de ameaça.
-- A API valida o JWT Supabase e faz autorização do recurso; RLS aplica uma segunda barreira por `auth.uid()` e pertença a `savings_members`.
+- A API valida o JWT Supabase e faz autorização do recurso; RLS aplica uma segunda barreira por `auth.uid()` e pertença a `budget_members`.
 - A ligação de dados opera com claims verificados e contexto de transação `authenticated` ou passa o JWT à Data API. Testar que contexto não vaza entre conexões pooled. **Não** operar pedidos comuns com `service_role`, superuser ou papel que contorne RLS.
-- `OWNER`, `CONTRIBUTOR`, `VIEWER` são papéis locais à poupança. Guardar a relação no banco e validar sempre o papel atual; não confiar em role fornecida pelo cliente nem em `user_metadata` de JWT.
+- `OWNER`, `CONTRIBUTOR`, `VIEWER` são papéis locais ao orçamento. Guardar a relação no banco e validar sempre o papel atual; não confiar em role fornecida pelo cliente nem em `user_metadata` de JWT.
 - Convites têm token imprevisível, guardar apenas hash, validade limitada, uso único, revogação, rate limiting e resposta que não revele se um e-mail já tem conta.
 - Views são avaliadas quanto a `security_invoker`/RLS e grants; funções com `SECURITY DEFINER` são exceção, não padrão, e exigem `search_path` fixo, autorização explícita e revisão de segurança.
 - Testar cada política com utilizador A, utilizador B, membro removido, owner, contributor, viewer e visitante não autenticado. Testes cobrem leitura, escrita, alteração de proprietário/IDs e acesso a identificadores adivinhados (BOLA/IDOR).

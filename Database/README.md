@@ -21,12 +21,12 @@ Para parar os containers: `pnpm db:stop`. A stack local contém serviços de des
 
 ## Migrações e seeds
 
-Criar migrações com a CLI, depois de o modelo de domínio ser aprovado:
+Criar migrações com a CLI, preservando o timestamp e nome gerados:
 
 ```powershell
 pnpm exec supabase migration new <nome-descritivo> --workdir .
 ```
 
-O `seed.sql` só deve conter dados sintéticos. A definição de tabelas, grants, RLS e dados de seed aguarda a conclusão das decisões de produto e privacidade. Configuração local de Auth não deve ser copiada para um projeto de produção sem revisão.
+O `seed.sql` só deve conter dados sintéticos. A migration inicial do domínio está em `supabase/migrations/` e inclui perfis, orçamentos, membros, convites, categorias configuráveis, percentagens de alocação, rendimentos e snapshots, despesas, ajustes, lembretes e auditoria. Todas as tabelas públicas têm RLS ativa e permanecem sem políticas até à revisão de autorização/RLS de MVP-08; a Data API não deve ser usada como funcionalidade de produto ainda. Num orçamento partilhado, as alocações e saldos pertencem ao fundo comum do orçamento, mantendo-se a origem de cada rendimento para histórico. Configuração local de Auth não deve ser copiada para um projeto de produção sem revisão.
 
 A CLI 3 usa a stack local por defeito; operações em projetos alojados precisam de `--remote` e aprovação. Não guardar tokens, passwords, chaves, dados pessoais reais nem cópias de produção nesta pasta.
