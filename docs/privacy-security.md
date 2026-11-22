@@ -74,3 +74,7 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 - [Supabase — Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Supabase — JWT](https://supabase.com/docs/guides/auth/jwts)
 - [Supabase — ligação a PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+### Identidade em orçamentos partilhados
+
+Membros ativos podem ver apenas o nome de perfil de outros membros ativos no mesmo orçamento, para identificar as pessoas que colaboram no fundo comum. Se o perfil ainda não existir, usa-se apenas o nome do metadata Auth fornecido no registo. Email, telefone, `user_id` e outros campos de perfil não são expostos. A RPC `list_budget_members` exige que o JWT atual tenha membership ativa no orçamento e limita os resultados a esse orçamento; perfis continuam sem acesso direto por RLS. Se a membership for removida, pedidos seguintes deixam de devolver nomes ou permitir acesso.
