@@ -25,8 +25,6 @@ create table public.budgets (
         check (budget_type in ('PERSONAL', 'SHARED')),
     currency_code text not null
         check (currency_code ~ '^[A-Z]{3}$'),
-    unspent_balance_policy text not null
-        check (unspent_balance_policy in ('CARRY_FORWARD', 'RESET')),
     owner_member_id uuid not null,
     owner_role text not null default 'OWNER'
         check (owner_role = 'OWNER'),
