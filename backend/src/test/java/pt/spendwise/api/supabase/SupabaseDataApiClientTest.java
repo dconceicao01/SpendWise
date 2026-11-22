@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class SupabaseDataApiClientTest {
@@ -93,6 +94,57 @@ class SupabaseDataApiClientTest {
                 }))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid Supabase relation name");
+
+        mockServer.verify();
+    }
+
+    @Test
+    void callsOnlyValidatedRpcFunctionsWithTheCurrentUserIdentity() {
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/rpc/create_budget"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
+                .andExpect(header("apikey", PUBLISHABLE_KEY))
+                .andExpect(content().json("{\"p_name\":\"Travel\",\"p_budget_type\":\"PERSONAL\",\"p_currency_code\":\"EUR\"}"))
+                .andRespond(withSuccess("[{\"budget_id\":\"ed7a90f2-f8f1-4f72-b5e5-1e4a09c20f66\"}]", MediaType.APPLICATION_JSON));
+
+        String response = supabaseDataApiClient.callFunction(
+                "create_budget",
+                Map.of("p_name", "Travel", "p_budget_type", "PERSONAL", "p_currency_code", "EUR"),
+                new ParameterizedTypeReference<>() {
+                });
+
+        org.assertj.core.api.Assertions.assertThat(response)
+                .contains("ed7a90f2-f8f1-4f72-b5e5-1e4a09c20f66");
+        mockServer.verify();
+    }
+
+    @Test
+    void includesRepresentationPreferenceWhenUpdatingRows() {
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budgets?id=eq.ed7a90f2-f8f1-4f72-b5e5-1e4a09c20f66"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header("Prefer", "return=representation"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        supabaseDataApiClient.requestReturningRepresentation(
+                HttpMethod.PATCH,
+                "budgets",
+                Map.of("id", "eq.ed7a90f2-f8f1-4f72-b5e5-1e4a09c20f66"),
+                Map.of("name", "Trip"),
+                new ParameterizedTypeReference<String>() {
+                });
+
+        mockServer.verify();
+    }
+
+    @Test
+    void rejectsInvalidFunctionNamesBeforeSendingARequest() {
+        assertThatThrownBy(() -> supabaseDataApiClient.callFunction(
+                "create_budget;drop table budgets",
+                Map.of(),
+                new ParameterizedTypeReference<String>() {
+                }))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid Supabase function name");
 
         mockServer.verify();
     }
