@@ -18,7 +18,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "SUPABASE_ISSUER_URI=http://127.0.0.1:54321/auth/v1")
+@SpringBootTest(properties = {
+        "SUPABASE_ISSUER_URI=http://127.0.0.1:54321/auth/v1",
+        "SUPABASE_URL=http://127.0.0.1:54321",
+        "SUPABASE_PUBLISHABLE_KEY=test-publishable-key"
+})
 @AutoConfigureMockMvc
 class SecurityConfigurationTest {
 
