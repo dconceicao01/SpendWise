@@ -24,3 +24,8 @@ springdoc:
     path: /api-docs
   swagger-ui:
     path: /api-docs/ui
+
+spendwise:
+  invitation:
+    base-url: ${SPENDWISE_INVITATION_BASE_URL:http://localhost:8081/invitations/accept}
+    ttl: ${SPENDWISE_INVITATION_TTL:PT168H}
