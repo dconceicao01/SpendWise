@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "SUPABASE_ISSUER_URI=http://127.0.0.1:54321/auth/v1")
 @AutoConfigureMockMvc
 class HealthControllerTest {
 

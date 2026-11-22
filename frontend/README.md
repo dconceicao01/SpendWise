@@ -14,6 +14,10 @@ Para testar callbacks de e-mail no telemóvel, usar uma development build que in
 
 Sessões móveis ficam em Expo SecureStore; sessões web em `sessionStorage` e terminam quando o separador fecha. A sessão web é acessível a JavaScript: manter CSP por cabeçalhos HTTP e prevenção de XSS. Consultar [privacidade e segurança](../docs/privacy-security.md) antes de configurar hosting.
 
+## Idiomas
+
+O produto deve suportar duas línguas. Os idiomas, o fallback e a forma de guardar a preferência ainda precisam de confirmação do Product Owner. Ao criar novos ecrãs, manter o texto de interface num ponto central de tradução em vez de o espalhar pelos componentes; definir a biblioteca e as regras de seleção antes de ampliar os fluxos da aplicação.
+
 ## Requisitos
 
 - Node.js 24 LTS
