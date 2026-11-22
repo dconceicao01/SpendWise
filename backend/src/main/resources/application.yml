@@ -1,6 +1,14 @@
 spring:
   application:
     name: spendwise-api
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SUPABASE_ISSUER_URI}
+          jwk-set-uri: ${SUPABASE_ISSUER_URI}/.well-known/jwks.json
+          audiences:
+            - authenticated
   mvc:
     problemdetails:
       enabled: true
