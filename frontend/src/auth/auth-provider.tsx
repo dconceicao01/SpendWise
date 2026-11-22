@@ -21,12 +21,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     });
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) {
-        setSession(data.session);
-        setIsLoading(false);
-      }
-    });
+    void supabase.auth.getSession().then(
+      ({ data }) => {
+        if (isMounted) {
+          setSession(data.session);
+          setIsLoading(false);
+        }
+      },
+      () => {
+        if (isMounted) {
+          setSession(null);
+          setIsLoading(false);
+        }
+      },
+    );
 
     return () => {
       isMounted = false;

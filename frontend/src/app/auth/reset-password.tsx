@@ -21,24 +21,43 @@ export default function ResetPasswordScreen() {
 
     setIsSubmitting(true);
     setIsError(false);
-    const activeSession =
-      session ?? (await supabase.auth.getSession()).data.session;
-    if (!activeSession) {
-      setIsSubmitting(false);
-      setIsError(true);
-      setNotice("A ligação expirou. Pede uma nova recuperação de acesso.");
-      return;
-    }
-    const { error } = await supabase.auth.updateUser({ password });
-    setIsSubmitting(false);
-    if (error) {
-      setIsError(true);
-      setNotice("Não foi possível atualizar a palavra-passe. Tenta novamente.");
-      return;
-    }
+    try {
+      const activeSession =
+        session ?? (await supabase.auth.getSession()).data.session;
+      if (!activeSession) {
+        setIsError(true);
+        setNotice("A ligação expirou. Pede uma nova recuperação de acesso.");
+        return;
+      }
 
-    await supabase.auth.signOut({ scope: "local" });
-    router.replace("/?passwordChanged=1");
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setIsError(true);
+        setNotice(
+          "Não foi possível atualizar a palavra-passe. Tenta novamente.",
+        );
+        return;
+      }
+
+      const { error: signOutError } = await supabase.auth.signOut({
+        scope: "local",
+      });
+      if (signOutError) {
+        setIsError(true);
+        setNotice(
+          "A palavra-passe foi atualizada. Termina a sessão e inicia novamente.",
+        );
+        return;
+      }
+      router.replace("/?passwordChanged=1");
+    } catch {
+      setIsError(true);
+      setNotice(
+        "Não foi possível concluir a operação. Pede uma nova ligação e tenta novamente.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (

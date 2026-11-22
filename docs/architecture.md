@@ -18,7 +18,7 @@ flowchart LR
 
 ### Caminho de uma chamada autenticada
 
-1. O utilizador regista-se, inicia sessão ou recupera o acesso pelo Supabase Auth com fluxo PKCE. No iOS/Android, a sessão persistida usa Expo SecureStore e fica acessível apenas com o dispositivo desbloqueado. Na web, usa `sessionStorage`: sobrevive a recargas no mesmo separador e é removida quando este termina. JavaScript da página consegue ler a sessão web, por isso CSP, prevenção de XSS e controlo de dependências continuam necessários. Palavras-passe nunca são guardadas pela aplicação.
+1. O utilizador regista-se, inicia sessão ou recupera o acesso pelo Supabase Auth com fluxo PKCE. No iOS/Android, a sessão persistida usa Expo SecureStore, fica acessível apenas com o dispositivo desbloqueado e é dividida em blocos abaixo do limite por valor do sistema. Na web, usa `sessionStorage`: sobrevive a recargas no mesmo separador e é removida quando este termina. JavaScript da página consegue ler a sessão web, por isso CSP, prevenção de XSS e controlo de dependências continuam necessários. Palavras-passe nunca são guardadas pela aplicação.
 2. O frontend envia `Authorization: Bearer <access-token>` à API Spring por HTTPS.
 3. Spring Security valida assinatura, emissor, expiração e claims do token usando o JWKS do projeto Supabase. O `sub` validado é a identidade do ator. Nunca aceitar um `userId` do corpo como prova de identidade.
 4. A API aplica validação de domínio e a Data API do Supabase aplica a autorização por linha e papel em cada pedido. Por exemplo, só `OWNER` altera configuração e membros; `OWNER`/`CONTRIBUTOR` registam rendimentos, despesas e ajustes; `VIEWER` só lê.
