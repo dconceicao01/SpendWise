@@ -170,7 +170,7 @@ create table public.budget_allocation_sets (
     budget_id uuid not null references public.budgets (id) on delete cascade,
     version integer not null check (version > 0),
     status text not null check (status in ('DRAFT', 'ACTIVE', 'RETIRED')),
-    effective_from date not null,
+    effective_from date not null default current_date,
     created_by_member_id uuid not null,
     created_at timestamptz not null default now(),
     unique (budget_id, id),
@@ -178,6 +178,44 @@ create table public.budget_allocation_sets (
     foreign key (budget_id, created_by_member_id)
         references public.budget_members (budget_id, id) on delete restrict
 );
+
+create function private.require_new_allocation_set_draft()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+begin
+    if new.status <> 'DRAFT' then
+        raise exception using
+            errcode = '23514',
+            message = 'An allocation set must be created as a draft';
+    end if;
+    return new;
+end;
+$function$;
+
+create trigger budget_allocation_sets_start_as_draft
+    before insert on public.budget_allocation_sets
+    for each row execute function private.require_new_allocation_set_draft();
+
+create function private.prevent_active_allocation_set_delete()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+begin
+    if old.status = 'ACTIVE' and pg_trigger_depth() = 1 then
+        raise exception using
+            errcode = '23514',
+            message = 'The active allocation set cannot be deleted directly';
+    end if;
+    return old;
+end;
+$function$;
+
+create trigger budget_allocation_sets_protect_active_delete
+    before delete on public.budget_allocation_sets
+    for each row execute function private.prevent_active_allocation_set_delete();
 
 create unique index budget_allocation_sets_one_active_idx
     on public.budget_allocation_sets (budget_id)
@@ -201,6 +239,236 @@ create table public.budget_allocation_items (
 
 create index budget_allocation_items_category_idx
     on public.budget_allocation_items (budget_id, category_id);
+
+create function private.prevent_archiving_allocated_category()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+begin
+    if old.archived_at is null and new.archived_at is not null then
+        perform pg_advisory_xact_lock(
+            hashtextextended(new.budget_id::text || ':allocation-activation', 0)
+        );
+
+        if exists (
+            select 1
+              from public.budget_allocation_items i
+              join public.budget_allocation_sets s
+                on s.budget_id = i.budget_id and s.id = i.allocation_set_id
+             where i.budget_id = new.budget_id
+               and i.category_id = new.id
+               and s.status = 'ACTIVE'
+        ) then
+            raise exception using
+                errcode = '23514',
+                message = 'A category in the active allocation must be removed before it can be archived';
+        end if;
+    end if;
+
+    return new;
+end;
+$function$;
+
+create trigger budget_categories_active_allocation_archive_guard
+    before update of archived_at on public.budget_categories
+    for each row execute function private.prevent_archiving_allocated_category();
+
+create function private.guard_draft_allocation_items()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+declare
+    item_budget_id uuid;
+    item_set_id uuid;
+    set_status text;
+begin
+    if tg_op = 'DELETE' and pg_trigger_depth() > 1 then
+        return old;
+    end if;
+
+    if tg_op = 'UPDATE'
+       and row(new.budget_id, new.allocation_set_id)
+           is distinct from row(old.budget_id, old.allocation_set_id) then
+        raise exception using
+            errcode = '23514',
+            message = 'An allocation item cannot be moved to another set';
+    end if;
+
+    if tg_op = 'DELETE' then
+        item_budget_id := old.budget_id;
+        item_set_id := old.allocation_set_id;
+    else
+        item_budget_id := new.budget_id;
+        item_set_id := new.allocation_set_id;
+    end if;
+
+    perform pg_advisory_xact_lock(
+        hashtextextended(item_budget_id::text || ':allocation:' || item_set_id::text, 0)
+    );
+
+    select status into set_status
+      from public.budget_allocation_sets
+     where budget_id = item_budget_id and id = item_set_id;
+
+    if not found and tg_op = 'DELETE' then
+        return old;
+    end if;
+    if not found or set_status <> 'DRAFT' then
+        raise exception using
+            errcode = '23514',
+            message = 'Allocation items can only change while their set is a draft';
+    end if;
+
+    if tg_op = 'DELETE' then
+        return old;
+    end if;
+    return new;
+end;
+$function$;
+
+create trigger budget_allocation_items_draft_only
+    before insert or update or delete on public.budget_allocation_items
+    for each row execute function private.guard_draft_allocation_items();
+
+create function private.validate_allocation_set_activation()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+declare
+    item_count bigint;
+    total_basis_points bigint;
+    active_category_count bigint;
+begin
+    if new.status = old.status then
+        return new;
+    end if;
+
+    if old.status = 'RETIRED'
+       or (old.status = 'ACTIVE' and new.status <> 'RETIRED')
+       or (old.status = 'DRAFT' and new.status not in ('ACTIVE', 'RETIRED')) then
+        raise exception using
+            errcode = '23514',
+            message = 'Invalid allocation set status transition';
+    end if;
+
+    if new.status <> 'ACTIVE' then
+        return new;
+    end if;
+
+    perform pg_advisory_xact_lock(
+        hashtextextended(new.budget_id::text || ':allocation-activation', 0)
+    );
+    perform pg_advisory_xact_lock(
+        hashtextextended(new.budget_id::text || ':allocation:' || new.id::text, 0)
+    );
+
+    select count(*), coalesce(sum(i.percentage_basis_points), 0),
+           count(*) filter (where c.archived_at is null)
+      into item_count, total_basis_points, active_category_count
+      from public.budget_allocation_items i
+      join public.budget_categories c
+        on c.budget_id = i.budget_id and c.id = i.category_id
+     where i.budget_id = new.budget_id
+       and i.allocation_set_id = new.id;
+
+    if item_count = 0 or total_basis_points <> 10000
+       or active_category_count <> item_count then
+        raise exception using
+            errcode = '23514',
+            message = 'An active allocation set needs active categories totaling 100 percent';
+    end if;
+
+    new.effective_from := current_date;
+
+    return new;
+end;
+$function$;
+
+create trigger budget_allocation_sets_validate_activation
+    before update of status on public.budget_allocation_sets
+    for each row execute function private.validate_allocation_set_activation();
+
+create function private.assert_active_allocation_replaced()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+begin
+    if old.status = 'ACTIVE' and new.status <> 'ACTIVE'
+       and not exists (
+           select 1
+             from public.budget_allocation_sets s
+            where s.budget_id = new.budget_id
+              and s.status = 'ACTIVE'
+       ) then
+        raise exception using
+            errcode = '23514',
+            message = 'A budget must retain an active allocation set';
+    end if;
+    return null;
+end;
+$function$;
+
+create constraint trigger budget_allocation_sets_keep_active
+    after update of status on public.budget_allocation_sets
+    deferrable initially deferred
+    for each row execute function private.assert_active_allocation_replaced();
+
+create function public.activate_budget_allocation_set(
+    p_budget_id uuid,
+    p_allocation_set_id uuid
+)
+returns void
+language plpgsql
+security invoker
+set search_path = pg_catalog
+as $function$
+declare
+    actor_role text;
+    target_status text;
+begin
+    if auth.uid() is null then
+        raise exception using errcode = '42501', message = 'Authentication is required';
+    end if;
+
+    select role into actor_role
+      from public.budget_members
+     where budget_id = p_budget_id
+       and user_id = auth.uid()
+       and removed_at is null;
+
+    if not found or actor_role <> 'OWNER' then
+        raise exception using errcode = '42501', message = 'Only the budget owner can activate allocations';
+    end if;
+
+    perform pg_advisory_xact_lock(
+        hashtextextended(p_budget_id::text || ':allocation-activation', 0)
+    );
+
+    select status into target_status
+      from public.budget_allocation_sets
+     where budget_id = p_budget_id and id = p_allocation_set_id
+     for update;
+
+    if not found or target_status <> 'DRAFT' then
+        raise exception using errcode = '23514', message = 'The allocation set must be a draft in this budget';
+    end if;
+
+    update public.budget_allocation_sets
+       set status = 'RETIRED'
+     where budget_id = p_budget_id and status = 'ACTIVE';
+
+    update public.budget_allocation_sets
+       set status = 'ACTIVE'
+     where budget_id = p_budget_id and id = p_allocation_set_id;
+end;
+$function$;
+
+revoke all on function public.activate_budget_allocation_set(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.activate_budget_allocation_set(uuid, uuid) to authenticated;
 
 create table public.income_schedules (
     id uuid primary key default gen_random_uuid(),
@@ -261,6 +529,56 @@ create table public.income_entries (
         references public.income_schedules (budget_id, id) on delete restrict,
     check ((schedule_id is null) = (scheduled_for is null))
 );
+
+create function private.require_active_income_allocation()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+declare
+    allocation_status text;
+begin
+    perform pg_advisory_xact_lock(
+        hashtextextended(new.budget_id::text || ':allocation-activation', 0)
+    );
+
+    select status into allocation_status
+      from public.budget_allocation_sets
+     where budget_id = new.budget_id and id = new.allocation_set_id;
+
+    if not found or allocation_status <> 'ACTIVE' then
+        raise exception using
+            errcode = '23514',
+            message = 'Income must reference the active allocation set';
+    end if;
+
+    return new;
+end;
+$function$;
+
+create trigger income_entries_require_active_allocation
+    before insert on public.income_entries
+    for each row execute function private.require_active_income_allocation();
+
+create function private.prevent_income_allocation_change()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+begin
+    if row(new.budget_id, new.allocation_set_id)
+       is distinct from row(old.budget_id, old.allocation_set_id) then
+        raise exception using
+            errcode = '23514',
+            message = 'An income entry cannot be moved to another allocation set or budget';
+    end if;
+    return new;
+end;
+$function$;
+
+create trigger income_entries_allocation_immutable
+    before update of budget_id, allocation_set_id on public.income_entries
+    for each row execute function private.prevent_income_allocation_change();
 
 create function private.assert_movement_date_in_period()
 returns trigger
@@ -345,6 +663,234 @@ create table public.income_allocation_snapshots (
 
 create index income_allocation_snapshots_category_idx
     on public.income_allocation_snapshots (budget_id, category_id);
+
+create function private.assert_income_snapshots_reconcile()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+declare
+    v_entry_id uuid;
+    v_entry_budget_id uuid;
+    v_entry_amount numeric(19, 4);
+    v_allocation_set_id uuid;
+    snapshot_count bigint;
+    total_basis_points bigint;
+    total_allocated numeric(19, 4);
+    item_count bigint;
+    v_remaining_units integer;
+begin
+    if tg_table_name = 'income_entries' then
+        if tg_op = 'DELETE' then
+            return null;
+        end if;
+        v_entry_id := new.id;
+        v_entry_budget_id := new.budget_id;
+    elsif tg_op = 'DELETE' then
+        v_entry_id := old.income_entry_id;
+        v_entry_budget_id := old.budget_id;
+    else
+        v_entry_id := new.income_entry_id;
+        v_entry_budget_id := new.budget_id;
+    end if;
+
+    select ie.amount, ie.allocation_set_id
+      into v_entry_amount, v_allocation_set_id
+      from public.income_entries
+       as ie
+     where ie.id = v_entry_id and ie.budget_id = v_entry_budget_id;
+
+    if not found then
+        return null;
+    end if;
+
+    select count(*), coalesce(sum(percentage_basis_points), 0),
+           coalesce(sum(allocated_amount), 0)
+      into snapshot_count, total_basis_points, total_allocated
+      from public.income_allocation_snapshots
+     where income_entry_id = v_entry_id and budget_id = v_entry_budget_id;
+
+    select count(*) into item_count
+      from public.budget_allocation_items i
+     where i.budget_id = v_entry_budget_id
+       and i.allocation_set_id = v_allocation_set_id;
+
+    if snapshot_count = 0 or total_basis_points <> 10000
+       or total_allocated <> v_entry_amount or snapshot_count <> item_count then
+        raise exception using
+            errcode = '23514',
+            message = 'Income snapshots must reconcile to the amount and allocation set';
+    end if;
+
+    if exists (
+        select 1
+          from public.budget_allocation_items i
+          left join public.income_allocation_snapshots s
+            on s.income_entry_id = v_entry_id
+           and s.budget_id = i.budget_id
+           and s.category_id = i.category_id
+         where i.budget_id = v_entry_budget_id
+           and i.allocation_set_id = v_allocation_set_id
+           and (s.income_entry_id is null
+                or s.percentage_basis_points <> i.percentage_basis_points)
+    ) then
+        raise exception using
+            errcode = '23514',
+            message = 'Income snapshots must match the selected allocation set';
+    end if;
+
+    select ((v_entry_amount - coalesce(sum(trunc(v_entry_amount * i.percentage_basis_points / 10000, 4)), 0)) * 10000)::integer
+      into v_remaining_units
+      from public.budget_allocation_items i
+     where i.budget_id = v_entry_budget_id
+       and i.allocation_set_id = v_allocation_set_id;
+
+    if exists (
+        with shares as (
+            select i.category_id,
+                   i.percentage_basis_points,
+                   trunc(v_entry_amount * i.percentage_basis_points / 10000, 4) as base_amount,
+                   v_entry_amount * i.percentage_basis_points / 10000
+                     - trunc(v_entry_amount * i.percentage_basis_points / 10000, 4) as fractional_remainder
+              from public.budget_allocation_items i
+             where i.budget_id = v_entry_budget_id
+               and i.allocation_set_id = v_allocation_set_id
+        ), ranked as (
+            select shares.*,
+                   row_number() over (order by fractional_remainder desc, category_id) as remainder_rank
+              from shares
+        )
+        select 1
+          from ranked r
+          join public.income_allocation_snapshots s
+            on s.income_entry_id = v_entry_id
+           and s.budget_id = v_entry_budget_id
+           and s.category_id = r.category_id
+         where s.allocated_amount <> r.base_amount
+                + case when r.remainder_rank <= v_remaining_units then 0.0001 else 0 end
+    ) then
+        raise exception using
+            errcode = '23514',
+            message = 'Income snapshots must use deterministic remainder allocation';
+    end if;
+
+    return null;
+end;
+$function$;
+
+create constraint trigger income_entries_snapshots_consistent
+    after insert or update on public.income_entries
+    deferrable initially deferred
+    for each row execute function private.assert_income_snapshots_reconcile();
+
+create constraint trigger income_allocation_snapshots_consistent
+    after insert or update or delete on public.income_allocation_snapshots
+    deferrable initially deferred
+    for each row execute function private.assert_income_snapshots_reconcile();
+
+create function public.record_income(
+    p_budget_id uuid,
+    p_period_id uuid,
+    p_amount numeric,
+    p_occurred_on date
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = pg_catalog
+as $function$
+declare
+    actor_member_id uuid;
+    actor_role text;
+    allocation_id uuid;
+    income_id uuid;
+    total_basis_points bigint;
+    item_count bigint;
+    base_total numeric(19, 4);
+    remaining_units integer;
+begin
+    if auth.uid() is null then
+        raise exception using errcode = '42501', message = 'Authentication is required';
+    end if;
+    if p_amount is null or p_amount <= 0 or p_amount <> trunc(p_amount, 4) then
+        raise exception using errcode = '22023', message = 'Income amount must be positive with at most four decimal places';
+    end if;
+
+    select id, role into actor_member_id, actor_role
+      from public.budget_members
+     where budget_id = p_budget_id
+       and user_id = auth.uid()
+       and removed_at is null;
+
+    if not found or actor_role not in ('OWNER', 'CONTRIBUTOR') then
+        raise exception using errcode = '42501', message = 'The current member cannot record income';
+    end if;
+
+    perform pg_advisory_xact_lock(
+        hashtextextended(p_budget_id::text || ':allocation-activation', 0)
+    );
+
+    select id into allocation_id
+      from public.budget_allocation_sets
+     where budget_id = p_budget_id and status = 'ACTIVE';
+
+    if not found then
+        raise exception using errcode = '23514', message = 'The budget has no active allocation set';
+    end if;
+
+    select count(*), coalesce(sum(i.percentage_basis_points), 0)
+      into item_count, total_basis_points
+      from public.budget_allocation_items i
+      join public.budget_categories c
+        on c.budget_id = i.budget_id and c.id = i.category_id
+     where i.budget_id = p_budget_id
+       and i.allocation_set_id = allocation_id
+       and c.archived_at is null;
+
+    if item_count = 0 or total_basis_points <> 10000 then
+        raise exception using errcode = '23514', message = 'The active allocation set must total 100 percent';
+    end if;
+
+    select coalesce(sum(trunc(p_amount * percentage_basis_points / 10000, 4)), 0)
+      into base_total
+      from public.budget_allocation_items
+     where budget_id = p_budget_id and allocation_set_id = allocation_id;
+    remaining_units := ((p_amount - base_total) * 10000)::integer;
+
+    insert into public.income_entries (
+        budget_id, period_id, income_member_id, recorded_by_member_id,
+        allocation_set_id, amount, occurred_on
+    ) values (
+        p_budget_id, p_period_id, actor_member_id, actor_member_id,
+        allocation_id, p_amount, p_occurred_on
+    ) returning id into income_id;
+
+    with shares as (
+        select i.category_id,
+               i.percentage_basis_points,
+               trunc(p_amount * i.percentage_basis_points / 10000, 4) as base_amount,
+               p_amount * i.percentage_basis_points / 10000
+                 - trunc(p_amount * i.percentage_basis_points / 10000, 4) as fractional_remainder
+          from public.budget_allocation_items i
+         where i.budget_id = p_budget_id and i.allocation_set_id = allocation_id
+    ), ranked as (
+        select shares.*,
+               row_number() over (order by fractional_remainder desc, category_id) as remainder_rank
+          from shares
+    )
+    insert into public.income_allocation_snapshots (
+        budget_id, income_entry_id, category_id, percentage_basis_points, allocated_amount
+    )
+    select p_budget_id, income_id, category_id, percentage_basis_points,
+           base_amount + case when remainder_rank <= remaining_units then 0.0001 else 0 end
+      from ranked;
+
+    return income_id;
+end;
+$function$;
+
+revoke all on function public.record_income(uuid, uuid, numeric, date) from public, anon, authenticated;
+grant execute on function public.record_income(uuid, uuid, numeric, date) to authenticated;
 
 create table public.expense_entries (
     id uuid primary key default gen_random_uuid(),
