@@ -21,11 +21,27 @@ flowchart LR
 1. O utilizador autentica-se pelo Supabase Auth. A aplicação Expo mantém a sessão com armazenamento adequado a cada plataforma e não regista tokens em logs. A estratégia de armazenamento da sessão e a política CSP são requisitos de implementação e revisão.
 2. O frontend envia `Authorization: Bearer <access-token>` à API Spring por HTTPS.
 3. Spring Security valida assinatura, emissor, expiração e claims do token usando o JWKS do projeto Supabase. O `sub` validado é a identidade do ator. Nunca aceitar um `userId` do corpo como prova de identidade.
-4. A API verifica autorização de domínio em cada pedido: pertença ao orçamento, papel e operação permitida. Por exemplo, só `OWNER` altera membros e partilha; `VIEWER` não regista rendimentos, despesas ou ajustes.
+4. A API aplica validação de domínio e a Data API do Supabase aplica a autorização por linha e papel em cada pedido. Por exemplo, só `OWNER` altera configuração e membros; `OWNER`/`CONTRIBUTOR` registam rendimentos, despesas e ajustes; `VIEWER` só lê.
 5. Para acesso a dados, o Spring encaminha o JWT original do utilizador à Supabase Data API, acompanhado da publishable key do projeto. Assim Supabase valida a chamada e aplica `authenticated`, `auth.uid()` e RLS. O Spring não liga diretamente ao PostgreSQL com credencial elevada para pedidos normais. Não usar `service_role` como atalho para operações de utilizador.
 6. Respostas e logs não incluem tokens, palavras-passe, convites secretos nem informação financeira que não seja necessária para diagnóstico.
 
 JWT é identidade autenticada, não autorização suficiente: os papéis e a pertença a orçamentos são confirmados no servidor/base de dados. Nunca usar `user_metadata` editável pelo utilizador para decidir permissões; não confiar em IDs fornecidos pelo browser. O JWT deve ser validado por biblioteca de confiança e chaves rotativas via JWKS. A publishable key pode estar no frontend/servidor; nunca enviar secret/service-role keys ao browser.
+
+### Matriz RLS e grants
+
+| Dados/operação | Acesso |
+|---|---|
+| Perfil | Cada utilizador lê, cria e atualiza apenas o próprio perfil. |
+| Orçamento e períodos | Membros ativos leem; OWNER altera nome/arquivo e datas dos períodos. |
+| Membership | Membros ativos consultam o grupo; OWNER atualiza papel/remoção. Inserção e transferência de propriedade aguardam fluxos transacionais próprios. |
+| Categorias e alocações | Membros ativos leem; OWNER cria/edita categorias e rascunhos. Ativação usa RPC; itens de versões ativas/retiradas são imutáveis. |
+| Rendimentos, despesas e ajustes | Membros ativos leem o fundo comum; OWNER/CONTRIBUTOR registam, sem atualizar/apagar movimentos. Rendimento usa `record_income`. |
+| Preferências de lembrete | Cada membro ativo lê e altera apenas a própria preferência. |
+| Convites | OWNER lê e gere metadados; a aceitação do destinatário é feita por token num fluxo dedicado do MVP-16. O hash do token não é legível pela Data API. |
+| Auditoria | Membros ativos leem o histórico; clientes não escrevem eventos diretamente. |
+| Membership removida e utilizador externo | Sem acesso aos dados do orçamento. Utilizadores anonimizados também não conseguem recuperar a associação anterior. |
+
+As funções `private.current_budget_member_id` e `private.current_budget_member_role` usam `SECURITY DEFINER` apenas para evitar recursão da policy de `budget_members`; estão num schema não exposto, com `search_path` fixo, sem argumento `user_id` e com execução limitada a `authenticated`. As RPCs de domínio continuam `SECURITY INVOKER`. A migration retira os grants Data API a `anon` e limita os grants de `authenticated` por tabela/coluna; criação de orçamento, membership e escrita de rendimentos recorrentes aguarda RPCs próprias.
 
 ## Módulos de domínio
 
