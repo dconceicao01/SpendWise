@@ -2,6 +2,7 @@ package pt.spendwise.api.budget;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +49,12 @@ class BudgetControllerTest {
 
     @MockitoBean
     private BudgetPeriodService periodService;
+
+    @MockitoBean
+    private BudgetCategoryService categoryService;
+
+    @MockitoBean
+    private AllocationSetService allocationSetService;
 
     @Test
     void requiresAuthenticationForBudgetReads() throws Exception {
@@ -110,6 +117,61 @@ class BudgetControllerTest {
 
         verify(periodService).create(BUDGET_ID, new CreateBudgetPeriodRequest(
                 LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30")));
+    }
+
+    @Test
+    void createsBudgetCategoryThroughTheBudgetScopedRoute() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        UUID categoryId = UUID.fromString("d7d0d8bf-f18f-4b90-a611-50baa2e4eaab");
+        when(categoryService.create(BUDGET_ID, new CreateBudgetCategoryRequest("Travel")))
+                .thenReturn(new BudgetCategoryResponse(categoryId, BUDGET_ID, "Travel",
+                        Instant.parse("2026-11-22T17:00:00Z"), null));
+
+        mockMvc.perform(post("/api/v1/budgets/" + BUDGET_ID + "/categories")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Travel\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location",
+                        "/api/v1/budgets/" + BUDGET_ID + "/categories/" + categoryId));
+
+        verify(categoryService).create(BUDGET_ID, new CreateBudgetCategoryRequest("Travel"));
+    }
+
+    @Test
+    void createsAllocationDraftUsingHumanReadablePercentages() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        UUID categoryId = UUID.fromString("d7d0d8bf-f18f-4b90-a611-50baa2e4eaab");
+        UUID allocationSetId = UUID.fromString("a0e4e090-b083-405f-9d25-fb481673ec77");
+        CreateAllocationSetRequest request = new CreateAllocationSetRequest(
+                List.of(new AllocationItemRequest(categoryId, new BigDecimal("50.25"))));
+        when(allocationSetService.createDraft(BUDGET_ID, request)).thenReturn(new AllocationSetResponse(
+                allocationSetId, BUDGET_ID, 1, "DRAFT", LocalDate.parse("2026-11-22"),
+                Instant.parse("2026-11-22T17:00:00Z"),
+                List.of(AllocationItemResponse.from(categoryId, 5025))));
+
+        mockMvc.perform(post("/api/v1/budgets/" + BUDGET_ID + "/allocation-sets")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"categoryId\":\"" + categoryId
+                                + "\",\"percentage\":50.25}]}"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/budgets/" + BUDGET_ID
+                        + "/allocation-sets/" + allocationSetId));
+
+        verify(allocationSetService).createDraft(BUDGET_ID, request);
+    }
+
+    @Test
+    void rejectsAllocationPercentageOverOneHundred() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        mockMvc.perform(post("/api/v1/budgets/" + BUDGET_ID + "/allocation-sets")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"categoryId\":\"" + PERIOD_ID
+                                + "\",\"percentage\":100.01}]}"))
+                .andExpect(status().isBadRequest());
+        verify(allocationSetService, never()).createDraft(any(), any());
     }
 
     private Jwt validJwt() {
