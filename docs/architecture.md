@@ -18,7 +18,7 @@ flowchart LR
 
 ### Caminho de uma chamada autenticada
 
-1. O utilizador autentica-se pelo Supabase Auth. A aplicação Expo mantém a sessão com armazenamento adequado a cada plataforma e não regista tokens em logs. A estratégia de armazenamento da sessão e a política CSP são requisitos de implementação e revisão.
+1. O utilizador regista-se, inicia sessão ou recupera o acesso pelo Supabase Auth com fluxo PKCE. No iOS/Android, a sessão persistida usa Expo SecureStore e fica acessível apenas com o dispositivo desbloqueado. Na web, usa `sessionStorage`: sobrevive a recargas no mesmo separador e é removida quando este termina. JavaScript da página consegue ler a sessão web, por isso CSP, prevenção de XSS e controlo de dependências continuam necessários. Palavras-passe nunca são guardadas pela aplicação.
 2. O frontend envia `Authorization: Bearer <access-token>` à API Spring por HTTPS.
 3. Spring Security valida assinatura, emissor, expiração e claims do token usando o JWKS do projeto Supabase. O `sub` validado é a identidade do ator. Nunca aceitar um `userId` do corpo como prova de identidade.
 4. A API aplica validação de domínio e a Data API do Supabase aplica a autorização por linha e papel em cada pedido. Por exemplo, só `OWNER` altera configuração e membros; `OWNER`/`CONTRIBUTOR` registam rendimentos, despesas e ajustes; `VIEWER` só lê.
@@ -26,6 +26,8 @@ flowchart LR
 6. Respostas e logs não incluem tokens, palavras-passe, convites secretos nem informação financeira que não seja necessária para diagnóstico.
 
 JWT é identidade autenticada, não autorização suficiente: os papéis e a pertença a orçamentos são confirmados no servidor/base de dados. Nunca usar `user_metadata` editável pelo utilizador para decidir permissões; não confiar em IDs fornecidos pelo browser. O JWT deve ser validado por biblioteca de confiança e chaves rotativas via JWKS. A publishable key pode estar no frontend/servidor; nunca enviar secret/service-role keys ao browser.
+
+O redirect de confirmação e recuperação usa `spendwise://auth/callback` em aplicações móveis e o URL HTTPS do ambiente web. O callback troca o código PKCE por uma sessão e substitui imediatamente a rota, retirando o código de uso único do URL visível/histórico. Cada URL de redirect permitido deve ser configurado explicitamente no Supabase Auth; não usar curingas para produção.
 
 ### Matriz RLS e grants
 

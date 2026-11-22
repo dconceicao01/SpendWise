@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "spendwise",
-    "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -17,8 +16,19 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            { "scheme": "spendwise", "host": "auth", "pathPrefix": "/callback" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
+    "userInterfaceStyle": "automatic",
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -32,7 +42,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
