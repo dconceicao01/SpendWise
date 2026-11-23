@@ -91,7 +91,8 @@ class SupabaseBudgetMovementRepositoryTest {
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(content().json("{\"p_budget_id\":\"" + BUDGET_ID
                         + "\",\"p_period_id\":\"" + PERIOD_ID
-                        + "\",\"p_amount\":900.00,\"p_occurred_on\":\"2026-11-22\"}"))
+                        + "\",\"p_amount\":900.00,\"p_occurred_on\":\"2026-11-22\","
+                        + "\"p_schedule_id\":null,\"p_scheduled_for\":null,\"p_recorder_member_id\":null}"))
                 .andRespond(withSuccess("\"" + ENTRY_ID + "\"", MediaType.APPLICATION_JSON));
         mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_entries?select=id,budget_id,period_id,income_member_id,recorded_by_member_id,allocation_set_id,schedule_id,scheduled_for,amount,occurred_on,created_at&budget_id=eq."
                         + BUDGET_ID + "&id=eq." + ENTRY_ID + "&limit=1"))

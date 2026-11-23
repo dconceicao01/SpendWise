@@ -127,6 +127,42 @@
     "amountInvalid": "Enter a positive amount with up to four decimal places.",
     "adjustmentSign": "Choose whether the adjustment increases or reduces the category balance."
   },
+  "schedule": {
+    "title": "Recurring income",
+    "description": "Recurring income consists of virtual entries created automatically. SpendWise does not move money.",
+    "single": "One-time",
+    "recurring": "Recurring",
+    "recurringDescription": "Cron creates virtual entries at the selected frequency and assigns each one to the matching period; if none exists, it stays pending.",
+    "frequency": "Frequency",
+    "frequencies": {
+      "WEEKLY": "Weekly",
+      "FORTNIGHTLY": "Fortnightly",
+      "MONTHLY": "Monthly"
+    },
+    "shortMonths": "When the selected day is unavailable",
+    "shortMonthDescription": "For example, day 31 in February.",
+    "shortMonthBehaviors": {
+      "LAST_DAY": "Use the last day of the month",
+      "SKIP": "Skip that month"
+    },
+    "startDate": "First entry date (YYYY-MM-DD)",
+    "endDateOptional": "End date (optional, YYYY-MM-DD)",
+    "create": "Create recurring income",
+    "created": "Recurring income created.",
+    "invalid": "Check the amount and dates for this recurring income.",
+    "saveError": "We couldn't save this recurring income.",
+    "statuses": {
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "CANCELLED": "Cancelled",
+      "COMPLETED": "Completed"
+    },
+    "nextDate": "Next date",
+    "pendingNoPeriod": "Pending: the virtual entry has not been created for this date yet.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel"
+  },
   "dashboard": {
     "periodBalances": "Virtual balances for this period",
     "allocated": "Allocated",

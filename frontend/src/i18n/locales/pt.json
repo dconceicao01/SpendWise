@@ -127,6 +127,42 @@
     "amountInvalid": "Introduz um valor positivo com até quatro casas decimais.",
     "adjustmentSign": "Escolhe se o ajuste aumenta ou reduz o saldo da categoria."
   },
+  "schedule": {
+    "title": "Rendimentos recorrentes",
+    "description": "Os rendimentos recorrentes são registos virtuais criados automaticamente. O SpendWise não movimenta dinheiro.",
+    "single": "Pontual",
+    "recurring": "Recorrente",
+    "recurringDescription": "O cron cria registos virtuais na frequência escolhida e associa cada um ao período correspondente; se não existir um, fica pendente.",
+    "frequency": "Frequência",
+    "frequencies": {
+      "WEEKLY": "Semanal",
+      "FORTNIGHTLY": "Quinzenal",
+      "MONTHLY": "Mensal"
+    },
+    "shortMonths": "Quando o dia não existir no mês",
+    "shortMonthDescription": "Por exemplo, para o dia 31 em fevereiro.",
+    "shortMonthBehaviors": {
+      "LAST_DAY": "Usar o último dia do mês",
+      "SKIP": "Saltar esse mês"
+    },
+    "startDate": "Data do primeiro registo (AAAA-MM-DD)",
+    "endDateOptional": "Data final (opcional, AAAA-MM-DD)",
+    "create": "Criar rendimento recorrente",
+    "created": "Rendimento recorrente criado.",
+    "invalid": "Confirma o valor e as datas do rendimento recorrente.",
+    "saveError": "Não foi possível guardar o rendimento recorrente.",
+    "statuses": {
+      "ACTIVE": "Ativo",
+      "PAUSED": "Pausado",
+      "CANCELLED": "Cancelado",
+      "COMPLETED": "Concluído"
+    },
+    "nextDate": "Próxima data",
+    "pendingNoPeriod": "Pendente: o registo virtual ainda não foi criado para esta data.",
+    "pause": "Pausar",
+    "resume": "Retomar",
+    "cancel": "Cancelar"
+  },
   "dashboard": {
     "periodBalances": "Saldos virtuais deste período",
     "allocated": "Alocado",

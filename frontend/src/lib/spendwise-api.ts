@@ -61,6 +61,22 @@ export type BudgetAdjustment = {
   occurred_on: string;
 };
 
+export type IncomeScheduleFrequency = "WEEKLY" | "FORTNIGHTLY" | "MONTHLY";
+export type IncomeScheduleStatus =
+  "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED";
+export type MonthlyShortMonthBehavior = "LAST_DAY" | "SKIP";
+export type IncomeSchedule = {
+  id: string;
+  budget_id: string;
+  amount: number;
+  frequency: IncomeScheduleFrequency;
+  monthly_short_month_behavior: MonthlyShortMonthBehavior;
+  start_date: string;
+  end_date: string | null;
+  next_occurrence_on: string;
+  status: IncomeScheduleStatus;
+};
+
 export class SpendWiseApiError extends Error {
   constructor(readonly status: number) {
     super("SpendWise API request failed");
@@ -171,6 +187,38 @@ export const spendwiseApi = {
       token,
       `/budgets/${budgetId}/incomes`,
       jsonBody(input),
+    ),
+  listIncomeSchedules: (token: string, budgetId: string, offset = 0) =>
+    request<IncomeSchedule[]>(
+      token,
+      `/budgets/${budgetId}/income-schedules?limit=100&offset=${offset}`,
+    ),
+  createIncomeSchedule: (
+    token: string,
+    budgetId: string,
+    input: {
+      amount: number;
+      frequency: IncomeScheduleFrequency;
+      monthlyShortMonthBehavior: MonthlyShortMonthBehavior;
+      startDate: string;
+      endDate: string | null;
+    },
+  ) =>
+    request<IncomeSchedule>(
+      token,
+      `/budgets/${budgetId}/income-schedules`,
+      jsonBody(input),
+    ),
+  updateIncomeSchedule: (
+    token: string,
+    budgetId: string,
+    scheduleId: string,
+    status: Exclude<IncomeScheduleStatus, "COMPLETED">,
+  ) =>
+    request<IncomeSchedule>(
+      token,
+      `/budgets/${budgetId}/income-schedules/${scheduleId}`,
+      { method: "PATCH", body: JSON.stringify({ status }) },
     ),
   listExpenses: (
     token: string,
