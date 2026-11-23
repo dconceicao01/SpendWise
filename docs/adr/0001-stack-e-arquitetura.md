@@ -1,6 +1,6 @@
 # ADR 0001: Stack inicial e limites de confiança
 
-- **Estado:** aceite para orientar o MVP; detalhes de fornecedor de hosting/região ainda em aberto.
+- **Estado:** stack e região de dados decididas para o MVP/piloto; hosting de produção e recuperação automatizada ainda em aberto.
 - **Data:** 2026-11-21
 
 ## Contexto
@@ -17,8 +17,9 @@ SpendWise é uma aplicação multiplataforma de orçamentos por envelopes e cola
 - O Spring encaminha o JWT original do utilizador à Supabase Data API, com a publishable key, para executar leituras/escritas sob `authenticated` e RLS. Não há ligação JDBC privilegiada para o caminho normal de pedidos; não usar `service_role`/superuser em operações de utilizador.
 - GitHub e GitHub Actions para controlo de versão, PR, CI e promoção entre ambientes; Docker para API.
 - Gitflow: `main` protegida representa produção, `develop` protegida integra o próximo lançamento, branches curtas alimentam `develop`, e branches `release/X.Y.Z` estabilizam uma versão antes da tag `vX.Y.Z`. Correções urgentes partem de `main` por `hotfix/X.Y.Z` e regressam a `develop`.
-- Supabase local, staging e produção são ambientes independentes. Docker Desktop é o runtime de containers escolhido para desenvolvimento local em Windows. Produção usa região e plano aprovados após avaliação contratual e operacional.
-- Lovable é ferramenta opcional de prototipagem/preview. GitHub permanece fonte de verdade. Hosting de produção mantém-se por escolher.
+- Supabase local, staging e produção são ambientes independentes. Paris (`eu-west-3`) é a região escolhida. Supabase Free é aceite para desenvolvimento/staging e piloto de baixa afluência, com aceitação explícita de pausa após inatividade e ausência de backups geridos. Reavaliar plano antes de escalar.
+- Meta aprovada para recuperação: RPO ≤24h, RTO ≤8h, retenção 7 dias, cópias cifradas antes do upload em Cloudflare R2 na jurisdição EU, apenas dentro da quota gratuita e sem overage. A solução não está operacional nem validada: dumps padrão não incluem `auth`, logo backup e restauro completos devem abranger dados/Auth e ser exercitados antes de produção.
+- Lovable é ferramenta opcional de prototipagem/preview, sem backend/Lovable Cloud para o SpendWise. GitHub permanece fonte de verdade. Hosting web/API de produção mantém-se por escolher.
 
 ## Consequências
 

@@ -30,6 +30,15 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 - `OWNER`, `CONTRIBUTOR`, `VIEWER` são papéis locais ao orçamento. Guardar a relação no banco e validar sempre o papel atual; não confiar em role fornecida pelo cliente nem em `user_metadata` de JWT.
 - Convites têm token imprevisível, guardar apenas hash, validade limitada, uso único, revogação, rate limiting e resposta que não revele se um e-mail já tem conta.
 - Views são avaliadas quanto a `security_invoker`/RLS e grants; funções com `SECURITY DEFINER` são exceção, não padrão, e exigem `search_path` fixo, autorização explícita e revisão de segurança.
+
+## Região, plano de piloto e recuperação
+
+- O projeto Supabase fica em Paris (`eu-west-3`). O plano Free é aceite para desenvolvimento/staging e piloto inicial de baixa afluência, tendo em conta que pode pausar após inatividade e não inclui backups geridos. Isto não é uma garantia de SLA nem uma aprovação para escalar ou operar produção com dados reais sem reavaliação.
+- Meta operacional aprovada: RPO ≤24 horas, RTO ≤8 horas, retenção de 7 dias. Cópias destinadas ao Cloudflare R2 devem usar jurisdição EU, cifragem antes do upload e quota gratuita apenas; impedir overage, interrompendo novas cópias e alertando antes de exceder o limite.
+- A cópia tem dados pessoais e deve ser considerada tratamento de dados: acesso mínimo, chaves fora do bucket, monitorização, expiração verificável e documentação de que a eliminação em cópias ocorre no máximo após a retenção aprovada.
+- Dump PostgreSQL comum não inclui o schema gerido `auth`. O plano só satisfaz recuperação quando inclui utilizadores/tabelas Auth e configuração necessária, e quando um restauro completo num projeto isolado foi exercitado. O RPO/RTO continua por validar até esse teste.
+- Um agendamento GitHub Actions é best effort; monitorizar a data/hora da última cópia e alertar se exceder 24 horas. Executar restauro trimestral e registar duração, integridade e lacunas.
+- Rever DPA, subprocessadores e localização para Supabase e Cloudflare antes de aceitar dados reais em produção. Região EU não equivale a conformidade RGPD.
 - Testar cada política com utilizador A, utilizador B, membro removido, owner, contributor, viewer e visitante não autenticado. Testes cobrem leitura, escrita, alteração de proprietário/IDs e acesso a identificadores adivinhados (BOLA/IDOR).
 
 ## Exportação de dados pessoais

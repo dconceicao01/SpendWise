@@ -51,7 +51,7 @@ Os comandos e versões concretos são fixados em lockfiles/Gradle wrapper e work
 | Passo | Staging | Produção |
 |---|---|---|
 | Infraestrutura | Ambiente persistente isolado e preview efémero sem dados reais. | Ambiente separado e restrito. |
-| Supabase | Projeto, Auth, base de dados, chaves e URLs próprios; dados sintéticos. | Projeto, credenciais, Auth e URLs próprios; região/contrato aprovados. |
+| Supabase | Projeto, Auth, base de dados, chaves e URLs próprios em Paris (`eu-west-3`); dados sintéticos. | Projeto, credenciais, Auth e URLs próprios. Plano/contratos reavaliados antes do lançamento/escala. |
 | Migrações | Aplicar automaticamente após os checks, com cópia descartável ou branch de validação. | Job dedicado com aprovação protegida, backup recente e migração compatível/expand-contract. |
 | API | Imagem Docker etiquetada por commit; smoke tests. | Mesma imagem validada, promovida sem rebuild; health checks e rollback. |
 | Frontend | Preview por PR e URL de staging. | Deploy do mesmo commit aprovado. Lovable pode apoiar previews; não é autoridade de produção enquanto região, contratos e processo de rollback não forem avaliados. |
@@ -67,6 +67,14 @@ Não copiar dados de produção para ambientes inferiores. Não executar `ddl-au
 4. Pessoa autorizada aprova job `production`; secrets só ficam disponíveis nesse environment.
 5. Aplicar migração compatível e depois publicar frontend/API; executar smoke test e verificar métricas/erros.
 6. Se falhar, interromper promoção, reverter artefacto compatível e executar runbook. Avaliar migração e dados sem apagar evidência.
+
+### Piloto e recuperação
+
+O piloto inicial pode usar Supabase Free em Paris para baixa afluência. A equipa aceita que o plano Free pode pausar projetos inativos e não oferece backups geridos; não prometer SLA. Lovable serve para protótipos/previews, sem backend/Lovable Cloud; o seu hosting não é ainda o destino aprovado para produção.
+
+Objetivos aprovados: RPO ≤24h, RTO ≤8h e retenção de 7 dias, com cópias cifradas no cliente para Cloudflare R2 sob jurisdição EU, limitadas à quota gratuita. O job deve falhar/alertar antes de qualquer overage. A cópia deve incluir a base de dados e Auth; `supabase db dump` padrão exclui o schema `auth`, pelo que a implementação tem de cobrir essa lacuna. Alertar se a cópia válida mais recente ultrapassar 24h e executar exercício trimestral. GitHub Actions schedule é best effort e não constitui por si só garantia de RPO.
+
+Antes de produção/aceitação de dados reais, concluir revisão contratual/DPA e subprocessadores, demonstrar restauro completo de base de dados + Auth dentro do RTO, verificar retenção e eliminação, e rever se o plano Free continua adequado. Até ao exercício, RPO/RTO são metas, não garantias.
 
 Cada fornecedor de hospedagem/segredos/monitorização será escolhido antes da produção com revisão do DPA, subprocessadores, residência, backups, logging e resposta a incidentes.
 
