@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
+  AppState,
   StyleSheet,
   View,
   useColorScheme,
@@ -9,18 +10,41 @@ import {
 import { useEffect, useState } from "react";
 import { AuthProvider } from "@/auth/auth-provider";
 import { initializeLanguage } from "@/i18n/i18n";
+import {
+  initializeRuntimeConfig,
+  refreshRuntimeConfig,
+  subscribeRuntimeConfig,
+} from "@/lib/runtime-config";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [isLanguageReady, setIsLanguageReady] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [runtimeConfigVersion, setRuntimeConfigVersion] = useState(0);
 
   useEffect(() => {
-    void initializeLanguage()
+    const unsubscribe = subscribeRuntimeConfig(() => {
+      setRuntimeConfigVersion((version) => version + 1);
+    });
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (state) => {
+        if (state === "active") {
+          void refreshRuntimeConfig().catch(() => undefined);
+        }
+      },
+    );
+
+    void Promise.all([initializeLanguage(), initializeRuntimeConfig()])
       .catch(() => undefined)
-      .finally(() => setIsLanguageReady(true));
+      .finally(() => setIsAppReady(true));
+
+    return () => {
+      unsubscribe();
+      appStateSubscription.remove();
+    };
   }, []);
 
-  if (!isLanguageReady) {
+  if (!isAppReady) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color="#285c3c" />
@@ -31,7 +55,7 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      <AuthProvider>
+      <AuthProvider key={runtimeConfigVersion}>
         <Stack screenOptions={{ headerShown: false }} />
       </AuthProvider>
     </>
