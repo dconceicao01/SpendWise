@@ -5,25 +5,32 @@ Este runbook define o processo de recuperação do piloto SpendWise. Os objetivo
 ## Âmbito e limites
 
 - Incluir schema, dados, policies, funções, triggers, grants e utilizadores/dados Auth do projeto Supabase.
-- A documentação Supabase para migração da plataforma para self-hosted declara que os dumps incluem `auth.users` e dados relacionados. `supabase db dump` também aplica filtragem de objetos internos. Cada execução deve verificar os artefactos e o restauro; não inferir a cobertura apenas pelo sucesso do comando.
+- Foi escolhido o guia Supabase de migração da plataforma para self-hosted como procedimento de restauro. Esse guia declara que `auth.users` e dados relacionados estão incluídos; a referência geral da CLI descreve exclusões dos schemas geridos `auth` e `storage`. Por isso o workflow falha fechado: exige marcadores de `auth.users` e `auth.identities` no schema e nos dados antes de cifrar ou fazer upload.
 - Se o projeto tiver personalizações em schemas geridos (`auth` ou `storage`), como triggers ou policies próprias, verificar e versionar essas alterações separadamente; o guia CLI trata-as como personalizações que podem exigir exportação/diff próprio. Objetos Storage não são ficheiros incluídos no dump.
 - Configuração de Auth — providers, URLs de redirect, SMTP, templates, JWT secrets e chaves — não é recuperada como configuração SQL. Guardar apenas a configuração não secreta no inventário operacional; segredos ficam num gestor de segredos próprio, separados do backup.
 - Não incluir artefactos de build, logs, tokens de sessão ou credenciais. Dumps contêm dados pessoais e valores virtuais, pelo que devem ter acesso restrito e cifragem antes de saírem do runner.
 - Cloudflare R2 deve usar a jurisdição EU e apenas a quota gratuita disponível. A automação tem de impedir uploads que ultrapassem o limite definido e alertar; não ativar billing/overage. Reconfirmar quotas e condições antes de ativar.
 
-## Processo planeado
+## Processo de backup
 
-1. Agendar uma cópia diária, com execução manual disponível para cópia antes de migrações relevantes. GitHub Actions é best effort: a monitorização tem de alertar se a cópia válida mais recente tiver mais de 24 horas.
-2. Usar uma versão de Supabase CLI fixada e revista. A CLI v3 mudou para operações locais por defeito e confirmação explícita de alterações remotas; rever as instruções de migração antes de atualizar a versão no job.
-3. Exportar roles, schema e dados em artefactos temporários. Usar `supabase db dump` com ligação de leitura controlada, e verificar que tabelas Auth esperadas aparecem no schema/dados exportados.
-4. Empacotar e cifrar localmente com uma chave mantida fora do runner e do bucket. Nunca enviar dumps em claro para artefactos GitHub, logs ou object storage.
-5. Fazer upload para R2 com chave de objeto datada, após verificar tamanho e quota. Aplicar retenção de 7 dias incluindo versões/objetos antigos, e confirmar periodicamente que a expiração ocorreu.
-6. Registar apenas timestamp, duração, tamanho cifrado, resultado e checksum do artefacto cifrado. Não registar URL de conexão, conteúdo SQL, dados pessoais ou material de chave.
+1. O workflow `.github/workflows/supabase-backup.yml` executa diariamente às 03:17 UTC quando `SPENDWISE_BACKUP_ENABLED=true`; também suporta execução manual após confirmação. GitHub Actions é best effort; verificar falhas e frescura, e alertar se a última cópia válida passar 24 horas.
+2. O CLI Supabase fica fixado pela dependência `Database/package.json`; `age` fica fixado em 1.2.1. A CLI v3 mudou para operações locais por defeito; os comandos usam a connection string explícita conforme o guia escolhido.
+3. Exportar roles, schema e dados em ficheiros temporários. A validação recusa o envio se não encontrar `auth.users` e `auth.identities` no schema e nos dados.
+4. Empacotar e cifrar localmente com a chave pública age. A chave privada de recuperação deve ser guardada offline num gestor de segredos; nunca no repositório, GitHub Actions, runner ou bucket. Dumps em claro não são publicados como artefactos GitHub.
+5. O script de upload lista o bucket, remove backups SpendWise com mais de 7 dias, bloqueia upload se o armazenamento projetado ultrapassar 9 GB e valida tamanho/checksum após upload. O bucket tem de ter uma regra lifecycle de 7 dias configurada e confirmada antes de ativar; o job exige essa confirmação. A limpeza do provider é eventual (normalmente até 24h após a expiração) e o exercício deve verificar objetos e versões residuais.
+6. R2 usa o endpoint EU. A quota gratuita indicada atualmente é 10 GB-mês; o limite interno de 9 GB deixa margem. Reconfirmar quotas e preço antes da configuração, pois podem mudar.
+7. Registar apenas resultado, tamanho cifrado e checksum do artefacto cifrado. Não registar URL de conexão, conteúdo SQL, dados pessoais ou material de chave.
+
+### Configuração antes de ativar
+
+Criar o GitHub Environment `spendwise-backup`, guardar como secrets `SPENDWISE_SUPABASE_DB_URL`, `SPENDWISE_R2_ACCESS_KEY_ID` e `SPENDWISE_R2_SECRET_ACCESS_KEY`, e definir como variables `SPENDWISE_AGE_RECIPIENT`, `SPENDWISE_R2_ACCOUNT_ID`, `SPENDWISE_R2_BUCKET`, `SPENDWISE_R2_PREFIX`, `SPENDWISE_R2_LIFECYCLE_CONFIRMED=true` e `SPENDWISE_R2_ACCOUNT_ISOLATED=true`. Criar uma chave R2 restrita ao bucket e uma chave age de cifragem; a chave privada age fica offline. O interruptor `SPENDWISE_BACKUP_ENABLED` fica inicialmente ausente/desligado. Confirmar no painel que a conta Cloudflare não tem uso R2 alheio ao SpendWise, pois o guard local mede objetos do bucket e não o uso agregado da conta. Preferir uma credencial de base de dados só de leitura, quando suportada. Ativar a agenda apenas depois de uma execução manual bem-sucedida e de rever o restauro.
+
+O agendamento do GitHub só funciona na branch por omissão (`main` neste repositório); ficará ativo após integrar a mudança nessa branch. `SPENDWISE_BACKUP_ENABLED` é a variável global de interrupção. Falhas aparecem no estado do workflow; alertas externos de falha/frescura ainda precisam de configuração própria.
 
 ## Recuperação
 
 1. Declarar incidente e selecionar a última cópia cifrada válida. A cópia deve ter no máximo 24 horas para cumprir o RPO.
-2. Criar um projeto Supabase isolado na região aprovada, sem ligar clientes de produção. Repor primeiro os segredos/configuração operacional a partir do gestor de segredos e validar URLs, providers, SMTP e configuração JWT.
+2. Preparar um destino Supabase self-hosted isolado conforme o guia escolhido, sem ligar clientes de produção. Repor primeiro a configuração operacional a partir do gestor de segredos e validar URLs, providers, SMTP e configuração JWT.
 3. Descarregar a cópia e decifrá-la apenas num ambiente controlado; validar checksum e origem antes de executar SQL.
 4. Restaurar roles, schema e dados na ordem indicada pelo guia Supabase. Fazer reconciliação de contagens em tabelas do domínio e `auth.users`, extensões, policies, funções, triggers e grants.
 5. Validar login/reauth, leitura e escrita por OWNER/CONTRIBUTOR/VIEWER, negação a utilizador removido e chamadas não autenticadas. Tokens antigos podem deixar de ser válidos; exigir novo login quando necessário.
@@ -42,9 +49,13 @@ Aplicar expiração aos sete dias e verificar a remoção efetiva de objetos ant
 
 ## Estado
 
-Este documento é o procedimento pretendido. A automação, o armazenamento R2, os alertas de frescura e um restauro comprovado continuam por configurar. Não declarar o serviço recuperável nem os objetivos RPO/RTO atingidos até completar os passos e um exercício de restauro.
+O workflow e os scripts estão preparados, mas permanecem inativos até configurar o GitHub Environment, projeto Supabase, bucket EU e segredos. Não existe ainda um servidor self-hosted de recuperação nem alertas externos. Não declarar o serviço recuperável nem os objetivos RPO/RTO atingidos até executar um backup manual completo, restaurar Auth e dados num destino isolado e medir o exercício.
 
 ## Referências do fornecedor
 
-- [Supabase: Restore a Platform Project to Self-Hosted](https://supabase.com/docs/guides/self-hosting/restore-from-platform) — comandos de dump e nota de que `auth.users` e dados relacionados estão incluídos; settings de providers, JWT e SMTP requerem configuração separada.
+- [Supabase: Restore a Platform Project to Self-Hosted](https://supabase.com/docs/guides/self-hosting/restore-from-platform) — procedimento escolhido; afirma que `auth.users` e dados relacionados estão incluídos e descreve configuração separada de JWT, providers e SMTP.
+- [Supabase CLI: `db dump`](https://supabase.com/docs/reference/cli/supabase-db-dump) — documenta filtragem de schemas geridos; o validador no workflow impede o upload se faltar Auth.
 - [Supabase CLI v3](https://supabase.com/changelog/supabase-cli-v3) — alteração de comportamento para operações locais por defeito e confirmações de alterações remotas.
+- [Cloudflare R2: jurisdição e endpoint EU](https://developers.cloudflare.com/r2/reference/data-location/) — o endpoint S3 inclui `.eu` para recursos na jurisdição europeia.
+- [Cloudflare R2: preço e quota gratuita](https://developers.cloudflare.com/r2/pricing/) — quota de armazenamento indicada atualmente como 10 GB-mês.
+- [Cloudflare R2: lifecycle](https://developers.cloudflare.com/r2/buckets/object-lifecycles/) — regras de expiração e atraso eventual de remoção.
