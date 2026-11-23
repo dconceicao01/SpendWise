@@ -1,6 +1,6 @@
 # SpendWise API
 
-API de domínio do SpendWise, construída com Java 21, Spring Boot 3.5 e Maven.
+API de domínio do SpendWise, construída com Java 21, Spring Boot 4.2 e Maven. A linha 4 usa Jackson 3; manter as anotações Jackson core em `com.fasterxml.jackson.annotation` e as anotações de databind em `tools.jackson.databind.annotation`.
 
 ## Pré-requisitos
 
