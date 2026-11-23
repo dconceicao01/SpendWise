@@ -35,7 +35,7 @@ Integração bancária, iniciação de pagamentos, cartões, aconselhamento fina
 
 O React chama a API Spring com um access token Supabase. O Spring valida assinatura e claims do JWT através do JWKS do projeto e aplica autorização de negócio. Para ler/escrever dados, o Spring encaminha o JWT original à Supabase Data API, que aplica RLS com a identidade do utilizador; a chave `service_role` não é usada no frontend nem nas operações normais da API. Ver [arquitetura](docs/architecture.md).
 
-Lovable é uma ferramenta opcional de prototipagem e preview, sem usar o backend/Lovable Cloud para o SpendWise. O código versionado no GitHub é a fonte de verdade; a aplicação mantém Expo, Spring Boot e Supabase. A utilização de Lovable como hosting de produção para a web não está decidida. Não publicar dados reais em previews.
+Lovable é uma ferramenta opcional de prototipagem e preview, sem usar o backend/Lovable Cloud para o SpendWise. O código versionado no GitHub é a fonte de verdade; a aplicação mantém Expo, Spring Boot e Supabase. Para um piloto pessoal de até cinco pessoas, foi aceite avaliar Vercel Hobby: frontend web estático e API Spring Boot em projetos separados, com Supabase isolado e dados sintéticos. A API usa o runtime de containers Vercel em beta. Esta escolha limita-se ao piloto; hosting de produção continua por decidir. Não publicar dados reais em previews. Ver [configuração do piloto Vercel](docs/vercel-pilot.md).
 
 O Supabase Free em Paris é a escolha para desenvolvimento/staging e um piloto inicial de baixa afluência, não uma garantia de disponibilidade para produção: projetos Free podem pausar após inatividade e não incluem backups geridos. Para recuperação, a meta aprovada é RPO até 24 horas e RTO até 8 horas, com cópias cifradas antes do envio, retenção de 7 dias e armazenamento Cloudflare R2 com jurisdição EU apenas enquanto o uso couber no nível gratuito. Não ativar faturação nem exceder quotas. A recuperação só será considerada validada depois de um exercício que inclua base de dados e Auth.
 
@@ -71,6 +71,7 @@ Esta documentação é uma base de engenharia, não um parecer jurídico nem uma
 - [Arquitetura, módulos e diagramas](docs/architecture.md)
 - [Privacidade, RGPD e segurança](docs/privacy-security.md)
 - [Desenvolvimento, revisão, testes e CI/CD](docs/workflow.md)
+- [Configuração do piloto Vercel](docs/vercel-pilot.md)
 - [Princípios de desenvolvimento, dependências e testes](docs/development-principles.md)
 - [Decisões de arquitetura](docs/adr/0001-stack-e-arquitetura.md)
 
