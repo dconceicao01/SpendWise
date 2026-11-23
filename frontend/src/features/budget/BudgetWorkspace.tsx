@@ -10,6 +10,12 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import {
+  calculateAnnualSummary,
+  calculatePeriodCategoryBalances,
+  periodsOverlappingYear,
+  type AnnualSummary,
+} from "@/features/budget/budget-summary";
 import { AccountSettings } from "@/features/profile/AccountSettings";
 import {
   spendwiseApi,
@@ -27,7 +33,6 @@ import {
 type Props = { accessToken: string; onSignOut: () => void; userEmail?: string };
 type DraftCategory = { name: string; percentage: string };
 type MovementTab = "income" | "expense" | "adjustment";
-type AnnualSummary = { income: number; expense: number; adjustment: number };
 
 const today = () => {
   const date = new Date();
@@ -118,29 +123,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     0,
   );
 
-  const categoryBalances = activeCategories.map((category) => {
-    const allocated = incomes.reduce(
-      (total, income) =>
-        total +
-        income.allocation_snapshot
-          .filter((allocation) => allocation.category_id === category.id)
-          .reduce((sum, allocation) => sum + allocation.allocated_amount, 0),
-      0,
-    );
-    const spent = expenses
-      .filter((expense) => expense.category_id === category.id)
-      .reduce((total, expense) => total + expense.amount, 0);
-    const adjusted = adjustments
-      .filter((adjustment) => adjustment.category_id === category.id)
-      .reduce((total, adjustment) => total + adjustment.amount_delta, 0);
-    return {
-      category,
-      allocated,
-      spent,
-      adjusted,
-      balance: allocated - spent + adjusted,
-    };
-  });
+  const categoryBalances = calculatePeriodCategoryBalances(
+    activeCategories,
+    incomes,
+    expenses,
+    adjustments,
+  );
 
   const loadBudgets = useCallback(async () => {
     const nextBudgets = await spendwiseApi.listBudgets(accessToken);
@@ -493,18 +481,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       return;
     }
     const year = Number(annualYear);
-    const from = `${annualYear}-01-01`;
-    const to = `${annualYear}-12-31`;
-    const relevantPeriods = periods.filter(
-      (period) => period.starts_on <= to && period.ends_on >= from,
-    );
+    const relevantPeriods = periodsOverlappingYear(periods, year);
     setIsLoadingAnnual(true);
     setIsError(false);
     setNotice("");
     try {
-      let incomeTotal = 0;
-      let expenseTotal = 0;
-      let adjustmentTotal = 0;
+      const annualIncomes: IncomeEntry[] = [];
+      const annualExpenses: ExpenseEntry[] = [];
+      const annualAdjustments: BudgetAdjustment[] = [];
       for (const period of relevantPeriods) {
         const [periodIncomes, periodExpenses, periodAdjustments] =
           await Promise.all([
@@ -533,21 +517,18 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               ),
             ),
           ]);
-        incomeTotal += periodIncomes
-          .filter((item) => item.occurred_on.startsWith(`${year}-`))
-          .reduce((total, item) => total + item.amount, 0);
-        expenseTotal += periodExpenses
-          .filter((item) => item.spent_on.startsWith(`${year}-`))
-          .reduce((total, item) => total + item.amount, 0);
-        adjustmentTotal += periodAdjustments
-          .filter((item) => item.occurred_on.startsWith(`${year}-`))
-          .reduce((total, item) => total + item.amount_delta, 0);
+        annualIncomes.push(...periodIncomes);
+        annualExpenses.push(...periodExpenses);
+        annualAdjustments.push(...periodAdjustments);
       }
-      setAnnualSummary({
-        income: incomeTotal,
-        expense: expenseTotal,
-        adjustment: adjustmentTotal,
-      });
+      setAnnualSummary(
+        calculateAnnualSummary(
+          year,
+          annualIncomes,
+          annualExpenses,
+          annualAdjustments,
+        ),
+      );
       setAnnualSummaryBudgetId(selectedBudgetId);
     } catch {
       setIsError(true);
