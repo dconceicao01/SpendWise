@@ -4,8 +4,11 @@ import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
 import { supabase } from "@/lib/supabase";
+import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation();
   const { session } = useAuth();
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState("");
@@ -15,7 +18,7 @@ export default function ResetPasswordScreen() {
   async function updatePassword() {
     if (!supabase) {
       setIsError(true);
-      setNotice("A ligação expirou. Pede uma nova recuperação de acesso.");
+      setNotice(t("reset.expired"));
       return;
     }
 
@@ -26,16 +29,14 @@ export default function ResetPasswordScreen() {
         session ?? (await supabase.auth.getSession()).data.session;
       if (!activeSession) {
         setIsError(true);
-        setNotice("A ligação expirou. Pede uma nova recuperação de acesso.");
+        setNotice(t("reset.expired"));
         return;
       }
 
       const { error } = await supabase.auth.updateUser({ password });
       if (error) {
         setIsError(true);
-        setNotice(
-          "Não foi possível atualizar a palavra-passe. Tenta novamente.",
-        );
+        setNotice(t("reset.error"));
         return;
       }
 
@@ -44,17 +45,13 @@ export default function ResetPasswordScreen() {
       });
       if (signOutError) {
         setIsError(true);
-        setNotice(
-          "A palavra-passe foi atualizada. Termina a sessão e inicia novamente.",
-        );
+        setNotice(t("reset.signInAgain"));
         return;
       }
       router.replace("/?passwordChanged=1");
     } catch {
       setIsError(true);
-      setNotice(
-        "Não foi possível concluir a operação. Pede uma nova ligação e tenta novamente.",
-      );
+      setNotice(t("reset.failed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -63,17 +60,18 @@ export default function ResetPasswordScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
-        <Text style={styles.brand}>SpendWise</Text>
-        <Text style={styles.title}>Criar nova palavra-passe</Text>
-        <Text style={styles.description}>
-          Escolhe uma palavra-passe nova para proteger a tua conta.
-        </Text>
+        <View style={styles.topActions}>
+          <Text style={styles.brand}>SpendWise</Text>
+          <LanguageSwitcher />
+        </View>
+        <Text style={styles.title}>{t("reset.title")}</Text>
+        <Text style={styles.description}>{t("reset.description")}</Text>
         <TextInput
-          accessibilityLabel="Nova palavra-passe"
+          accessibilityLabel={t("reset.password")}
           autoCapitalize="none"
           autoComplete="new-password"
           onChangeText={setPassword}
-          placeholder="Pelo menos 8 caracteres"
+          placeholder={t("auth.passwordPlaceholder")}
           secureTextEntry
           style={styles.input}
           textContentType="newPassword"
@@ -97,7 +95,7 @@ export default function ResetPasswordScreen() {
           ]}
         >
           <Text style={styles.buttonText}>
-            {isSubmitting ? "A guardar…" : "Guardar palavra-passe"}
+            {isSubmitting ? t("common.saving") : t("reset.save")}
           </Text>
         </Pressable>
       </View>
@@ -116,6 +114,11 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   brand: { color: "#18291f", fontSize: 34, fontWeight: "700" },
+  topActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   title: { color: "#18291f", fontSize: 24, fontWeight: "700", marginTop: 32 },
   description: {
     color: "#4c5d52",

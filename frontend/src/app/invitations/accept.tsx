@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,8 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
 import { useAuth } from "@/auth/auth-context";
+import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 type AcceptanceResult = {
   accepted: boolean;
@@ -26,46 +28,11 @@ function tokenFromUrl(url: string | null): string | null {
 }
 
 export default function AcceptInvitationScreen() {
+  const { t } = useTranslation();
   const { token: routeToken } = useLocalSearchParams<{ token?: string }>();
   const linkUrl = Linking.useURL();
   const { isLoading, session } = useAuth();
   const token = routeToken ?? tokenFromUrl(linkUrl);
-  const language = useMemo(
-    () =>
-      Intl.DateTimeFormat()
-        .resolvedOptions()
-        .locale.toLowerCase()
-        .startsWith("pt")
-        ? "pt"
-        : "en",
-    [],
-  );
-  const copy =
-    language === "pt"
-      ? {
-          title: "Convite para um orçamento",
-          description:
-            "Inicia sessão na conta cujo email recebeu o convite e volta a esta página para aceitar. Se ainda não tens conta, cria-a, confirma o email e abre novamente esta ligação.",
-          signIn: "Iniciar sessão",
-          accept: "Aceitar convite",
-          accepted:
-            "Convite aceite. A associação ao orçamento partilhado foi criada.",
-          invalid:
-            "Não foi possível aceitar este convite. Confirma a conta e tenta novamente.",
-          missing: "A ligação não contém um convite válido.",
-        }
-      : {
-          title: "Budget invitation",
-          description:
-            "Sign in with the account whose email received the invitation, then return to this page to accept. If you don't have an account, create one, confirm the email, then reopen this link.",
-          signIn: "Sign in",
-          accept: "Accept invitation",
-          accepted:
-            "Invitation accepted. Your membership in the shared budget is now active.",
-          invalid:
-            "We couldn't accept this invitation. Check the account and try again.",
-          missing: "This link does not contain a valid invitation.",
-        };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
@@ -76,7 +43,7 @@ export default function AcceptInvitationScreen() {
     const apiUrl = process.env.EXPO_PUBLIC_SPENDWISE_API_URL;
     if (!apiUrl) {
       setIsError(true);
-      setNotice(copy.invalid);
+      setNotice(t("invitation.invalid"));
       return;
     }
     setIsSubmitting(true);
@@ -97,10 +64,10 @@ export default function AcceptInvitationScreen() {
       if (!response.ok) throw new Error("Invitation rejected");
       const result = (await response.json()) as AcceptanceResult;
       if (!result.accepted) throw new Error("Invitation rejected");
-      setNotice(copy.accepted);
+      setNotice(t("invitation.accepted"));
     } catch {
       setIsError(true);
-      setNotice(copy.invalid);
+      setNotice(t("invitation.invalid"));
     } finally {
       setIsSubmitting(false);
     }
@@ -109,9 +76,12 @@ export default function AcceptInvitationScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>SPENDWISE</Text>
-        <Text style={styles.title}>{copy.title}</Text>
-        <Text style={styles.description}>{copy.description}</Text>
+        <View style={styles.topActions}>
+          <Text style={styles.eyebrow}>SPENDWISE</Text>
+          <LanguageSwitcher />
+        </View>
+        <Text style={styles.title}>{t("invitation.title")}</Text>
+        <Text style={styles.description}>{t("invitation.description")}</Text>
         {isLoading ? <ActivityIndicator color="#285c3c" /> : null}
         {!isLoading && !session ? (
           <Pressable
@@ -119,7 +89,7 @@ export default function AcceptInvitationScreen() {
             onPress={() => router.push("/")}
             style={styles.button}
           >
-            <Text style={styles.buttonText}>{copy.signIn}</Text>
+            <Text style={styles.buttonText}>{t("invitation.signIn")}</Text>
           </Pressable>
         ) : null}
         {!isLoading && session && token ? (
@@ -135,13 +105,13 @@ export default function AcceptInvitationScreen() {
             {isSubmitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>{copy.accept}</Text>
+              <Text style={styles.buttonText}>{t("invitation.accept")}</Text>
             )}
           </Pressable>
         ) : null}
         {missingToken ? (
           <Text accessibilityRole="alert" style={styles.error}>
-            {copy.missing}
+            {t("invitation.missing")}
           </Text>
         ) : null}
         {notice ? (
@@ -172,6 +142,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.8,
+  },
+  topActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   title: { color: "#18291f", fontSize: 26, fontWeight: "700", marginTop: 28 },
   description: {

@@ -15,17 +15,15 @@ import * as Linking from "expo-linking";
 import { useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/auth/auth-context";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { BudgetWorkspace } from "@/features/budget/BudgetWorkspace";
 
 type AuthMode = "signIn" | "signUp" | "recover";
 
-const modeContent: Record<AuthMode, { title: string; button: string }> = {
-  signIn: { title: "Iniciar sessão", button: "Entrar" },
-  signUp: { title: "Criar conta", button: "Criar conta" },
-  recover: { title: "Recuperar acesso", button: "Enviar ligação" },
-};
-
 export default function HomeScreen() {
   const { isLoading, session } = useAuth();
+  const { t } = useTranslation();
   const { confirmed, authError, passwordChanged } = useLocalSearchParams<{
     confirmed?: string;
     authError?: string;
@@ -40,14 +38,26 @@ export default function HomeScreen() {
   const [isError, setIsError] = useState(false);
   const routeNotice =
     confirmed === "1"
-      ? "E-mail confirmado. Já podes iniciar sessão."
+      ? t("auth.confirmed")
       : authError === "1"
-        ? "A ligação expirou ou já foi utilizada. Pede uma nova ligação."
+        ? t("auth.expired")
         : passwordChanged === "1"
-          ? "Palavra-passe atualizada. Já podes iniciar sessão."
+          ? t("auth.passwordChanged")
           : "";
   const visibleNotice = notice || routeNotice;
   const visibleError = isError || authError === "1";
+  const modeTitle =
+    mode === "signIn"
+      ? t("auth.signIn")
+      : mode === "signUp"
+        ? t("auth.signUp")
+        : t("auth.recover");
+  const submitLabel =
+    mode === "signIn"
+      ? t("auth.submitSignIn")
+      : mode === "signUp"
+        ? t("auth.submitSignUp")
+        : t("auth.submitRecover");
 
   async function submitAuth() {
     setNotice("");
@@ -76,9 +86,7 @@ export default function HomeScreen() {
           },
         });
         if (error) throw error;
-        setNotice(
-          "Se for possível criar a conta, receberás uma mensagem com os próximos passos.",
-        );
+        setNotice(t("auth.confirmationSent"));
         return;
       }
 
@@ -91,17 +99,15 @@ export default function HomeScreen() {
         },
       );
       if (error) throw error;
-      setNotice(
-        "Se existir uma conta para este endereço, receberás uma ligação de recuperação.",
-      );
+      setNotice(t("auth.recoverySent"));
     } catch {
       setIsError(true);
       setNotice(
         mode === "signIn"
-          ? "Não foi possível iniciar sessão. Confirma os dados e tenta novamente."
+          ? t("auth.signInError")
           : mode === "signUp"
-            ? "Não foi possível concluir o registo. Confirma os dados e tenta novamente."
-            : "Não foi possível pedir a recuperação. Tenta novamente mais tarde.",
+            ? t("auth.signUpError")
+            : t("auth.recoverError"),
       );
     } finally {
       setIsSubmitting(false);
@@ -114,7 +120,7 @@ export default function HomeScreen() {
     const { error } = await supabase.auth.signOut();
     if (error) {
       setIsError(true);
-      setNotice("Não foi possível terminar a sessão. Tenta novamente.");
+      setNotice(t("common.error"));
     }
   }
 
@@ -123,7 +129,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centered}>
           <ActivityIndicator color="#35684b" />
-          <Text style={styles.loadingText}>A verificar sessão…</Text>
+          <Text style={styles.loadingText}>{t("common.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -133,12 +139,13 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
-          <Brand />
-          <Text style={styles.title}>Configuração necessária</Text>
+          <View style={styles.topActions}>
+            <Brand />
+            <LanguageSwitcher />
+          </View>
+          <Text style={styles.title}>{t("auth.configuredTitle")}</Text>
           <Text style={styles.description}>
-            Define o URL e a chave pública do Supabase no ficheiro local
-            <Text style={styles.code}> frontend/.env</Text> e reinicia a
-            aplicação.
+            {t("auth.configuredDescription")}
           </Text>
         </View>
       </SafeAreaView>
@@ -148,16 +155,11 @@ export default function HomeScreen() {
   if (session) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          <Brand />
-          <Text style={styles.title}>Sessão iniciada</Text>
-          <Text style={styles.description}>
-            A tua conta está autenticada. Os próximos módulos do MVP vão
-            aparecer aqui.
-          </Text>
-          <Text style={styles.email}>{session.user.email}</Text>
-          <PrimaryButton label="Terminar sessão" onPress={signOut} />
-        </View>
+        <BudgetWorkspace
+          accessToken={session.access_token}
+          onSignOut={signOut}
+          userEmail={session.user.email ?? undefined}
+        />
       </SafeAreaView>
     );
   }
@@ -173,38 +175,38 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            <Brand />
-            <Text style={styles.title}>{modeContent[mode].title}</Text>
-            <Text style={styles.description}>
-              Organiza os teus objetivos e acompanha o orçamento por períodos. O
-              SpendWise não movimenta dinheiro.
-            </Text>
+            <View style={styles.topActions}>
+              <Brand />
+              <LanguageSwitcher />
+            </View>
+            <Text style={styles.title}>{modeTitle}</Text>
+            <Text style={styles.description}>{t("auth.description")}</Text>
 
             <View style={styles.form}>
               {mode === "signUp" && (
                 <>
-                  <Text style={styles.label}>Nome</Text>
+                  <Text style={styles.label}>{t("auth.fullName")}</Text>
                   <TextInput
-                    accessibilityLabel="Nome"
+                    accessibilityLabel={t("auth.fullName")}
                     autoComplete="name"
                     maxLength={120}
                     onChangeText={setFullName}
-                    placeholder="Nome completo"
+                    placeholder={t("auth.fullNamePlaceholder")}
                     style={styles.input}
                     textContentType="name"
                     value={fullName}
                   />
                 </>
               )}
-              <Text style={styles.label}>E-mail</Text>
+              <Text style={styles.label}>{t("auth.email")}</Text>
               <TextInput
-                accessibilityLabel="E-mail"
+                accessibilityLabel={t("auth.email")}
                 autoCapitalize="none"
                 autoComplete="email"
                 autoCorrect={false}
                 keyboardType="email-address"
                 onChangeText={setEmail}
-                placeholder="nome@exemplo.pt"
+                placeholder={t("auth.emailPlaceholder")}
                 returnKeyType={mode === "recover" ? "done" : "next"}
                 style={styles.input}
                 textContentType="emailAddress"
@@ -213,16 +215,16 @@ export default function HomeScreen() {
 
               {mode !== "recover" && (
                 <>
-                  <Text style={styles.label}>Palavra-passe</Text>
+                  <Text style={styles.label}>{t("auth.password")}</Text>
                   <TextInput
-                    accessibilityLabel="Palavra-passe"
+                    accessibilityLabel={t("auth.password")}
                     autoCapitalize="none"
                     autoComplete={
                       mode === "signUp" ? "new-password" : "password"
                     }
                     onChangeText={setPassword}
                     onSubmitEditing={submitAuth}
-                    placeholder="Pelo menos 8 caracteres"
+                    placeholder={t("auth.passwordPlaceholder")}
                     returnKeyType="go"
                     secureTextEntry
                     style={styles.input}
@@ -251,7 +253,7 @@ export default function HomeScreen() {
                   (mode !== "recover" && !password) ||
                   (mode === "signUp" && password.length < 8)
                 }
-                label={isSubmitting ? "A processar…" : modeContent[mode].button}
+                label={isSubmitting ? t("common.loading") : submitLabel}
                 onPress={submitAuth}
               />
             </View>
@@ -260,18 +262,18 @@ export default function HomeScreen() {
               {mode === "signIn" && (
                 <>
                   <TextLink
-                    label="Criar conta"
+                    label={t("auth.createAccountLink")}
                     onPress={() => changeMode("signUp")}
                   />
                   <TextLink
-                    label="Esqueci-me da palavra-passe"
+                    label={t("auth.forgotPasswordLink")}
                     onPress={() => changeMode("recover")}
                   />
                 </>
               )}
               {mode !== "signIn" && (
                 <TextLink
-                  label="Voltar a iniciar sessão"
+                  label={t("auth.backToSignIn")}
                   onPress={() => changeMode("signIn")}
                 />
               )}
@@ -290,9 +292,10 @@ export default function HomeScreen() {
 }
 
 function Brand() {
+  const { t } = useTranslation();
   return (
     <>
-      <Text style={styles.eyebrow}>POUPAR EM CONJUNTO</Text>
+      <Text style={styles.eyebrow}>{t("auth.eyebrow")}</Text>
       <Text style={styles.brand}>SpendWise</Text>
     </>
   );
@@ -345,6 +348,12 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     width: "100%",
     alignSelf: "center",
+  },
+  topActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
   eyebrow: {
     color: "#35684b",
