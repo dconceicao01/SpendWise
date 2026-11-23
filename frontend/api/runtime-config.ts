@@ -26,7 +26,10 @@ function requireHttpsUrl(name: string) {
   return url.origin;
 }
 
-export default function handler(request: VercelRequest, response: VercelResponse) {
+export default function handler(
+  request: VercelRequest,
+  response: VercelResponse,
+) {
   response.setHeader("Cache-Control", "no-store, max-age=0");
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.setHeader("X-Content-Type-Options", "nosniff");
