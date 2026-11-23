@@ -6,6 +6,7 @@ Este runbook define o processo de recuperação do piloto SpendWise. Os objetivo
 
 - Incluir schema, dados, policies, funções, triggers, grants e utilizadores/dados Auth do projeto Supabase.
 - A documentação Supabase para migração da plataforma para self-hosted declara que os dumps incluem `auth.users` e dados relacionados. `supabase db dump` também aplica filtragem de objetos internos. Cada execução deve verificar os artefactos e o restauro; não inferir a cobertura apenas pelo sucesso do comando.
+- Se o projeto tiver personalizações em schemas geridos (`auth` ou `storage`), como triggers ou policies próprias, verificar e versionar essas alterações separadamente; o guia CLI trata-as como personalizações que podem exigir exportação/diff próprio. Objetos Storage não são ficheiros incluídos no dump.
 - Configuração de Auth — providers, URLs de redirect, SMTP, templates, JWT secrets e chaves — não é recuperada como configuração SQL. Guardar apenas a configuração não secreta no inventário operacional; segredos ficam num gestor de segredos próprio, separados do backup.
 - Não incluir artefactos de build, logs, tokens de sessão ou credenciais. Dumps contêm dados pessoais e valores virtuais, pelo que devem ter acesso restrito e cifragem antes de saírem do runner.
 - Cloudflare R2 deve usar a jurisdição EU e apenas a quota gratuita disponível. A automação tem de impedir uploads que ultrapassem o limite definido e alertar; não ativar billing/overage. Reconfirmar quotas e condições antes de ativar.
