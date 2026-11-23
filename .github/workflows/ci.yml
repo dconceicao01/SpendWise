@@ -41,6 +41,12 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Diagnose E2E formatting
+        working-directory: frontend
+        run: |
+          pnpm exec prettier --write e2e/spendwise.spec.ts
+          git --no-pager diff -- e2e/spendwise.spec.ts
+
       - name: Check formatting
         working-directory: frontend
         run: pnpm format:check
