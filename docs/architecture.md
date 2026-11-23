@@ -104,10 +104,12 @@ Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos 
 
 ### Cópias de segurança e recuperação
 
+O procedimento detalhado está em [Cópias de segurança e recuperação](disaster-recovery.md).
+
 - Objetivos aprovados: RPO até 24 horas, RTO até 8 horas e retenção de 7 dias.
 - Destino planeado: Cloudflare R2 com jurisdição EU, usando exclusivamente a quota gratuita (10 GB-mês na data desta decisão). Cifrar o artefacto no cliente antes do upload; guardar chaves de cifragem separadas do bucket e com acesso operacional restrito.
 - Parar o envio e alertar antes de ultrapassar a quota gratuita; não ativar faturação/overage. A disponibilidade da cópia não pode depender apenas de um cron de GitHub Actions, pois os horários podem atrasar ou falhar: monitorizar frescura e alertar quando a última cópia válida exceder 24 horas.
-- Um dump PostgreSQL padrão da CLI Supabase exclui schemas geridos como `auth`; portanto, backup da aplicação sozinho não cumpre recuperação. O procedimento deve capturar e validar separadamente `auth.users` e tabelas relacionadas, definir restauro seguro num projeto limpo, e preservar/configurar separadamente settings Auth, chaves e segredos. Tokens ativos podem deixar de ser válidos após migração.
+- A documentação Supabase para migração da plataforma para self-hosted indica que `supabase db dump` inclui `auth.users` e dados relacionados, além dos schemas, policies, funções e triggers. A filtragem Supabase exclui objetos internos específicos; confirmar a cobertura no artefacto real e num restauro limpo antes de depender do processo. Settings de providers, URLs, SMTP, JWT secrets e chaves são configuração operacional separada e não devem ser copiados como SQL. Tokens emitidos podem deixar de ser válidos após recuperação/migração.
 - Cópias incluem dados pessoais e valores virtuais: controlar acesso, cifrar antes da saída, testar a eliminação por expiração após 7 dias e documentar que pedidos de apagamento podem permanecer nas cópias até essa expiração.
 - Realizar exercício de restauro trimestral. RPO/RTO são alvos aprovados, não garantias, até se demonstrar um restauro completo de dados e Auth dentro dos tempos definidos.
 
@@ -120,7 +122,7 @@ Lovable fica limitado a prototipagem/preview, sem Lovable Cloud/backend. A produ
 - RLS habilitada em cada tabela do schema exposto, grants mínimos, políticas por operação e testes positivos/negativos por papel.
 - Paginação e limites de tamanho; validação server-side; limites de pedido e rate limiting em login, recuperação, convites e escrita.
 - CORS por allowlist dos domínios de cada ambiente; CSP restritiva; prevenção de XSS e dependências com lockfiles.
-- Backups: decisões para piloto definidas acima; automação, cópia completa de Auth, alertas de frescura e teste periódico de restauro ainda por implementar/validar. Backup não substitui exportação/eliminação aplicável.
+- Backups: decisões para piloto definidas acima; automação, verificação da inclusão de Auth, alertas de frescura e teste periódico de restauro ainda por implementar/validar. Backup não substitui exportação/eliminação aplicável.
 - Métricas e logs com IDs de correlação pseudónimos. Não incluir access tokens, e-mails completos, payloads de rendimentos/despesas ou secrets.
 - Objetivos de latência são metas a medir em staging/produção; o requisito antigo `<200 ms` não é garantia sem carga, região e percentil definidos.
 
