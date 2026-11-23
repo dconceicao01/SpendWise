@@ -11,6 +11,7 @@ SpendWise é uma aplicação multiplataforma de orçamentos por envelopes e cola
 
 - UI universal: React Native + Expo + TypeScript + Expo Router para web, Android e iOS.
 - API: Java com Spring Boot, Spring Security Resource Server, REST/OpenAPI e validação JWT Supabase via JWKS.
+- Runtime da API: Java 21, Spring Boot 4.2.0, Maven e springdoc-openapi 3.2.1. A migração aprovada em 2026-11-23 substitui Spring Boot 3.5 depois de a CI encontrar dependências com correções Open Source apenas na linha Spring Framework 7. O domínio usa Jackson 3; anotações de databind ficam no namespace `tools.jackson`, enquanto anotações core como `JsonProperty` permanecem em `com.fasterxml.jackson.annotation`.
 - Identidade: Supabase Auth.
 - Base de dados: PostgreSQL no Supabase, migrações SQL versionadas e RLS.
 - A API é a única camada de domínio exposta. A identidade do utilizador chega por JWT verificado; autorização por recurso ocorre na API e é reforçada por RLS.

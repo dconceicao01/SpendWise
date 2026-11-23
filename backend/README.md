@@ -1,6 +1,6 @@
 # SpendWise API
 
-API de domínio do SpendWise, construída com Java 21, Spring Boot 3.5 e Maven.
+API de domínio do SpendWise, construída com Java 21, Spring Boot 4.2 e Maven. A linha 4 usa Jackson 3; manter as anotações Jackson core em `com.fasterxml.jackson.annotation` e as anotações de databind em `tools.jackson.databind.annotation`.
 
 ## Pré-requisitos
 
@@ -32,6 +32,14 @@ Para executar os testes:
 ```powershell
 .\mvnw.cmd verify
 ```
+
+Para construir a imagem do container localmente, a partir de `backend/`:
+
+```powershell
+docker build -t spendwise-api:local .
+```
+
+A imagem usa Java 21 JRE e executa como utilizador sem privilégios. A CI constrói a imagem e verifica vulnerabilidades altas/críticas; a imagem ainda não é publicada nem implantada por este workflow.
 
 ## Exportação de dados pessoais
 
