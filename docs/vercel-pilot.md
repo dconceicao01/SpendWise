@@ -8,14 +8,14 @@ São necessários dois projetos Vercel independentes para evitar dependência da
 
 | Projeto | Root Directory | Build/deploy |
 | --- | --- | --- |
-| Web | `frontend/` | Node.js 24, pnpm 12.20, `pnpm build:web`, output `dist/` |
-| API | `backend/` | Container runtime a partir de `Dockerfile.vercel`; serviço Spring Boot HTTP |
+| Web | `frontend/` | `frontend/vercel.json` define `pnpm build:web` e output `dist/`; usar Node.js 24 e pnpm 12.20 |
+| API | `backend/` | `backend/vercel.json` seleciona Container runtime e Paris (`cdg1`); `Dockerfile.vercel` constrói a API |
 
-Definir a região de execução da API para Paris (`cdg1`), junto do Supabase em Paris. O Spring Boot lê a porta de `PORT`, com `8080` como fallback local. O container não pode depender de disco local persistente nem de processos de fundo contínuos; tarefas agendadas continuam no Postgres/Supabase.
+Em cada projeto, definir o respetivo diretório raiz no monorepo (`frontend/` ou `backend/`). Os ficheiros `vercel.json` guardam build, output, runtime e região no controlo de versões. No projeto da API, definir `PORT=8080` como variável de ambiente de runtime: o Spring Boot lê essa porta e usa `8080` como fallback local. O container não pode depender de disco local persistente nem de processos de fundo contínuos; tarefas agendadas continuam no Postgres/Supabase.
 
 ## Variáveis e configuração
 
-No ambiente server-side do projeto API, configurar valores próprios do projeto de teste:
+No ambiente server-side do projeto API, configurar `PORT=8080` e valores próprios do projeto de teste:
 
 - `SUPABASE_ISSUER_URI`
 - `SUPABASE_URL`
