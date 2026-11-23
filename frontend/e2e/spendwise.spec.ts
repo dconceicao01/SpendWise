@@ -154,11 +154,7 @@ async function mockBudgetApi(page: Page) {
     budgets: [],
     periods: [],
     categories: [],
-    movements: {
-      incomes: [],
-      expenses: [],
-      adjustments: [],
-    },
+    movements: { incomes: [], expenses: [], adjustments: [] },
     invitations: [],
     profile: {
       user_id: accountId,
