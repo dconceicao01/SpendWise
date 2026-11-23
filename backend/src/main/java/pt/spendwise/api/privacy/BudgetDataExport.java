@@ -1,7 +1,7 @@
 package pt.spendwise.api.privacy;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonNaming;
 import java.util.List;
 import pt.spendwise.api.budget.AllocationSetResponse;
 import pt.spendwise.api.budget.BudgetCategoryResponse;

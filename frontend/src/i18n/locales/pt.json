@@ -7,6 +7,8 @@
     "retry": "Tentar novamente",
     "signOut": "Terminar sessão",
     "switchLanguage": "Mudar idioma para {{language}}",
+    "languagePortuguese": "português",
+    "languageEnglish": "inglês",
     "error": "Não foi possível concluir esta operação. Tenta novamente."
   },
   "auth": {

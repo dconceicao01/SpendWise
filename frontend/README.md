@@ -46,14 +46,18 @@ pnpm android
 pnpm ios
 ```
 
-Para verificar tipos e exportar a versão web:
+Para executar testes unitários, E2E e verificar tipos/exportar a versão web:
 
 ```powershell
+pnpm test
+pnpm test:e2e
 pnpm lint
 pnpm typecheck
 pnpm format:check
 pnpm build:web
 ```
+
+Os testes E2E iniciam a aplicação web em `localhost:8081` e usam autenticação, API e dados sintéticos interceptados pelo Playwright; não contactam um projeto Supabase real. A suíte corre em Chromium desktop e em emulação de viewport Pixel 7, com axe a verificar critérios WCAG 2.0/2.1 A/AA nos ecrãs cobertos. Para preparar Chromium localmente, executar `pnpm exec playwright install chromium`. A emulação móvel valida a interface web responsiva; não substitui testes numa aplicação nativa iOS/Android nem no staging.
 
 ## Publicação móvel
 

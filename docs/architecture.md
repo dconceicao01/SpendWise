@@ -1,5 +1,7 @@
 # Arquitetura e módulos
 
+O backend usa Java 21, Spring Boot 4.2 e springdoc-openapi 3.2. A linha Spring Boot 4 traz Jackson 3; manter as anotações específicas de databind no namespace `tools.jackson` e confirmar que os contratos JSON continuam a serializar os nomes e formatos previstos.
+
 ## Visão de contexto
 
 ```mermaid

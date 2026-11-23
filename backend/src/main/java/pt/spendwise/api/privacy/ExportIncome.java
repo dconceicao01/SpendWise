@@ -1,7 +1,7 @@
 package pt.spendwise.api.privacy;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonNaming;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
