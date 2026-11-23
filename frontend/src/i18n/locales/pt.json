@@ -126,5 +126,18 @@
     "saveError": "Não foi possível registar este movimento. Confirma a data e o período.",
     "amountInvalid": "Introduz um valor positivo com até quatro casas decimais.",
     "adjustmentSign": "Escolhe se o ajuste aumenta ou reduz o saldo da categoria."
+  },
+  "dashboard": {
+    "periodBalances": "Saldos virtuais deste período",
+    "allocated": "Alocado",
+    "spent": "Gasto",
+    "balance": "Saldo",
+    "annualTitle": "Resumo anual",
+    "annualDescription": "Agrega movimentos pela data efetiva. Não transporta saldos entre períodos.",
+    "year": "Ano",
+    "loadAnnual": "Ver resumo",
+    "netChange": "Variação virtual",
+    "invalidYear": "Introduz um ano válido com quatro dígitos.",
+    "loadError": "Não foi possível carregar o resumo anual."
   }
 }

@@ -126,5 +126,18 @@
     "saveError": "We couldn't record this movement. Check the date and period.",
     "amountInvalid": "Enter a positive amount with up to four decimal places.",
     "adjustmentSign": "Choose whether the adjustment increases or reduces the category balance."
+  },
+  "dashboard": {
+    "periodBalances": "Virtual balances for this period",
+    "allocated": "Allocated",
+    "spent": "Spent",
+    "balance": "Balance",
+    "annualTitle": "Annual summary",
+    "annualDescription": "Groups movements by effective date. Balances do not carry between periods.",
+    "year": "Year",
+    "loadAnnual": "View summary",
+    "netChange": "Virtual change",
+    "invalidYear": "Enter a valid four-digit year.",
+    "loadError": "We couldn't load the annual summary."
   }
 }

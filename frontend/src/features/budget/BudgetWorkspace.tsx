@@ -23,8 +23,15 @@ import {
 type Props = { accessToken: string; onSignOut: () => void; userEmail?: string };
 type DraftCategory = { name: string; percentage: string };
 type MovementTab = "income" | "expense" | "adjustment";
+type AnnualSummary = { income: number; expense: number; adjustment: number };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 function numberValue(value: string) {
@@ -44,6 +51,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [incomes, setIncomes] = useState<IncomeEntry[]>([]);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [adjustments, setAdjustments] = useState<BudgetAdjustment[]>([]);
+  const [annualYear, setAnnualYear] = useState(
+    String(new Date().getFullYear()),
+  );
+  const [annualSummary, setAnnualSummary] = useState<AnnualSummary | null>(
+    null,
+  );
+  const [annualSummaryBudgetId, setAnnualSummaryBudgetId] = useState("");
+  const [isLoadingAnnual, setIsLoadingAnnual] = useState(false);
   const [tab, setTab] = useState<MovementTab>("income");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,9 +86,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const selectedBudget = budgets.find(
     (budget) => budget.id === selectedBudgetId,
   );
-  const selectedPeriod = periods.find(
-    (period) => period.id === selectedPeriodId,
-  );
   const activeCategories = categories.filter(
     (category) => !category.archived_at,
   );
@@ -82,6 +94,30 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       total + (Number(category.percentage.replace(",", ".")) || 0),
     0,
   );
+
+  const categoryBalances = activeCategories.map((category) => {
+    const allocated = incomes.reduce(
+      (total, income) =>
+        total +
+        income.allocation_snapshot
+          .filter((allocation) => allocation.category_id === category.id)
+          .reduce((sum, allocation) => sum + allocation.allocated_amount, 0),
+      0,
+    );
+    const spent = expenses
+      .filter((expense) => expense.category_id === category.id)
+      .reduce((total, expense) => total + expense.amount, 0);
+    const adjusted = adjustments
+      .filter((adjustment) => adjustment.category_id === category.id)
+      .reduce((total, adjustment) => total + adjustment.amount_delta, 0);
+    return {
+      category,
+      allocated,
+      spent,
+      adjusted,
+      balance: allocated - spent + adjusted,
+    };
+  });
 
   const loadBudgets = useCallback(async () => {
     const nextBudgets = await spendwiseApi.listBudgets(accessToken);
@@ -94,11 +130,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   }, [accessToken]);
 
   const loadWorkspace = useCallback(async () => {
-    if (!selectedBudgetId) {
-      setPeriods([]);
-      setCategories([]);
-      return;
-    }
+    if (!selectedBudgetId) return;
     const [nextPeriods, nextCategories] = await Promise.all([
       spendwiseApi.listPeriods(accessToken, selectedBudgetId),
       spendwiseApi.listCategories(accessToken, selectedBudgetId),
@@ -113,12 +145,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   }, [accessToken, selectedBudgetId]);
 
   const loadMovements = useCallback(async () => {
-    if (!selectedBudgetId || !selectedPeriodId) {
-      setIncomes([]);
-      setExpenses([]);
-      setAdjustments([]);
-      return;
-    }
+    if (!selectedBudgetId || !selectedPeriodId) return;
     const [nextIncomes, nextExpenses, nextAdjustments] = await Promise.all([
       spendwiseApi.listIncomes(accessToken, selectedBudgetId, selectedPeriodId),
       spendwiseApi.listExpenses(
@@ -139,7 +166,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   useEffect(() => {
     let active = true;
-    setIsLoading(true);
     spendwiseApi
       .listBudgets(accessToken)
       .then((nextBudgets) => {
@@ -166,17 +192,23 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   useEffect(() => {
     if (!selectedBudgetId) return;
-    void loadWorkspace().catch(() => {
-      setIsError(true);
-      setNotice(t("budget.setupError"));
-    });
+    const timer = setTimeout(() => {
+      void loadWorkspace().catch(() => {
+        setIsError(true);
+        setNotice(t("budget.setupError"));
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadWorkspace, selectedBudgetId, t]);
 
   useEffect(() => {
-    void loadMovements().catch(() => {
-      setIsError(true);
-      setNotice(t("movement.loadError"));
-    });
+    const timer = setTimeout(() => {
+      void loadMovements().catch(() => {
+        setIsError(true);
+        setNotice(t("movement.loadError"));
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadMovements, t]);
 
   const formatAmount = useMemo(
@@ -184,7 +216,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       new Intl.NumberFormat(i18n.language, {
         style: "currency",
         currency: selectedBudget?.currency_code ?? currency,
-        maximumFractionDigits: 2,
+        maximumFractionDigits: 4,
       }),
     [currency, i18n.language, selectedBudget?.currency_code],
   );
@@ -357,6 +389,91 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     }
   }
 
+  async function loadAnnualSummary() {
+    if (
+      !selectedBudgetId ||
+      !/^\d{4}$/.test(annualYear) ||
+      Number(annualYear) < 1
+    ) {
+      setIsError(true);
+      setNotice(t("dashboard.invalidYear"));
+      return;
+    }
+    const year = Number(annualYear);
+    const from = `${annualYear}-01-01`;
+    const to = `${annualYear}-12-31`;
+    const relevantPeriods = periods.filter(
+      (period) => period.starts_on <= to && period.ends_on >= from,
+    );
+    setIsLoadingAnnual(true);
+    setIsError(false);
+    setNotice("");
+    try {
+      let incomeTotal = 0;
+      let expenseTotal = 0;
+      let adjustmentTotal = 0;
+      async function allPages<T>(
+        page: (offset: number) => Promise<T[]>,
+      ): Promise<T[]> {
+        const rows: T[] = [];
+        for (let offset = 0; ; offset += 100) {
+          const current = await page(offset);
+          rows.push(...current);
+          if (current.length < 100) return rows;
+        }
+      }
+      for (const period of relevantPeriods) {
+        const [periodIncomes, periodExpenses, periodAdjustments] =
+          await Promise.all([
+            allPages((offset) =>
+              spendwiseApi.listIncomes(
+                accessToken,
+                selectedBudgetId,
+                period.id,
+                offset,
+              ),
+            ),
+            allPages((offset) =>
+              spendwiseApi.listExpenses(
+                accessToken,
+                selectedBudgetId,
+                period.id,
+                offset,
+              ),
+            ),
+            allPages((offset) =>
+              spendwiseApi.listAdjustments(
+                accessToken,
+                selectedBudgetId,
+                period.id,
+                offset,
+              ),
+            ),
+          ]);
+        incomeTotal += periodIncomes
+          .filter((item) => item.occurred_on.startsWith(`${year}-`))
+          .reduce((total, item) => total + item.amount, 0);
+        expenseTotal += periodExpenses
+          .filter((item) => item.spent_on.startsWith(`${year}-`))
+          .reduce((total, item) => total + item.amount, 0);
+        adjustmentTotal += periodAdjustments
+          .filter((item) => item.occurred_on.startsWith(`${year}-`))
+          .reduce((total, item) => total + item.amount_delta, 0);
+      }
+      setAnnualSummary({
+        income: incomeTotal,
+        expense: expenseTotal,
+        adjustment: adjustmentTotal,
+      });
+      setAnnualSummaryBudgetId(selectedBudgetId);
+    } catch {
+      setIsError(true);
+      setNotice(t("dashboard.loadError"));
+    } finally {
+      setIsLoadingAnnual(false);
+    }
+  }
+
   const canRecordMovements = Boolean(
     selectedPeriodId && activeCategories.length,
   );
@@ -371,6 +488,18 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       ),
     );
   };
+
+  function selectBudget(budgetId: string) {
+    setSelectedBudgetId(budgetId);
+    setSelectedPeriodId("");
+    setPeriods([]);
+    setCategories([]);
+    setIncomes([]);
+    setExpenses([]);
+    setAdjustments([]);
+    setAnnualSummary(null);
+    setAnnualSummaryBudgetId("");
+  }
 
   if (isLoading) {
     return (
@@ -421,7 +550,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 key={budget.id}
                 label={budget.name}
                 selected={budget.id === selectedBudgetId}
-                onPress={() => setSelectedBudgetId(budget.id)}
+                onPress={() => selectBudget(budget.id)}
               />
             ))}
           </View>
@@ -476,6 +605,32 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ) : null}
           {canRecordMovements ? (
             <>
+              <Text style={styles.sectionTitle}>
+                {t("dashboard.periodBalances")}
+              </Text>
+              <View style={styles.list}>
+                {categoryBalances.map((item) => (
+                  <View key={item.category.id} style={styles.entry}>
+                    <View style={styles.entryText}>
+                      <Text style={styles.entryTitle}>
+                        {item.category.name}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {t("dashboard.allocated")}:{" "}
+                        {formatAmount.format(item.allocated)} ·{" "}
+                        {t("dashboard.spent")}:{" "}
+                        {formatAmount.format(item.spent)}
+                      </Text>
+                    </View>
+                    <View style={styles.balanceValue}>
+                      <Text style={styles.muted}>{t("dashboard.balance")}</Text>
+                      <Text style={styles.entryAmount}>
+                        {formatAmount.format(item.balance)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
               <View style={styles.summary}>
                 <Summary
                   label={t("movement.income")}
@@ -495,6 +650,64 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   )}
                   format={formatAmount}
                 />
+              </View>
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>
+                  {t("dashboard.annualTitle")}
+                </Text>
+                <Text style={styles.muted}>
+                  {t("dashboard.annualDescription")}
+                </Text>
+                <View style={styles.annualRow}>
+                  <TextInput
+                    accessibilityLabel={t("dashboard.year")}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    onChangeText={(value) => {
+                      setAnnualYear(value);
+                      setAnnualSummary(null);
+                    }}
+                    style={[styles.input, styles.yearInput]}
+                    value={annualYear}
+                  />
+                  <ActionButton
+                    disabled={isLoadingAnnual}
+                    label={
+                      isLoadingAnnual
+                        ? t("common.loading")
+                        : t("dashboard.loadAnnual")
+                    }
+                    onPress={loadAnnualSummary}
+                  />
+                </View>
+                {annualSummary && annualSummaryBudgetId === selectedBudgetId ? (
+                  <View style={styles.summary}>
+                    <Summary
+                      label={t("movement.income")}
+                      value={annualSummary.income}
+                      format={formatAmount}
+                    />
+                    <Summary
+                      label={t("movement.expense")}
+                      value={annualSummary.expense}
+                      format={formatAmount}
+                    />
+                    <Summary
+                      label={t("movement.adjustment")}
+                      value={annualSummary.adjustment}
+                      format={formatAmount}
+                    />
+                    <Summary
+                      label={t("dashboard.netChange")}
+                      value={
+                        annualSummary.income -
+                        annualSummary.expense +
+                        annualSummary.adjustment
+                      }
+                      format={formatAmount}
+                    />
+                  </View>
+                ) : null}
               </View>
               <View style={styles.tabs}>
                 {(["income", "expense", "adjustment"] as const).map((item) => (
@@ -949,6 +1162,9 @@ const styles = StyleSheet.create({
   },
   summaryValue: { color: "#18291f", fontSize: 18, fontWeight: "700" },
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  balanceValue: { alignItems: "flex-end", gap: 2 },
+  annualRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  yearInput: { width: 100 },
   list: { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 14 },
   entry: {
     minHeight: 56,

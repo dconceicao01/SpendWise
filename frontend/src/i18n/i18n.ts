@@ -1,4 +1,4 @@
-import i18n from "i18next";
+import { createInstance } from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "@/i18n/locales/en.json";
 import pt from "@/i18n/locales/pt.json";
@@ -7,6 +7,8 @@ import {
   writeLanguagePreference,
 } from "@/i18n/language-preference";
 import { resolveDeviceLanguage, type SupportedLanguage } from "@/i18n/language";
+
+const i18n = createInstance();
 
 export const i18nReady = i18n.use(initReactI18next).init({
   resources: {

@@ -99,8 +99,12 @@ function jsonBody(value: unknown): Pick<RequestInit, "method" | "body"> {
   return { method: "POST", body: JSON.stringify(value) };
 }
 
-function movementQuery(periodId: string) {
-  const params = new URLSearchParams({ periodId, limit: "100", offset: "0" });
+function movementQuery(periodId: string, offset = 0) {
+  const params = new URLSearchParams({
+    periodId,
+    limit: "100",
+    offset: String(offset),
+  });
   return `?${params.toString()}`;
 }
 
@@ -148,10 +152,15 @@ export const spendwiseApi = {
       `/budgets/${budgetId}/allocation-sets/${setId}/activate`,
       { method: "POST" },
     ),
-  listIncomes: (token: string, budgetId: string, periodId: string) =>
+  listIncomes: (
+    token: string,
+    budgetId: string,
+    periodId: string,
+    offset = 0,
+  ) =>
     request<IncomeEntry[]>(
       token,
-      `/budgets/${budgetId}/incomes${movementQuery(periodId)}`,
+      `/budgets/${budgetId}/incomes${movementQuery(periodId, offset)}`,
     ),
   createIncome: (
     token: string,
@@ -163,10 +172,15 @@ export const spendwiseApi = {
       `/budgets/${budgetId}/incomes`,
       jsonBody(input),
     ),
-  listExpenses: (token: string, budgetId: string, periodId: string) =>
+  listExpenses: (
+    token: string,
+    budgetId: string,
+    periodId: string,
+    offset = 0,
+  ) =>
     request<ExpenseEntry[]>(
       token,
-      `/budgets/${budgetId}/expenses${movementQuery(periodId)}`,
+      `/budgets/${budgetId}/expenses${movementQuery(periodId, offset)}`,
     ),
   createExpense: (
     token: string,
@@ -184,10 +198,15 @@ export const spendwiseApi = {
       `/budgets/${budgetId}/expenses`,
       jsonBody(input),
     ),
-  listAdjustments: (token: string, budgetId: string, periodId: string) =>
+  listAdjustments: (
+    token: string,
+    budgetId: string,
+    periodId: string,
+    offset = 0,
+  ) =>
     request<BudgetAdjustment[]>(
       token,
-      `/budgets/${budgetId}/adjustments${movementQuery(periodId)}`,
+      `/budgets/${budgetId}/adjustments${movementQuery(periodId, offset)}`,
     ),
   createAdjustment: (
     token: string,
