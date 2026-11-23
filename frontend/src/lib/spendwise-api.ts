@@ -1,3 +1,5 @@
+import { getRuntimeConfig } from "@/lib/runtime-config";
+
 export type BudgetType = "PERSONAL" | "SHARED";
 
 export type Budget = {
@@ -112,15 +114,7 @@ export class SpendWiseApiError extends Error {
   }
 }
 
-const configuredApiUrl = process.env.EXPO_PUBLIC_SPENDWISE_API_URL?.replace(
-  /\/$/,
-  "",
-);
-
-function requireApiUrl() {
-  if (!configuredApiUrl) throw new SpendWiseApiError(0);
-  return configuredApiUrl;
-}
+function requireApiUrl() {\n  const apiUrl = getRuntimeConfig().apiUrl;\n  if (!apiUrl) throw new SpendWiseApiError(0);\n  return apiUrl;\n}
 
 async function request<T>(
   accessToken: string,
