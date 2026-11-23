@@ -7,6 +7,8 @@
     "retry": "Try again",
     "signOut": "Sign out",
     "switchLanguage": "Change language to {{language}}",
+    "languagePortuguese": "Portuguese",
+    "languageEnglish": "English",
     "error": "We couldn't complete this action. Please try again."
   },
   "auth": {

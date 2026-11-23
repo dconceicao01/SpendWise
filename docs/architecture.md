@@ -1,5 +1,7 @@
 # Arquitetura e módulos
 
+O backend usa Java 21, Spring Boot 4.2 e springdoc-openapi 3.2. A linha Spring Boot 4 traz Jackson 3; manter as anotações específicas de databind no namespace `tools.jackson` e confirmar que os contratos JSON continuam a serializar os nomes e formatos previstos.
+
 ## Visão de contexto
 
 ```mermaid
@@ -96,7 +98,18 @@ flowchart TB
   MIG -->|Após validação e aprovação| PROD
 ```
 
-Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos independentes. Staging usa dados sintéticos. A seleção da região europeia e do plano Supabase é pré-requisito de produção: verificar disponibilidade, backups/PITR, localização de backups, subprocessadores, DPA e transferências no contrato efetivamente escolhido. Localização EU, por si só, não garante conformidade RGPD.
+Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos independentes. Staging usa dados sintéticos. A região escolhida é Paris (`eu-west-3`); Supabase Free é aceite para desenvolvimento/staging e piloto inicial de baixa afluência. O plano Free pode pausar projetos inativos e não inclui backups geridos; não há compromisso de SLA e o piloto deve ser promovido/reavaliado antes de aumentar a utilização. A escolha da região não garante conformidade RGPD.
+
+### Cópias de segurança e recuperação
+
+- Objetivos aprovados: RPO até 24 horas, RTO até 8 horas e retenção de 7 dias.
+- Destino planeado: Cloudflare R2 com jurisdição EU, usando exclusivamente a quota gratuita (10 GB-mês na data desta decisão). Cifrar o artefacto no cliente antes do upload; guardar chaves de cifragem separadas do bucket e com acesso operacional restrito.
+- Parar o envio e alertar antes de ultrapassar a quota gratuita; não ativar faturação/overage. A disponibilidade da cópia não pode depender apenas de um cron de GitHub Actions, pois os horários podem atrasar ou falhar: monitorizar frescura e alertar quando a última cópia válida exceder 24 horas.
+- Um dump PostgreSQL padrão da CLI Supabase exclui schemas geridos como `auth`; portanto, backup da aplicação sozinho não cumpre recuperação. O procedimento deve capturar e validar separadamente `auth.users` e tabelas relacionadas, definir restauro seguro num projeto limpo, e preservar/configurar separadamente settings Auth, chaves e segredos. Tokens ativos podem deixar de ser válidos após migração.
+- Cópias incluem dados pessoais e valores virtuais: controlar acesso, cifrar antes da saída, testar a eliminação por expiração após 7 dias e documentar que pedidos de apagamento podem permanecer nas cópias até essa expiração.
+- Realizar exercício de restauro trimestral. RPO/RTO são alvos aprovados, não garantias, até se demonstrar um restauro completo de dados e Auth dentro dos tempos definidos.
+
+Lovable fica limitado a prototipagem/preview, sem Lovable Cloud/backend. A produção web via hosting Lovable não está aprovada; frontend e backend de produção continuam sem fornecedor selecionado.
 
 ## Requisitos não funcionais
 
@@ -105,15 +118,15 @@ Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos 
 - RLS habilitada em cada tabela do schema exposto, grants mínimos, políticas por operação e testes positivos/negativos por papel.
 - Paginação e limites de tamanho; validação server-side; limites de pedido e rate limiting em login, recuperação, convites e escrita.
 - CORS por allowlist dos domínios de cada ambiente; CSP restritiva; prevenção de XSS e dependências com lockfiles.
-- Backups, retenção, RPO/RTO e teste periódico de restauro definidos antes de produção. Backup não substitui exportação/eliminação aplicável.
+- Backups: decisões para piloto definidas acima; automação, cópia completa de Auth, alertas de frescura e teste periódico de restauro ainda por implementar/validar. Backup não substitui exportação/eliminação aplicável.
 - Métricas e logs com IDs de correlação pseudónimos. Não incluir access tokens, e-mails completos, payloads de rendimentos/despesas ou secrets.
 - Objetivos de latência são metas a medir em staging/produção; o requisito antigo `<200 ms` não é garantia sem carga, região e percentil definidos.
 
 ## Decisões ainda abertas
 
-- Fornecedor e região exatos para frontend/API de produção; Lovable é prototipagem/preview até essa seleção.
+- Fornecedor de hosting para frontend/API de produção; Lovable é prototipagem/preview, sem backend.
 - Versões de Java/Spring suportadas no início da implementação e política de atualização.
 - Alojamento de email, analytics, logging e gestão de segredos; cada fornecedor precisa de avaliação de dados e contrato.
-- Retenção por tipo de dado, critérios de arquivo e processo de eliminação em backups.
+- Contratos/DPA e subprocessadores dos fornecedores selecionados; processo operacional de eliminação em backups após a retenção de 7 dias.
 - Se e como habilitar MFA por defeito, exigência de MFA para funções privilegiadas e duração de sessão.
 - AIPD/DPIA: documentar avaliação de necessidade e conclusão antes do lançamento.

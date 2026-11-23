@@ -13,12 +13,16 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "test": "jest --ci",
+    "test:watch": "jest --watch",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check .",
     "build:web": "expo export --platform web",
     "lint": "expo lint"
   },
   "dependencies": {
+    "@babel/runtime": "7.29.15",
     "@expo/ui": "~58.0.29",
     "@supabase/supabase-js": "2.119.2",
     "expo": "~58.0.26",
@@ -49,10 +53,29 @@
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "30.0.0",
+    "@types/node": "^24.19.2",
     "@types/react": "~19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
+    "jest": "~30.5.2",
+    "jest-expo": "~58.0.15",
     "prettier": "3.9.9",
     "typescript": "~6.0.3"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testMatch": [
+      "**/?(*.)+(spec|test).[jt]s?(x)"
+    ],
+    "testPathIgnorePatterns": [
+      "/e2e/"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    }
   }
 }

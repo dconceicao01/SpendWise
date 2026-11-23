@@ -1,5 +1,12 @@
 # Princípios de desenvolvimento
 
+## Testes
+
+- Frontend Expo: usar Jest com `jest-expo` e React Native Testing Library, evitando testes baseados em detalhes internos de implementação. Executar `pnpm test` sem modo watch em CI e manter testes perto do módulo com sufixo `.test.ts`/`.test.tsx`.
+- Testar regras puras, persistência de preferências, limites de segurança e comportamento visível/acessível. Para módulos nativos, mockar somente a fronteira nativa; não substituir a lógica da aplicação no teste.
+- Backend: testar regras de domínio e serviços com JUnit/Spring Boot; testar a Data API/RLS e migrations contra Supabase local/fixtures sintéticas. Nunca apontar suites para produção.
+- Testes de integração Auth/RLS e execução das migrations continuam a ser fechados na MVP-24/MVP-27; testes E2E e acessibilidade automatizada nas rotas principais pertencem à MVP-25. Testes unitários não substituem esses gates.
+
 Estas regras aplicam-se ao frontend e ao backend. A escolha de uma biblioteca não substitui a validação de privacidade, segurança, acessibilidade ou obrigações legais do produto.
 
 ## Dependências e licenças

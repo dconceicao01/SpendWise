@@ -1,6 +1,6 @@
 # SpendWise API
 
-API de domínio do SpendWise, construída com Java 21, Spring Boot 3.5 e Maven.
+API de domínio do SpendWise, construída com Java 21, Spring Boot 4.2 e Maven. A linha 4 usa Jackson 3; manter as anotações Jackson core em `com.fasterxml.jackson.annotation` e as anotações de databind em `tools.jackson.databind.annotation`.
 
 ## Pré-requisitos
 
@@ -23,6 +23,8 @@ $env:SUPABASE_SERVICE_ROLE_KEY = "<chave secreta apenas no servidor>"
 
 Spring Security Resource Server obtém as chaves públicas em `{SUPABASE_ISSUER_URI}/.well-known/jwks.json` e valida assinatura, `iss`, `exp` e `aud=authenticated`; tokens anónimos (`aud=anon`) são recusados. O projeto Supabase deve emitir tokens com uma chave de assinatura publicada no JWKS; uma chave legacy simétrica não satisfaz este fluxo. `GET /api/v1/health` é público; os restantes endpoints exigem Bearer JWT válido. Os erros de autenticação não incluem tokens nem claims na resposta. A API mantém erros técnicos independentes do idioma; a interface deve traduzir os códigos/estados para a língua selecionada pelo utilizador.
 
+CORS está limitado por omissão às origens locais `http://localhost:8081` e `http://127.0.0.1:8081`. Em staging/produção, define `SPENDWISE_CORS_ALLOWED_ORIGINS` como lista separada por vírgulas de origens HTTPS exatas (scheme, host e porta quando aplicável), por exemplo `https://app.example.com`; não usar `*`. A API não aceita credenciais por cookies e permite apenas os métodos/headers usados pelo cliente. O hosting do frontend deve configurar CSP e restantes cabeçalhos HTTP no documento web, uma vez que estes cabeçalhos não são efetivos quando enviados pela API.
+
 Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados. `SUPABASE_SERVICE_ROLE_KEY` só é usada pelo endpoint de eliminação para a chamada Auth Admin, depois de a limpeza transacional de dados terminar; nunca a configurar no frontend nem em pedidos normais.
 
 Para executar os testes:
@@ -30,6 +32,14 @@ Para executar os testes:
 ```powershell
 .\mvnw.cmd verify
 ```
+
+Para construir a imagem do container localmente, a partir de `backend/`:
+
+```powershell
+docker build -t spendwise-api:local .
+```
+
+A imagem usa Java 21 JRE e executa como utilizador sem privilégios. A CI constrói a imagem e verifica vulnerabilidades altas/críticas; a imagem ainda não é publicada nem implantada por este workflow.
 
 ## Exportação de dados pessoais
 
