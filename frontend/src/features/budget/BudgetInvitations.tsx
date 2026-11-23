@@ -156,7 +156,9 @@ export function BudgetInvitations({ accessToken, budgetId }: Props) {
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{t("invitation.manageTitle")}</Text>
-      <Text style={styles.description}>{t("invitation.manageDescription")}</Text>
+      <Text style={styles.description}>
+        {t("invitation.manageDescription")}
+      </Text>
 
       {notice ? (
         <Text

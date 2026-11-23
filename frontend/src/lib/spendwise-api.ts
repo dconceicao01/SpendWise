@@ -174,10 +174,7 @@ export const spendwiseApi = {
     ownerTransfers: { budgetId: string; targetMemberId: string }[],
   ) => request<void>(token, "/me/deletion", jsonBody({ ownerTransfers })),
   listBudgetInvitations: (token: string, budgetId: string) =>
-    request<BudgetInvitation[]>(
-      token,
-      `/budgets/${budgetId}/invitations`,
-    ),
+    request<BudgetInvitation[]>(token, `/budgets/${budgetId}/invitations`),
   createBudgetInvitation: (
     token: string,
     budgetId: string,
