@@ -1,0 +1,209 @@
+export type BudgetType = "PERSONAL" | "SHARED";
+
+export type Budget = {
+  id: string;
+  name: string;
+  budget_type: BudgetType;
+  currency_code: string;
+  archived_at: string | null;
+};
+
+export type BudgetPeriod = {
+  id: string;
+  budget_id: string;
+  starts_on: string;
+  ends_on: string;
+};
+
+export type BudgetCategory = {
+  id: string;
+  budget_id: string;
+  name: string;
+  archived_at: string | null;
+};
+
+export type AllocationSet = {
+  id: string;
+  budgetId: string;
+  version: number;
+  status: "DRAFT" | "ACTIVE" | "RETIRED";
+  items: { categoryId: string; percentage: number }[];
+};
+
+export type IncomeEntry = {
+  id: string;
+  period_id: string;
+  amount: number;
+  occurred_on: string;
+  allocation_snapshot: {
+    category_id: string;
+    percentage_basis_points: number;
+    allocated_amount: number;
+  }[];
+};
+
+export type ExpenseEntry = {
+  id: string;
+  period_id: string;
+  category_id: string;
+  amount: number;
+  spent_on: string;
+  description: string | null;
+};
+
+export type BudgetAdjustment = {
+  id: string;
+  period_id: string;
+  category_id: string;
+  corrected_expense_entry_id: string | null;
+  amount_delta: number;
+  reason: string;
+  occurred_on: string;
+};
+
+export class SpendWiseApiError extends Error {
+  constructor(readonly status: number) {
+    super("SpendWise API request failed");
+  }
+}
+
+const configuredApiUrl = process.env.EXPO_PUBLIC_SPENDWISE_API_URL?.replace(
+  /\/$/,
+  "",
+);
+
+function requireApiUrl() {
+  if (!configuredApiUrl) throw new SpendWiseApiError(0);
+  return configuredApiUrl;
+}
+
+async function request<T>(
+  accessToken: string,
+  path: string,
+  init?: RequestInit,
+) {
+  const response = await fetch(`${requireApiUrl()}/api/v1${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
+  if (!response.ok) throw new SpendWiseApiError(response.status);
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+function jsonBody(value: unknown): Pick<RequestInit, "method" | "body"> {
+  return { method: "POST", body: JSON.stringify(value) };
+}
+
+function movementQuery(periodId: string) {
+  const params = new URLSearchParams({ periodId, limit: "100", offset: "0" });
+  return `?${params.toString()}`;
+}
+
+export const spendwiseApi = {
+  listBudgets: (token: string) => request<Budget[]>(token, "/budgets"),
+  createBudget: (
+    token: string,
+    input: { name: string; budgetType: BudgetType; currencyCode: string },
+  ) => request<Budget>(token, "/budgets", jsonBody(input)),
+  listPeriods: (token: string, budgetId: string) =>
+    request<BudgetPeriod[]>(token, `/budgets/${budgetId}/periods`),
+  createPeriod: (
+    token: string,
+    budgetId: string,
+    input: { startsOn: string; endsOn: string },
+  ) =>
+    request<BudgetPeriod>(
+      token,
+      `/budgets/${budgetId}/periods`,
+      jsonBody(input),
+    ),
+  listCategories: (token: string, budgetId: string) =>
+    request<BudgetCategory[]>(token, `/budgets/${budgetId}/categories`),
+  createCategory: (token: string, budgetId: string, name: string) =>
+    request<BudgetCategory>(
+      token,
+      `/budgets/${budgetId}/categories`,
+      jsonBody({ name }),
+    ),
+  listAllocationSets: (token: string, budgetId: string) =>
+    request<AllocationSet[]>(token, `/budgets/${budgetId}/allocation-sets`),
+  createAllocationSet: (
+    token: string,
+    budgetId: string,
+    items: { categoryId: string; percentage: number }[],
+  ) =>
+    request<AllocationSet>(
+      token,
+      `/budgets/${budgetId}/allocation-sets`,
+      jsonBody({ items }),
+    ),
+  activateAllocationSet: (token: string, budgetId: string, setId: string) =>
+    request<AllocationSet>(
+      token,
+      `/budgets/${budgetId}/allocation-sets/${setId}/activate`,
+      { method: "POST" },
+    ),
+  listIncomes: (token: string, budgetId: string, periodId: string) =>
+    request<IncomeEntry[]>(
+      token,
+      `/budgets/${budgetId}/incomes${movementQuery(periodId)}`,
+    ),
+  createIncome: (
+    token: string,
+    budgetId: string,
+    input: { period_id: string; amount: number; occurred_on: string },
+  ) =>
+    request<IncomeEntry>(
+      token,
+      `/budgets/${budgetId}/incomes`,
+      jsonBody(input),
+    ),
+  listExpenses: (token: string, budgetId: string, periodId: string) =>
+    request<ExpenseEntry[]>(
+      token,
+      `/budgets/${budgetId}/expenses${movementQuery(periodId)}`,
+    ),
+  createExpense: (
+    token: string,
+    budgetId: string,
+    input: {
+      period_id: string;
+      category_id: string;
+      amount: number;
+      spent_on: string;
+      description: string | null;
+    },
+  ) =>
+    request<ExpenseEntry>(
+      token,
+      `/budgets/${budgetId}/expenses`,
+      jsonBody(input),
+    ),
+  listAdjustments: (token: string, budgetId: string, periodId: string) =>
+    request<BudgetAdjustment[]>(
+      token,
+      `/budgets/${budgetId}/adjustments${movementQuery(periodId)}`,
+    ),
+  createAdjustment: (
+    token: string,
+    budgetId: string,
+    input: {
+      period_id: string;
+      category_id: string;
+      amount_delta: number;
+      reason: string;
+      occurred_on: string;
+      corrected_expense_entry_id: string | null;
+    },
+  ) =>
+    request<BudgetAdjustment>(
+      token,
+      `/budgets/${budgetId}/adjustments`,
+      jsonBody(input),
+    ),
+};
