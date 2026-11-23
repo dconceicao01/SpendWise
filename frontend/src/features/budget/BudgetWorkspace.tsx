@@ -18,6 +18,9 @@ import {
   type BudgetPeriod,
   type ExpenseEntry,
   type IncomeEntry,
+  type IncomeSchedule,
+  type IncomeScheduleFrequency,
+  type MonthlyShortMonthBehavior,
 } from "@/lib/spendwise-api";
 
 type Props = { accessToken: string; onSignOut: () => void; userEmail?: string };
@@ -60,6 +63,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [incomes, setIncomes] = useState<IncomeEntry[]>([]);
+  const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [adjustments, setAdjustments] = useState<BudgetAdjustment[]>([]);
   const [annualYear, setAnnualYear] = useState(
@@ -89,6 +93,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   ]);
   const [amount, setAmount] = useState("");
   const [movementDate, setMovementDate] = useState(today());
+  const [scheduleFrequency, setScheduleFrequency] =
+    useState<IncomeScheduleFrequency>("MONTHLY");
+  const [shortMonthBehavior, setShortMonthBehavior] =
+    useState<MonthlyShortMonthBehavior>("LAST_DAY");
+  const [scheduleEndDate, setScheduleEndDate] = useState("");
+  const [incomeRecurring, setIncomeRecurring] = useState(false);
   const [movementCategoryId, setMovementCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [adjustmentSign, setAdjustmentSign] = useState<1 | -1>(1);
@@ -142,12 +152,16 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   const loadWorkspace = useCallback(async () => {
     if (!selectedBudgetId) return;
-    const [nextPeriods, nextCategories] = await Promise.all([
+    const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
       spendwiseApi.listPeriods(accessToken, selectedBudgetId),
       spendwiseApi.listCategories(accessToken, selectedBudgetId),
+      allPages((offset) =>
+        spendwiseApi.listIncomeSchedules(accessToken, selectedBudgetId, offset),
+      ),
     ]);
     setPeriods(nextPeriods);
     setCategories(nextCategories);
+    setIncomeSchedules(nextSchedules);
     setSelectedPeriodId((current) =>
       nextPeriods.some((period) => period.id === current)
         ? current
@@ -339,12 +353,38 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     setNotice("");
     try {
       if (tab === "income") {
-        await spendwiseApi.createIncome(accessToken, selectedBudgetId, {
-          period_id: selectedPeriodId,
-          amount: parsedAmount,
-          occurred_on: movementDate,
-        });
-        setNotice(t("movement.incomeSaved"));
+        if (incomeRecurring) {
+          if (
+            scheduleEndDate &&
+            (!datePattern.test(scheduleEndDate) ||
+              scheduleEndDate < movementDate)
+          ) {
+            setIsError(true);
+            setNotice(t("schedule.invalid"));
+            return;
+          }
+          await spendwiseApi.createIncomeSchedule(
+            accessToken,
+            selectedBudgetId,
+            {
+              amount: parsedAmount,
+              frequency: scheduleFrequency,
+              monthlyShortMonthBehavior: shortMonthBehavior,
+              startDate: movementDate,
+              endDate: scheduleEndDate || null,
+            },
+          );
+          setNotice(t("schedule.created"));
+          setScheduleEndDate("");
+          await loadWorkspace();
+        } else {
+          await spendwiseApi.createIncome(accessToken, selectedBudgetId, {
+            period_id: selectedPeriodId,
+            amount: parsedAmount,
+            occurred_on: movementDate,
+          });
+          setNotice(t("movement.incomeSaved"));
+        }
       } else if (tab === "expense") {
         if (!movementCategoryId) throw new Error("Choose a category");
         await spendwiseApi.createExpense(accessToken, selectedBudgetId, {
@@ -375,6 +415,30 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     } catch {
       setIsError(true);
       setNotice(t("movement.saveError"));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function setIncomeScheduleStatus(
+    schedule: IncomeSchedule,
+    status: "ACTIVE" | "PAUSED" | "CANCELLED",
+  ) {
+    if (!selectedBudgetId) return;
+    setIsSaving(true);
+    setIsError(false);
+    setNotice("");
+    try {
+      await spendwiseApi.updateIncomeSchedule(
+        accessToken,
+        selectedBudgetId,
+        schedule.id,
+        status,
+      );
+      await loadWorkspace();
+    } catch {
+      setIsError(true);
+      setNotice(t("schedule.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -619,6 +683,89 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ) : null}
           {canRecordMovements ? (
             <>
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>{t("schedule.title")}</Text>
+                <Text style={styles.muted}>{t("schedule.description")}</Text>
+                {incomeSchedules.length ? (
+                  <View style={styles.scheduleList}>
+                    {incomeSchedules.map((schedule) => {
+                      const pending =
+                        schedule.status === "ACTIVE" &&
+                        schedule.next_occurrence_on <= today();
+                      return (
+                        <View key={schedule.id} style={styles.scheduleItem}>
+                          <View style={styles.entryText}>
+                            <Text style={styles.entryTitle}>
+                              {formatAmount.format(schedule.amount)} ·{" "}
+                              {t(`schedule.frequencies.${schedule.frequency}`)}
+                            </Text>
+                            <Text style={styles.muted}>
+                              {t(`schedule.statuses.${schedule.status}`)} ·{" "}
+                              {t("schedule.nextDate")}:{" "}
+                              {schedule.next_occurrence_on}
+                            </Text>
+                            {schedule.frequency === "MONTHLY" ? (
+                              <Text style={styles.muted}>
+                                {t("schedule.shortMonths")}:{" "}
+                                {t(
+                                  `schedule.shortMonthBehaviors.${schedule.monthly_short_month_behavior}`,
+                                )}
+                              </Text>
+                            ) : null}
+                            {pending ? (
+                              <Text style={styles.error}>
+                                {t("schedule.pendingNoPeriod")}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {schedule.status === "ACTIVE" ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={isSaving}
+                              onPress={() =>
+                                void setIncomeScheduleStatus(schedule, "PAUSED")
+                              }
+                            >
+                              <Text style={styles.link}>
+                                {t("schedule.pause")}
+                              </Text>
+                            </Pressable>
+                          ) : schedule.status === "PAUSED" ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={isSaving}
+                              onPress={() =>
+                                void setIncomeScheduleStatus(schedule, "ACTIVE")
+                              }
+                            >
+                              <Text style={styles.link}>
+                                {t("schedule.resume")}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {schedule.status === "ACTIVE" ||
+                          schedule.status === "PAUSED" ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={isSaving}
+                              onPress={() =>
+                                void setIncomeScheduleStatus(
+                                  schedule,
+                                  "CANCELLED",
+                                )
+                              }
+                            >
+                              <Text style={styles.link}>
+                                {t("schedule.cancel")}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.sectionTitle}>
                 {t("dashboard.periodBalances")}
               </Text>
@@ -744,9 +891,25 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   )}
                 </Text>
                 {tab === "income" ? (
-                  <Text style={styles.muted}>
-                    {t("movement.activeAllocation")}
-                  </Text>
+                  <>
+                    <View style={styles.rowWrap}>
+                      <Choice
+                        label={t("schedule.single")}
+                        selected={!incomeRecurring}
+                        onPress={() => setIncomeRecurring(false)}
+                      />
+                      <Choice
+                        label={t("schedule.recurring")}
+                        selected={incomeRecurring}
+                        onPress={() => setIncomeRecurring(true)}
+                      />
+                    </View>
+                    <Text style={styles.muted}>
+                      {incomeRecurring
+                        ? t("schedule.recurringDescription")
+                        : t("movement.activeAllocation")}
+                    </Text>
+                  </>
                 ) : (
                   <>
                     <Text style={styles.label}>{t("movement.category")}</Text>
@@ -777,14 +940,71 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   style={styles.input}
                   value={amount}
                 />
-                <Text style={styles.label}>{t("movement.date")}</Text>
+                <Text style={styles.label}>
+                  {tab === "income" && incomeRecurring
+                    ? t("schedule.startDate")
+                    : t("movement.date")}
+                </Text>
                 <TextInput
-                  accessibilityLabel={t("movement.date")}
+                  accessibilityLabel={
+                    tab === "income" && incomeRecurring
+                      ? t("schedule.startDate")
+                      : t("movement.date")
+                  }
                   onChangeText={setMovementDate}
                   placeholder="AAAA-MM-DD"
                   style={styles.input}
                   value={movementDate}
                 />
+                {tab === "income" && incomeRecurring ? (
+                  <>
+                    <Text style={styles.label}>{t("schedule.frequency")}</Text>
+                    <View style={styles.rowWrap}>
+                      {(["WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const).map(
+                        (frequency) => (
+                          <Choice
+                            key={frequency}
+                            label={t(`schedule.frequencies.${frequency}`)}
+                            selected={scheduleFrequency === frequency}
+                            onPress={() => setScheduleFrequency(frequency)}
+                          />
+                        ),
+                      )}
+                    </View>
+                    {scheduleFrequency === "MONTHLY" ? (
+                      <>
+                        <Text style={styles.label}>
+                          {t("schedule.shortMonths")}
+                        </Text>
+                        <Text style={styles.muted}>
+                          {t("schedule.shortMonthDescription")}
+                        </Text>
+                        <View style={styles.rowWrap}>
+                          {(["LAST_DAY", "SKIP"] as const).map((behavior) => (
+                            <Choice
+                              key={behavior}
+                              label={t(
+                                `schedule.shortMonthBehaviors.${behavior}`,
+                              )}
+                              selected={shortMonthBehavior === behavior}
+                              onPress={() => setShortMonthBehavior(behavior)}
+                            />
+                          ))}
+                        </View>
+                      </>
+                    ) : null}
+                    <Text style={styles.label}>
+                      {t("schedule.endDateOptional")}
+                    </Text>
+                    <TextInput
+                      accessibilityLabel={t("schedule.endDateOptional")}
+                      onChangeText={setScheduleEndDate}
+                      placeholder="AAAA-MM-DD"
+                      style={styles.input}
+                      value={scheduleEndDate}
+                    />
+                  </>
+                ) : null}
                 {tab === "expense" ? (
                   <>
                     <Text style={styles.label}>
@@ -832,7 +1052,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                     (tab !== "income" && !movementCategoryId) ||
                     (tab === "adjustment" && !reason.trim())
                   }
-                  label={isSaving ? t("common.saving") : t("common.save")}
+                  label={
+                    isSaving
+                      ? t("common.saving")
+                      : tab === "income" && incomeRecurring
+                        ? t("schedule.create")
+                        : t("common.save")
+                  }
                   onPress={submitMovement}
                 />
               </View>
@@ -1180,6 +1406,18 @@ const styles = StyleSheet.create({
   annualRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   yearInput: { width: 100 },
   list: { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 14 },
+  scheduleList: { marginTop: 8, borderTopColor: "#edf1ed", borderTopWidth: 1 },
+  scheduleItem: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomColor: "#edf1ed",
+    borderBottomWidth: 1,
+  },
   entry: {
     minHeight: 56,
     flexDirection: "row",
