@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { AccountSettings } from "@/features/profile/AccountSettings";
 import {
   spendwiseApi,
   type Budget,
@@ -76,6 +77,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [isLoadingAnnual, setIsLoadingAnnual] = useState(false);
   const [tab, setTab] = useState<MovementTab>("income");
   const [isLoading, setIsLoading] = useState(true);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
@@ -588,6 +590,16 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     );
   }
 
+  if (showAccountSettings) {
+    return (
+      <AccountSettings
+        accessToken={accessToken}
+        onBack={() => setShowAccountSettings(false)}
+        onSignOut={onSignOut}
+      />
+    );
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.page}
@@ -600,6 +612,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         </View>
         <View style={styles.headerActions}>
           <LanguageSwitcher />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowAccountSettings(true)}
+          >
+            <Text style={styles.link}>{t("account.openSettings")}</Text>
+          </Pressable>
           <Pressable onPress={onSignOut} accessibilityRole="button">
             <Text style={styles.link}>{t("common.signOut")}</Text>
           </Pressable>

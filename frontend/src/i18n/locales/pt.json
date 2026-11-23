@@ -175,5 +175,29 @@
     "netChange": "Variação virtual",
     "invalidYear": "Introduz um ano válido com quatro dígitos.",
     "loadError": "Não foi possível carregar o resumo anual."
+  },
+  "account": {
+    "openSettings": "Perfil e privacidade",
+    "title": "Perfil e privacidade",
+    "back": "Voltar ao orçamento",
+    "profileTitle": "O meu perfil",
+    "profileDescription": "Atualiza os dados do teu perfil. O endereço de e-mail é gerido pelo serviço de autenticação.",
+    "email": "E-mail",
+    "fullName": "Nome",
+    "phone": "Telemóvel (opcional)",
+    "phonePlaceholder": "+351912345678",
+    "currency": "Moeda predefinida (código de 3 letras)",
+    "profileSaved": "Perfil atualizado.",
+    "profileSaveError": "Não foi possível atualizar o perfil. Confirma o nome, a moeda e o formato do telemóvel.",
+    "loadError": "Não foi possível carregar o perfil e os dados de eliminação.",
+    "deleteTitle": "Apagar conta",
+    "deleteDescription": "Esta ação é permanente. Os orçamentos pessoais e os dados associados serão eliminados. Nos orçamentos partilhados, o teu histórico ficará pseudonimizado enquanto o orçamento existir. O SpendWise guarda valores virtuais e não movimenta dinheiro real.",
+    "transferBudget": "Escolhe quem recebe a propriedade de «{{name}}»:",
+    "unnamedMember": "Membro sem nome de perfil",
+    "noTransferTargets": "Este orçamento não tem outro membro ativo. Adiciona um membro antes de pedir a eliminação da conta.",
+    "acknowledge": "Compreendo que a ação é permanente e os meus dados pessoais serão apagados; o histórico partilhado será pseudonimizado.",
+    "deleting": "A apagar conta…",
+    "deleteButton": "Pedir eliminação da conta",
+    "deleteError": "Não foi possível concluir a eliminação. Se o pedido já estiver pendente, tenta novamente mais tarde."
   }
 }
