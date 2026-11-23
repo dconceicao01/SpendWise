@@ -17,12 +17,13 @@ No PowerShell, a partir de `backend/`:
 $env:SUPABASE_ISSUER_URI = "http://127.0.0.1:54321/auth/v1"
 $env:SUPABASE_URL = "http://127.0.0.1:54321"
 $env:SUPABASE_PUBLISHABLE_KEY = "<chave publishable do projeto>"
+$env:SUPABASE_SERVICE_ROLE_KEY = "<chave secreta apenas no servidor>"
 .\mvnw.cmd spring-boot:run
 ```
 
 Spring Security Resource Server obtém as chaves públicas em `{SUPABASE_ISSUER_URI}/.well-known/jwks.json` e valida assinatura, `iss`, `exp` e `aud=authenticated`; tokens anónimos (`aud=anon`) são recusados. O projeto Supabase deve emitir tokens com uma chave de assinatura publicada no JWKS; uma chave legacy simétrica não satisfaz este fluxo. `GET /api/v1/health` é público; os restantes endpoints exigem Bearer JWT válido. Os erros de autenticação não incluem tokens nem claims na resposta. A API mantém erros técnicos independentes do idioma; a interface deve traduzir os códigos/estados para a língua selecionada pelo utilizador.
 
-Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados; não configurar nem encaminhar uma `service_role` key.
+Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados. `SUPABASE_SERVICE_ROLE_KEY` só é usada pelo endpoint de eliminação para a chamada Auth Admin, depois de a limpeza transacional de dados terminar; nunca a configurar no frontend nem em pedidos normais.
 
 Para executar os testes:
 
@@ -33,6 +34,10 @@ Para executar os testes:
 ## Exportação de dados pessoais
 
 `GET /api/v1/me/export` exige um Bearer JWT válido e devolve um anexo `application/json` chamado `spendwise-data-export.json`. Inclui o email do próprio JWT e os dados do perfil próprio; para cada orçamento visível ao utilizador, inclui configuração, períodos, categorias, versões de alocação, rendimentos, despesas, ajustes e agendamentos. As listas são paginadas internamente até ao fim. Em orçamentos partilhados, a exportação respeita exatamente a visibilidade atual via Data API/RLS e omite os identificadores que indicam qual membro criou cada movimento/agendamento. A resposta usa `Cache-Control: no-store`; o cliente deve guardar o ficheiro apenas onde o utilizador escolher.
+
+`GET` e `PUT /api/v1/me/profile` consultam e atualizam o perfil do utilizador atual. Nome e moeda (código ISO de três letras) são obrigatórios; telefone E.164 é opcional. O email vem do JWT Auth e não é alterado por este endpoint. Respostas não são guardadas em cache.
+
+`POST /api/v1/me/deletion` recebe `{"ownerTransfers":[{"budgetId":"…","targetMemberId":"…"}]}`. Para cada orçamento partilhado em que a pessoa é OWNER, é obrigatório indicar um membro ativo para receber a propriedade. A RPC deriva a identidade de `auth.uid()`, valida todas as transferências, apaga os orçamentos pessoais, revoga convites abertos, remove preferências de lembretes, pausa agendamentos que perdem um criador elegível, remove o perfil e pseudonimiza as memberships partilhadas numa única transação. A aplicação só chama Auth Admin após essa transação. Se Auth Admin estiver indisponível, a tabela privada de pedidos pendentes bloqueia nova leitura/escrita do utilizador e permite repetir o pedido depois de corrigida a configuração. A eliminação Auth remove a identidade e impede novas sessões; JWTs já emitidos podem permanecer criptograficamente válidos até expirarem, mas as policies e helpers da base de dados bloqueiam a conta pendente e a membership é removida antes da chamada Admin. Ver [política de dados e migração](../Database/README.md).
 
 O teste opcional `SupabaseDataApiLocalIntegrationTest` comprova a passagem do JWT pelo cliente Java até ao gateway Supabase e o isolamento de perfis via RLS. Para o executar, inicia a stack local em `Database/`, define no processo atual `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SPENDWISE_LOCAL_SUPABASE_ADMIN_KEY` (a `SERVICE_ROLE_KEY` obtida do estado local apenas para criar/apagar utilizadores sintéticos) e corre:
 
