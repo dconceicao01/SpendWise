@@ -606,4 +606,4 @@ test("creates and revokes a one-time invitation for a shared budget", async ({
   await expect(page.getByText("Invitation revoked.")).toBeVisible();
   await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
 });
-
+

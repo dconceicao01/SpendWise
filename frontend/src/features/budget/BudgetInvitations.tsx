@@ -400,4 +400,4 @@ const styles = StyleSheet.create({
   notice: { color: "#285c3c", fontSize: 14, lineHeight: 20 },
   error: { color: "#a33024", fontSize: 14, lineHeight: 20 },
 });
-
+
