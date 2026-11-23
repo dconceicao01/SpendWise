@@ -138,7 +138,7 @@ jobs:
           export SUPABASE_PUBLISHABLE_KEY="$publishable_key"
           export SPENDWISE_LOCAL_SUPABASE_ADMIN_KEY="$admin_key"
           cd ../backend
-          ./mvnw --batch-mode --no-transfer-progress -Dspendwise.local.supabase=true verify
+          bash ./mvnw --batch-mode --no-transfer-progress -Dspendwise.local.supabase=true verify
 
       - name: Build API container
         run: docker build --pull --tag spendwise-api:${{ github.sha }} backend
