@@ -15,6 +15,7 @@
     "web": "expo start --web",
     "test": "jest --ci",
     "test:watch": "jest --watch",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check .",
     "build:web": "expo export --platform web",
@@ -52,8 +53,11 @@
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
+    "@types/node": "^24.19.2",
     "@types/react": "~19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
@@ -66,6 +70,9 @@
     "preset": "jest-expo",
     "testMatch": [
       "**/?(*.)+(spec|test).[jt]s?(x)"
+    ],
+    "testPathIgnorePatterns": [
+      "/e2e/"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"

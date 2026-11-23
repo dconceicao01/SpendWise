@@ -2,7 +2,7 @@
 
 O SpendWise é uma aplicação multiplataforma de orçamentos por envelopes: cada utilizador define categorias e percentagens para distribuir rendimentos registados e acompanha despesas e saldos virtuais. Orçamentos podem ser individuais ou partilhados. Num orçamento partilhado, os rendimentos de todos os membros alimentam o mesmo fundo comum e são distribuídos pelas categorias e percentagens escolhidas pelo grupo. O produto não movimenta dinheiro nem se liga a bancos: os valores servem apenas para organização e acompanhamento.
 
-> **Estado:** scaffold técnico inicial para web, Android e iOS. Os fluxos funcionais e as decisões marcadas como “a confirmar” têm de ser fechados antes da produção.
+> **Estado:** MVP em desenvolvimento para web, Android e iOS. Já existem fluxos de autenticação, orçamentos, alocações, movimentos, partilha e direitos de dados, com testes unitários, integração e CI. Os PRs continuam sujeitos a revisão humana; staging e produção ainda não foram provisionados.
 
 **Períodos do orçamento:** o utilizador define as datas de cada período. Cada período é independente: saldos positivos e negativos ficam no período onde ocorreram e não alteram o saldo inicial do seguinte. Rendimentos, despesas e ajustes ficam associados a um período. As estatísticas anuais podem agregar os movimentos pela data efetiva, mesmo quando um período atravessa dois anos; uma correção de despesa mantém a data e o período originais.
 
@@ -24,14 +24,14 @@ Integração bancária, iniciação de pagamentos, cartões, aconselhamento fina
 
 ## Stack decidida
 
-| Camada | Tecnologia | Responsabilidade |
-|---|---|---|
-| Aplicação universal | React Native + Expo + TypeScript + Expo Router | Interface partilhada entre web, Android e iOS; adaptações por plataforma quando necessárias. |
-| API | Java + Spring Boot | Regras de domínio, autorização por recurso, validação, convites e relatórios. |
-| Identidade | Supabase Auth | Registo, sessão, recuperação de acesso e MFA. |
-| Dados | PostgreSQL gerido pelo Supabase | Dados de produto, migrações SQL versionadas e RLS. Região Paris (`eu-west-3`), plano Free para desenvolvimento/staging e piloto inicial de baixa afluência. |
-| Contrato API | REST + OpenAPI | Contratos versionados entre React e Spring. |
-| Entrega | GitHub + GitHub Actions + Docker | PRs, CI, publicação em staging e promoção controlada a produção. |
+| Camada              | Tecnologia                                     | Responsabilidade                                                                                                                                            |
+| ------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Aplicação universal | React Native + Expo + TypeScript + Expo Router | Interface partilhada entre web, Android e iOS; adaptações por plataforma quando necessárias.                                                                |
+| API                 | Java + Spring Boot                             | Regras de domínio, autorização por recurso, validação, convites e relatórios.                                                                               |
+| Identidade          | Supabase Auth                                  | Registo, sessão, recuperação de acesso e MFA.                                                                                                               |
+| Dados               | PostgreSQL gerido pelo Supabase                | Dados de produto, migrações SQL versionadas e RLS. Região Paris (`eu-west-3`), plano Free para desenvolvimento/staging e piloto inicial de baixa afluência. |
+| Contrato API        | REST + OpenAPI                                 | Contratos versionados entre React e Spring.                                                                                                                 |
+| Entrega             | GitHub + GitHub Actions + Docker               | PRs, CI, publicação em staging e promoção controlada a produção.                                                                                            |
 
 O React chama a API Spring com um access token Supabase. O Spring valida assinatura e claims do JWT através do JWKS do projeto e aplica autorização de negócio. Para ler/escrever dados, o Spring encaminha o JWT original à Supabase Data API, que aplica RLS com a identidade do utilizador; a chave `service_role` não é usada no frontend nem nas operações normais da API. Ver [arquitetura](docs/architecture.md).
 
@@ -74,13 +74,11 @@ Esta documentação é uma base de engenharia, não um parecer jurídico nem uma
 - [Princípios de desenvolvimento, dependências e testes](docs/development-principles.md)
 - [Decisões de arquitetura](docs/adr/0001-stack-e-arquitetura.md)
 
-## Roadmap inicial
+## Próximos marcos
 
-1. Validar modelo de domínio, partilha e permissões.
-2. Criar projetos Supabase local/staging/produção e migrações RLS testadas.
-3. Construir autenticação, orçamentos, categorias, rendimentos, despesas e ajustes.
-4. Construir partilha, dashboard, exportação e eliminação de conta.
-5. Completar avaliação de privacidade, segurança, recuperação e operação antes do lançamento.
+1. Rever e integrar os PRs da fundação do MVP e concluir a cobertura E2E/acessibilidade.
+2. Clarificar e provisionar um ambiente de staging isolado com projeto Supabase próprio e dados sintéticos.
+3. Preparar promoção de artefacto validado, rollback/roll-forward, backups e recuperação antes do piloto.
 
 ## Equipa de trabalho
 
