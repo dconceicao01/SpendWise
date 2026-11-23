@@ -21,7 +21,7 @@ O projeto web serve `GET /api/runtime-config`, uma função Vercel sem cache que
 - `SPENDWISE_ACTIVE_SUPABASE_PUBLISHABLE_KEY`
 - `SPENDWISE_ACTIVE_API_URL`
 
-Para builds Android/iOS, definir `EXPO_PUBLIC_RUNTIME_CONFIG_URL` com o URL HTTPS estável `https://<domínio-web>/api/runtime-config`. Esse endereço de bootstrap fica no binário; o destino Supabase/API pode mudar pela configuração Vercel sem publicar outra versão da app. A app carrega a configuração no arranque e ao voltar ao primeiro plano. Se o endpoint estiver indisponível, mantém a configuração de fallback do bundle e volta a tentar quando a app retoma.
+Para builds Android/iOS, definir `EXPO_PUBLIC_RUNTIME_CONFIG_URL` com o URL HTTPS estável `https://<domínio-web>/api/runtime-config`. Esse endereço de bootstrap fica no binário; o destino Supabase/API pode mudar pela configuração Vercel sem publicar outra versão da app. A app carrega a configuração no arranque e ao voltar ao primeiro plano. Se uma atualização falhar, mantém o último destino carregado em memória e volta a tentar quando a app retoma. Num arranque sem acesso ao endpoint, usa os valores fallback do bundle.
 
 A resposta é pública e não pode conter segredos. A chave publishable é pública por desenho; nunca incluir `service_role`, tokens ou credenciais. Alterar os destinos ativos muda a identidade do projeto Supabase e pode exigir novo início de sessão. A Vercel é uma dependência de controlo: indisponibilidade ou configuração incorreta impede descobrir o destino ativo. Proteger a conta Vercel com MFA e acesso operacional restrito.
 
