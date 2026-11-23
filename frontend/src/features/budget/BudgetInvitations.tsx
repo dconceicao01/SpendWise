@@ -18,10 +18,11 @@ import {
 } from "@/lib/spendwise-api";
 
 type Props = { accessToken: string; budgetId: string };
+type InvitationListItem = BudgetInvitation & { expired: boolean };
 
 export function BudgetInvitations({ accessToken, budgetId }: Props) {
   const { t, i18n } = useTranslation();
-  const [invitations, setInvitations] = useState<BudgetInvitation[]>([]);
+  const [invitations, setInvitations] = useState<InvitationListItem[]>([]);
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,14 +35,17 @@ export function BudgetInvitations({ accessToken, budgetId }: Props) {
 
   useEffect(() => {
     let active = true;
-    setIsOwner(null);
-    setIsLoading(true);
-
     spendwiseApi
       .listBudgetInvitations(accessToken, budgetId)
       .then((rows) => {
         if (!active) return;
-        setInvitations(rows);
+        const now = Date.now();
+        setInvitations(
+          rows.map((invitation) => ({
+            ...invitation,
+            expired: Date.parse(invitation.expires_at) <= now,
+          })),
+        );
         setIsOwner(true);
       })
       .catch((error: unknown) => {
@@ -235,7 +239,7 @@ export function BudgetInvitations({ accessToken, budgetId }: Props) {
         const pending =
           !invitation.accepted_at &&
           !invitation.revoked_at &&
-          Date.parse(invitation.expires_at) > Date.now();
+          !invitation.expired;
         const status = invitation.revoked_at
           ? t("invitation.statuses.revoked")
           : invitation.accepted_at

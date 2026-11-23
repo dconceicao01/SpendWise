@@ -590,14 +590,12 @@ test("creates and revokes a one-time invitation for a shared budget", async ({
   await expect(
     page.getByText(/Invitation created\. Copy or share the link now/),
   ).toBeVisible();
-  await expect(
-    page.getByText(/#token=synthetic-one-time-token/),
-  ).toBeVisible();
+  await expect(page.getByText(/#token=synthetic-one-time-token/)).toBeVisible();
   await expect(page.getByText("friend@example.test")).toBeVisible();
   await page.getByRole("button", { name: "Hide link" }).click();
-  await expect(
-    page.getByText(/#token=synthetic-one-time-token/),
-  ).toHaveCount(0);
+  await expect(page.getByText(/#token=synthetic-one-time-token/)).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByText("Invitation revoked.")).toBeVisible();
   await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
