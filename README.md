@@ -48,7 +48,7 @@ O MVP usa um monorepo com aplicações independentes por camada:
 - `frontend/` — React Native, Expo, Expo Router e TypeScript para web, Android e iOS; pnpm (Node.js 24 LTS).
 - `backend/` — API Java 21 com Spring Boot 3.5.x e Maven Wrapper.
 - `Database/` — configuração local Supabase e migrações versionadas (preparação em MVP-06).
-- `.github/workflows/` — CI de validação em pull requests, a criar na tarefa MVP-27; deploy fica fora do primeiro scaffold.
+- `.github/workflows/` — CI em pull requests e nas branches `develop`/`main`: frontend, backend, Supabase local, migrações/pgTAP, dependências, segredos, configuração e imagem Docker. Deploy continua separado.
 - `docs/` — arquitetura, privacidade, fluxo e decisões.
 
 Consultar os READMEs de `frontend/` e `backend/` para os comandos locais. O ambiente Supabase local em `Database/` usa Docker e é tratado na tarefa MVP-06.

@@ -46,6 +46,8 @@ flowchart LR
 
 Os comandos e versões concretos são fixados em lockfiles/Gradle wrapper e workflow. Pin de GitHub Actions por SHA, `permissions` mínimos, environments protegidos e concorrência de deploy por ambiente. Mudanças no CLI Supabase devem ser verificadas contra changelog; a versão 3 alterou o comportamento do CLI para local por defeito, pelo que a versão e os comandos de CI não devem flutuar.
 
+O workflow `.github/workflows/ci.yml` corre nos pull requests e em `develop`/`main`. Usa Actions fixadas por SHA e permissão `contents: read`. O job de dados inicia Supabase local, aplica migrations, executa pgTAP e o teste de integração Spring/Auth/RLS com credenciais locais efémeras; não usa segredos de produção. A pipeline também executa testes frontend, verificações Maven, auditoria de dependências, análise de segredos/configuração e build/scan da imagem Docker. A promoção/deploy para staging ou produção permanece noutras tarefas.
+
 ## Staging e produção
 
 | Passo | Staging | Produção |
