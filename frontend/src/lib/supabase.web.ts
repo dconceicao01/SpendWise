@@ -1,12 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+export type SupabaseRuntimeConfig = {
+  supabaseUrl: string | null;
+  supabasePublishableKey: string | null;
+};
+
 const hasBrowserStorage = typeof window !== "undefined";
-
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabasePublishableKey,
-);
+export let isSupabaseConfigured = false;
+export let supabase: SupabaseClient | null = null;
 
 const tabSessionStorage = {
   getItem: (key: string) =>
@@ -19,14 +20,20 @@ const tabSessionStorage = {
   },
 };
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl!, supabasePublishableKey!, {
-      auth: {
-        storage: tabSessionStorage,
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-        flowType: "pkce",
-        persistSession: true,
-      },
-    })
-  : null;
+export function configureSupabase(config: SupabaseRuntimeConfig) {
+  isSupabaseConfigured = Boolean(
+    config.supabaseUrl && config.supabasePublishableKey,
+  );
+  supabase =
+    isSupabaseConfigured && config.supabaseUrl && config.supabasePublishableKey
+      ? createClient(config.supabaseUrl, config.supabasePublishableKey, {
+          auth: {
+            storage: tabSessionStorage,
+            autoRefreshToken: true,
+            detectSessionInUrl: false,
+            flowType: "pkce",
+            persistSession: true,
+          },
+        })
+      : null;
+}
