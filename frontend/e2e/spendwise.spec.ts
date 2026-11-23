@@ -598,5 +598,5 @@ test("creates and revokes a one-time invitation for a shared budget", async ({
   );
   await page.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByText("Invitation revoked.")).toBeVisible();
-  await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
+  await expect(page.getByText(/· Revoked/)).toBeVisible();
 });
