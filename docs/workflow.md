@@ -31,6 +31,8 @@ flowchart LR
 - Code reviewer revê autorização, RLS, migrações, exposição de segredos, logging, privacidade e erros; reviewer automático é apoio, nunca aprovação final para segurança.
 - Tester independente do autor confirma critérios de aceitação em staging e regista resultado. Bugs bloqueadores regressam ao PR.
 - Exigir pelo menos uma aprovação humana. Alterações a migrações, auth, RLS, segredos ou produção precisam de aprovação de pessoa responsável por segurança/dados.
+- O template `.github/PULL_REQUEST_TEMPLATE.md` recolhe objetivo, nível de risco, impacto em dados pessoais, migrações, evidência de testes, revisão independente e plano de recuperação. Autor, code reviewer e QA não devem ser a mesma pessoa para a validação independente.
+- O template documenta o processo, mas não bloqueia merge por si só. Configurar nas regras de proteção de `develop`/`main` aprovação humana, checks obrigatórios e, para alterações sensíveis, aprovação de CODEOWNER antes de aceitar merges.
 
 ## Pipeline de CI
 
