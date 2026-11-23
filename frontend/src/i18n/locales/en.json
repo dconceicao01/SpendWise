@@ -59,7 +59,44 @@
     "accept": "Accept invitation",
     "accepted": "Invitation accepted. Your membership in the shared budget is now active.",
     "invalid": "We couldn't accept this invitation. Check the account and try again.",
-    "missing": "This link does not contain a valid invitation."
+    "missing": "This link does not contain a valid invitation.",
+    "manageTitle": "Manage invitations",
+    "manageDescription": "Create a one-time invitation link for a confirmed email address. SpendWise does not send the email; share the link with the invited person yourself.",
+    "email": "Invited email",
+    "emailPlaceholder": "name@example.com",
+    "role": "Access level",
+    "contributor": "Can record movements",
+    "viewer": "View only",
+    "create": "Create invitation",
+    "created": "Invitation created. Copy or share the link now; it is shown only once.",
+    "createError": "We couldn't create the invitation. Check the email and try again.",
+    "emailInvalid": "Enter a valid email address.",
+    "linkReady": "One-time invitation link",
+    "linkWarning": "Treat this link like a secret. Only the invited person can accept it using the confirmed email address above.",
+    "copyLink": "Copy link",
+    "shareLink": "Share link",
+    "hideLink": "Hide link",
+    "copied": "Invitation link copied.",
+    "copyError": "Clipboard access is unavailable. Select and copy the link above.",
+    "shareError": "We couldn't open the share options. Try copying the link instead.",
+    "pendingTitle": "Invitations",
+    "empty": "There are no invitations for this budget yet.",
+    "loadError": "We couldn't load invitations. Try again.",
+    "recipientUnavailable": "Recipient email unavailable",
+    "expiresAt": "Expires {{date}}",
+    "revoke": "Revoke",
+    "revoked": "Invitation revoked.",
+    "revokeError": "We couldn't revoke this invitation. Try again.",
+    "statuses": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
+    "roles": {
+      "CONTRIBUTOR": "Can record movements",
+      "VIEWER": "View only"
+    }
   },
   "budget": {
     "title": "Your budgets",
@@ -203,3 +240,4 @@
     "deleteError": "We couldn't complete deletion. If the request is already pending, try again later."
   }
 }
+

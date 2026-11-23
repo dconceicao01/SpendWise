@@ -17,6 +17,7 @@ import {
   type AnnualSummary,
 } from "@/features/budget/budget-summary";
 import { AccountSettings } from "@/features/profile/AccountSettings";
+import { BudgetInvitations } from "@/features/budget/BudgetInvitations";
 import {
   spendwiseApi,
   type Budget,
@@ -641,6 +642,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 : t("budget.personal")}{" "}
               · {selectedBudget.currency_code}
             </Text>
+          ) : null}
+          {selectedBudget?.budget_type === "SHARED" ? (
+            <BudgetInvitations
+              accessToken={accessToken}
+              budgetId={selectedBudget.id}
+            />
           ) : null}
           {periods.length ? (
             <>
@@ -1433,3 +1440,4 @@ const styles = StyleSheet.create({
   entryTitle: { color: "#26382d", fontSize: 14, fontWeight: "600" },
   entryAmount: { color: "#18291f", fontSize: 14, fontWeight: "700" },
 });
+
