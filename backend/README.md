@@ -41,6 +41,14 @@ docker build -t spendwise-api:local .
 
 A imagem usa Java 21 JRE e executa como utilizador sem privilégios. A CI constrói a imagem e verifica vulnerabilidades altas/críticas; a imagem ainda não é publicada nem implantada por este workflow.
 
+### Piloto pessoal na Vercel (opcional)
+
+A Vercel pode alojar o piloto pessoal através de dois projetos independentes: um para o frontend web estático e outro para a API Spring Boot. A API usa o runtime de containers da Vercel, que está em beta. O projeto da API deve usar `backend/` como diretório raiz; o ficheiro `Dockerfile.vercel` usa o mesmo build Java 21 da imagem local. A aplicação escuta a porta indicada por `PORT` (predefinição 8080 nesta configuração).
+
+No projeto da API, selecionar a região Paris (`cdg1`) e definir apenas no ambiente server-side: `SUPABASE_ISSUER_URI`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SPENDWISE_CORS_ALLOWED_ORIGINS` e `SPENDWISE_INVITATION_BASE_URL`. A origem CORS e a URL de convite devem corresponder exatamente ao domínio do projeto web e usar HTTPS. O projeto web recebe `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `EXPO_PUBLIC_SPENDWISE_API_URL` como variáveis de build. Nunca colocar a chave `service_role` em variáveis `EXPO_PUBLIC_*`, no frontend ou em previews.
+
+O projeto web deve usar a raiz `frontend/`, instalar com pnpm 12.20 e Node.js 24, executar `pnpm build:web` e publicar `dist/`. Configurar os URLs de redirecionamento do Supabase Auth para o domínio de piloto e os callbacks realmente usados. Usar um projeto Supabase separado, com contas e dados sintéticos; nunca apontar previews para dados reais. Hobby só é adequado ao uso pessoal não comercial, sem SLA; containers escalam a zero e têm quotas/faturação próprias. Rever limites e termos antes de qualquer utilização fora do piloto. Esta configuração não constitui autorização para produção.
+
 ## Exportação de dados pessoais
 
 `GET /api/v1/me/export` exige um Bearer JWT válido e devolve um anexo `application/json` chamado `spendwise-data-export.json`. Inclui o email do próprio JWT e os dados do perfil próprio; para cada orçamento visível ao utilizador, inclui configuração, períodos, categorias, versões de alocação, rendimentos, despesas, ajustes e agendamentos. As listas são paginadas internamente até ao fim. Em orçamentos partilhados, a exportação respeita exatamente a visibilidade atual via Data API/RLS e omite os identificadores que indicam qual membro criou cada movimento/agendamento. A resposta usa `Cache-Control: no-store`; o cliente deve guardar o ficheiro apenas onde o utilizador escolher.

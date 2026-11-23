@@ -1,0 +1,45 @@
+# Piloto pessoal na Vercel
+
+## Âmbito
+
+Esta opção foi aceite para avaliar um piloto pessoal com, no máximo, cinco pessoas. Usa Vercel Hobby apenas para uso pessoal e não comercial, sem garantia de disponibilidade. A API depende do runtime de containers da Vercel, atualmente em beta e faturado segundo as regras/quotas de Functions; pode escalar a zero. Confirmar termos e quotas atuais na conta antes de publicar. A decisão não se estende a produção.
+
+São necessários dois projetos Vercel independentes para evitar dependência da funcionalidade Services, que não é necessária neste desenho:
+
+| Projeto | Root Directory | Build/deploy |
+| --- | --- | --- |
+| Web | `frontend/` | Node.js 24, pnpm 12.20, `pnpm build:web`, output `dist/` |
+| API | `backend/` | Container runtime a partir de `Dockerfile.vercel`; serviço Spring Boot HTTP |
+
+Definir a região de execução da API para Paris (`cdg1`), junto do Supabase em Paris. O Spring Boot lê a porta de `PORT`, com `8080` como fallback local. O container não pode depender de disco local persistente nem de processos de fundo contínuos; tarefas agendadas continuam no Postgres/Supabase.
+
+## Variáveis e configuração
+
+No ambiente server-side do projeto API, configurar valores próprios do projeto de teste:
+
+- `SUPABASE_ISSUER_URI`
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` — estritamente server-side; usada apenas pelo fluxo de eliminação Auth Admin já previsto
+- `SPENDWISE_CORS_ALLOWED_ORIGINS` — origem HTTPS exata do projeto web, sem `*`
+- `SPENDWISE_INVITATION_BASE_URL` — rota HTTPS de aceitação de convites no domínio web
+
+No projeto web, definir como variáveis de build:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `EXPO_PUBLIC_SPENDWISE_API_URL`
+
+Só a chave publishable pode estar no bundle web. Nunca usar `service_role` em `EXPO_PUBLIC_*`, código, logs, previews ou variáveis disponíveis ao projeto web. Não replicar segredos entre projetos/ambientes. Restringir os redirect URLs do Supabase Auth ao domínio do piloto e callbacks necessários.
+
+## Isolamento e publicação
+
+Criar/usar um projeto Supabase isolado em Paris, sem copiar dados de outros ambientes. Usar contas sintéticas e validar Auth, CORS, convites, eliminação de conta e links de callback depois do deploy. As previews por pull request devem usar configuração Supabase de teste isolada ou não habilitar operações autenticadas; nunca apontar para dados reais.
+
+Os containers são efémeros, podem reiniciar e escalam a zero. O piloto não deve depender de estado local ou disponibilidade contínua. Monitorizar quotas e suspender o piloto antes de ultrapassar limites; não ativar faturação sem decisão separada. Antes de qualquer promoção a produção, escolher novamente o hosting e aprovar contratos/DPA, região, segurança, backups/restauro, limites, observabilidade e rollback.
+
+## Referências do fornecedor
+
+- [Running Docker on Vercel](https://vercel.com/kb/guide/docker): containers OCI como Functions, `Dockerfile.vercel`, porta HTTP, scale-in e faturação.
+- [Regiões de Functions](https://vercel.com/docs/functions/configuring-functions/region): Hobby permite escolher uma região, incluindo Paris (`cdg1`).
+- [Termos Vercel](https://vercel.com/legal/terms): confirmar as condições de uso pessoal/não comercial e as condições vigentes do plano.

@@ -60,6 +60,8 @@ O workflow `.github/workflows/ci.yml` corre nos pull requests e em `develop`/`ma
 | Frontend       | Preview por PR e URL de staging.                                                               | Deploy do mesmo commit aprovado. Lovable pode apoiar previews; não é autoridade de produção enquanto região, contratos e processo de rollback não forem avaliados. |
 | Segredos       | Environment secrets de staging apenas.                                                         | GitHub Environment de produção, menor privilégio e acesso restrito; nunca nos logs.                                                                                |
 
+O piloto pessoal pode usar Vercel Hobby nos termos documentados em [configuração do piloto](vercel-pilot.md): projetos separados para web/API, API em container na região Paris e Supabase independente com dados sintéticos. A Vercel não substitui staging ou produção aprovados e não deve receber segredos de produção em previews.
+
 Não copiar dados de produção para ambientes inferiores. Não executar `ddl-auto=update` em produção; Flyway (ou ferramenta de migrações escolhida) é a fonte reproduzível do esquema. Migrações de remoção/alteração incompatível usam sequência expand/contract e plano de recuperação. Rollback de aplicação não implica rollback cego de dados.
 
 ## Release e incidentes de deploy
@@ -73,7 +75,7 @@ Não copiar dados de produção para ambientes inferiores. Não executar `ddl-au
 
 ### Piloto e recuperação
 
-O piloto inicial pode usar Supabase Free em Paris para baixa afluência. A equipa aceita que o plano Free pode pausar projetos inativos e não oferece backups geridos; não prometer SLA. Lovable serve para protótipos/previews, sem backend/Lovable Cloud; o seu hosting não é ainda o destino aprovado para produção.
+O piloto inicial pode usar Supabase Free em Paris para baixa afluência. A equipa aceita que o plano Free pode pausar projetos inativos e não oferece backups geridos; não prometer SLA. Vercel Hobby foi aceite apenas para um piloto pessoal limitado; os seus limites, comportamento de escala a zero e runtime de containers em beta estão descritos em `vercel-pilot.md`. Lovable serve para protótipos/previews, sem backend/Lovable Cloud; o seu hosting não é o destino aprovado para este piloto nem para produção.
 
 Objetivos aprovados: RPO ≤24h, RTO ≤8h e retenção de 7 dias, com cópias cifradas no cliente para Cloudflare R2 sob jurisdição EU, limitadas à quota gratuita. O job deve falhar/alertar antes de qualquer overage. A cópia deve incluir a base de dados e Auth; `supabase db dump` padrão exclui o schema `auth`, pelo que a implementação tem de cobrir essa lacuna. Alertar se a cópia válida mais recente ultrapassar 24h e executar exercício trimestral. GitHub Actions schedule é best effort e não constitui por si só garantia de RPO.
 
