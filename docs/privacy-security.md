@@ -29,6 +29,7 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 - A ligação de dados opera com claims verificados e contexto de transação `authenticated` ou passa o JWT à Data API. Testar que contexto não vaza entre conexões pooled. **Não** operar pedidos comuns com `service_role`, superuser ou papel que contorne RLS.
 - `OWNER`, `CONTRIBUTOR`, `VIEWER` são papéis locais ao orçamento. Guardar a relação no banco e validar sempre o papel atual; não confiar em role fornecida pelo cliente nem em `user_metadata` de JWT.
 - Convites têm token imprevisível, guardar apenas hash, validade limitada, uso único, revogação, rate limiting e resposta que não revele se um e-mail já tem conta.
+- Limitar inscrição, verificação, recuperação e refresh através dos controlos de Supabase Auth e rever os valores de cada projeto antes do deploy. Triggers Postgres aplicam 120 transações de escrita por utilizador em janela móvel de 60 segundos, partilhadas entre instâncias; o estado mínimo fica privado e expira após 24 horas. A API converte o limite para HTTP 429. Os limites de convites são adicionais.
 - Views são avaliadas quanto a `security_invoker`/RLS e grants; funções com `SECURITY DEFINER` são exceção, não padrão, e exigem `search_path` fixo, autorização explícita e revisão de segurança.
 
 ## Região, plano de piloto e recuperação
