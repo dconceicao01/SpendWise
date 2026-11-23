@@ -114,7 +114,11 @@ export class SpendWiseApiError extends Error {
   }
 }
 
-function requireApiUrl() {\n  const apiUrl = getRuntimeConfig().apiUrl;\n  if (!apiUrl) throw new SpendWiseApiError(0);\n  return apiUrl;\n}
+function requireApiUrl() {
+  const apiUrl = getRuntimeConfig().apiUrl;
+  if (!apiUrl) throw new SpendWiseApiError(0);
+  return apiUrl;
+}
 
 async function request<T>(
   accessToken: string,
