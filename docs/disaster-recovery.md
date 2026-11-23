@@ -30,11 +30,25 @@ O agendamento do GitHub só funciona na branch por omissão (`main` neste reposi
 ## Recuperação
 
 1. Declarar incidente e selecionar a última cópia cifrada válida. A cópia deve ter no máximo 24 horas para cumprir o RPO.
-2. Preparar um destino Supabase self-hosted isolado conforme o guia escolhido, sem ligar clientes de produção. Repor primeiro a configuração operacional a partir do gestor de segredos e validar URLs, providers, SMTP e configuração JWT.
-3. Descarregar a cópia e decifrá-la apenas num ambiente controlado; validar checksum e origem antes de executar SQL.
-4. Restaurar roles, schema e dados na ordem indicada pelo guia Supabase. Fazer reconciliação de contagens em tabelas do domínio e `auth.users`, extensões, policies, funções, triggers e grants.
-5. Validar login/reauth, leitura e escrita por OWNER/CONTRIBUTOR/VIEWER, negação a utilizador removido e chamadas não autenticadas. Tokens antigos podem deixar de ser válidos; exigir novo login quando necessário.
-6. Cronometrar desde a declaração até à validação. Só considerar cumprido o RTO se terminar em até 8 horas; registar lacunas e corrigir antes de depender do procedimento.
+2. Preparar um destino Supabase self-hosted novo e isolado conforme o guia escolhido, sem apontar clientes de produção para ele. Repor primeiro a configuração operacional e secrets a partir do gestor de segredos; confirmar extensões e compatibilidade da versão de Postgres/Auth.
+3. Descarregar o artefacto cifrado para um ambiente controlado. Desencriptar com a chave privada age offline; listar e conferir os nomes de ficheiro previstos antes de extrair. Validar `SHA256SUMS` e executar `verify-dump.mjs`. Não executar ficheiros SQL se qualquer verificação falhar.
+4. Confirmar que o destino é self-hosted, isolado e novo. Definir a connection string em `SELF_HOSTED_DB_URL` no terminal privado; não a copiar para comandos em texto, logs ou tickets. O guia do fornecedor restaura numa única transação:
+
+   ```sh
+   psql \
+     --single-transaction \
+     --variable ON_ERROR_STOP=1 \
+     --file roles.sql \
+     --file schema.sql \
+     --command 'SET session_replication_role = replica' \
+     --file data.sql \
+     --dbname "$SELF_HOSTED_DB_URL"
+   ```
+
+   `session_replication_role = replica` desativa triggers durante a importação. O comando pode falhar se a versão da plataforma for mais recente do que o alvo; nesse caso, não editar a cópia original nem prosseguir para produção. Resolver compatibilidade num ambiente de teste e registar as transformações.
+5. Fazer reconciliação de contagens nas tabelas do domínio e `auth.users`, extensões, policies, funções, triggers e grants. Os settings de Auth (JWT, providers, redirects e SMTP) são configurados separadamente; tokens anteriores exigem novo login.
+6. Validar login/reauth, leitura e escrita por OWNER/CONTRIBUTOR/VIEWER, negação a utilizador removido e pedidos não autenticados.
+7. Cronometrar desde a declaração até à validação. Só considerar cumprido o RTO se terminar em até 8 horas; registar lacunas e corrigir antes de depender do procedimento.
 
 ## Retenção e RGPD
 
