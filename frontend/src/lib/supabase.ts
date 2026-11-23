@@ -1,1 +1,1 @@
-export { configureSupabase, isSupabaseConfigured, supabase } from "./supabase.native";\n
+export { configureSupabase, isSupabaseConfigured, supabase } from "./supabase.native";
