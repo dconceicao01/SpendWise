@@ -1,0 +1,155 @@
+name: Supabase encrypted backup
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      confirm_backup:
+        description: "Run the encrypted SpendWise backup now"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spendwise-supabase-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: ${{ (github.event_name == 'schedule' && vars.SPENDWISE_BACKUP_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && inputs.confirm_backup == true) }}
+    name: Dump, verify, encrypt and store
+    runs-on: ubuntu-24.04
+    environment: spendwise-backup
+    timeout-minutes: 30
+    steps:
+      - name: Check out the protected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.20.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: Database/pnpm-lock.yaml
+
+      - name: Validate configuration and install database tooling
+        working-directory: Database
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SPENDWISE_SUPABASE_DB_URL }}
+          AGE_RECIPIENT: ${{ vars.SPENDWISE_AGE_RECIPIENT }}
+          R2_ACCOUNT_ID: ${{ vars.SPENDWISE_R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.SPENDWISE_R2_BUCKET }}
+          R2_PREFIX: ${{ vars.SPENDWISE_R2_PREFIX }}
+          R2_ACCESS_KEY_ID: ${{ secrets.SPENDWISE_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.SPENDWISE_R2_SECRET_ACCESS_KEY }}
+          R2_LIFECYCLE_CONFIRMED: ${{ vars.SPENDWISE_R2_LIFECYCLE_CONFIRMED }}
+          R2_ACCOUNT_ISOLATED: ${{ vars.SPENDWISE_R2_ACCOUNT_ISOLATED }}
+        run: |
+          set -euo pipefail
+          for name in SUPABASE_DB_URL AGE_RECIPIENT R2_ACCOUNT_ID R2_BUCKET R2_PREFIX R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::A required backup setting is missing. Configure the spendwise-backup environment."
+              exit 1
+            fi
+          done
+          if [[ "${R2_LIFECYCLE_CONFIRMED:-}" != "true" ]]; then
+            echo "::error::Configure and verify the R2 seven-day lifecycle rule before enabling backups."
+            exit 1
+          fi
+          if [[ "${R2_ACCOUNT_ISOLATED:-}" != "true" ]]; then
+            echo "::error::Verify that this Cloudflare account has no unrelated R2 usage before enabling the free-tier guard."
+            exit 1
+          fi
+          pnpm install --frozen-lockfile
+          pnpm exec supabase --version
+          aws --version
+          go version
+
+      - name: Install pinned age encryption tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install filippo.io/age/cmd/age@v1.2.1
+          "$(go env GOPATH)/bin/age" --version
+
+      - name: Dump database using the Supabase self-hosted restore guide
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SPENDWISE_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          work_dir="$RUNNER_TEMP/spendwise-backup-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -m 700 "$work_dir"
+          echo "SPENDWISE_BACKUP_WORK_DIR=$work_dir" >> "$GITHUB_ENV"
+          cd Database
+          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work_dir/roles.sql" --role-only > "$work_dir/cli.log" 2>&1; then
+            echo "::error::Supabase role dump failed; provider output was suppressed."
+            exit 1
+          fi
+          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work_dir/schema.sql" > "$work_dir/cli.log" 2>&1; then
+            echo "::error::Supabase schema dump failed; provider output was suppressed."
+            exit 1
+          fi
+          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work_dir/data.sql" --use-copy --data-only > "$work_dir/cli.log" 2>&1; then
+            echo "::error::Supabase data dump failed; provider output was suppressed."
+            exit 1
+          fi
+          rm -f "$work_dir/cli.log"
+          node ../scripts/supabase-backup/verify-dump.mjs "$work_dir/schema.sql" "$work_dir/data.sql"
+
+      - name: Create encrypted archive and upload to EU R2
+        shell: bash
+        env:
+          AGE_RECIPIENT: ${{ vars.SPENDWISE_AGE_RECIPIENT }}
+        run: |
+          set -euo pipefail
+          work_dir="$SPENDWISE_BACKUP_WORK_DIR"
+          archive="$RUNNER_TEMP/spendwise-backup-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+          encrypted="$archive.age"
+          cd Database
+          supabase_version="$(pnpm exec supabase --version 2>/dev/null | tail -n 1)"
+          cd "$GITHUB_WORKSPACE"
+          printf '{"created_at":"%s","run_id":"%s","supabase_cli":"%s"}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_RUN_ID" "$supabase_version" > "$work_dir/manifest.json"
+          (cd "$work_dir" && sha256sum roles.sql schema.sql data.sql manifest.json > SHA256SUMS)
+          tar -C "$work_dir" -czf "$archive" roles.sql schema.sql data.sql manifest.json SHA256SUMS
+          "$(go env GOPATH)/bin/age" -r "$AGE_RECIPIENT" -o "$encrypted" "$archive"
+          rm -f "$archive" "$work_dir/roles.sql" "$work_dir/schema.sql" "$work_dir/data.sql" "$work_dir/manifest.json" "$work_dir/SHA256SUMS"
+
+      - name: Upload encrypted archive to EU R2
+        shell: bash
+        env:
+          R2_ACCOUNT_ID: ${{ vars.SPENDWISE_R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.SPENDWISE_R2_BUCKET }}
+          R2_PREFIX: ${{ vars.SPENDWISE_R2_PREFIX }}
+          R2_ACCESS_KEY_ID: ${{ secrets.SPENDWISE_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.SPENDWISE_R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/supabase-backup/publish.mjs "$RUNNER_TEMP/spendwise-backup-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz.age"
+          rm -f "$RUNNER_TEMP/spendwise-backup-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz.age"
+          rmdir "$SPENDWISE_BACKUP_WORK_DIR"
+
+      - name: Remove temporary plaintext and encrypted files
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          work_dir="${SPENDWISE_BACKUP_WORK_DIR:-}"
+          case "$work_dir" in
+            "$RUNNER_TEMP"/spendwise-backup-*) rm -rf -- "$work_dir" ;;
+          esac
+          rm -f -- "$RUNNER_TEMP/spendwise-backup-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"*
