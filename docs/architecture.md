@@ -47,6 +47,8 @@ O redirect de confirmação e recuperação usa `spendwise://auth/callback` em a
 
 As funções `private.current_budget_member_id` e `private.current_budget_member_role` usam `SECURITY DEFINER` apenas para evitar recursão da policy de `budget_members`; estão num schema não exposto, com `search_path` fixo, sem argumento `user_id` e com execução limitada a `authenticated`. As RPCs de domínio continuam `SECURITY INVOKER`, com uma exceção restrita para `public.create_budget`: a FK OWNER diferida exige criar orçamento e membership na mesma transação; a função usa `auth.uid()`, `search_path` fixo e não aceita identidade fornecida pelo cliente. Execução é concedida apenas a `authenticated`. A migration retira os grants Data API a `anon` e limita os grants de `authenticated` por tabela/coluna; outras operações com garantias transacionais específicas terão RPCs próprias.
 
+Escritas autenticadas têm um limite partilhado de 120 transações por utilizador em janela móvel de 60 segundos. Triggers nas tabelas de domínio registam uma vez por transação Postgres, independentemente das linhas escritas. O estado mínimo vive em `private`, não está exposto pela Data API e é apagado após 24 horas; os helpers usam `auth.uid()` e execução revogada para os papéis da aplicação. Spring converte a rejeição da base de dados para HTTP 429. Supabase Auth aplica os seus próprios limites de inscrição, verificação, recuperação e refresh, que devem ser confirmados em cada projeto. Os limites de convites do MVP-16 são independentes.
+
 ## Módulos de domínio
 
 | Módulo | Entidades principais | Regras e limites |

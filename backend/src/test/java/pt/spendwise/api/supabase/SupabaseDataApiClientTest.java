@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -18,6 +19,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 
 class SupabaseDataApiClientTest {
 
@@ -94,6 +96,27 @@ class SupabaseDataApiClientTest {
                 }))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid Supabase relation name");
+
+        mockServer.verify();
+    }
+
+    @Test
+    void mapsDatabaseWriteRateLimitToHttp429() {
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/profiles?user_id=eq.synthetic-user-id"))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withBadRequest().body("{\"code\":\"P0001\",\"message\":\"write_rate_limited\"}"));
+
+        assertThatThrownBy(() -> supabaseDataApiClient.request(
+                HttpMethod.PATCH,
+                "profiles",
+                Map.of("user_id", "eq.synthetic-user-id"),
+                Map.of("full_name", "Pilot User"),
+                new ParameterizedTypeReference<String>() {
+                }))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .satisfies(exception -> org.assertj.core.api.Assertions.assertThat(
+                                ((org.springframework.web.server.ResponseStatusException) exception).getStatusCode())
+                        .isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
 
         mockServer.verify();
     }
