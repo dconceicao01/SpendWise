@@ -77,6 +77,19 @@ export type AccountDeletionOption = {
   transferTargets: { memberId: string; displayName: string | null }[];
 };
 
+export type BudgetInvitationRole = "CONTRIBUTOR" | "VIEWER";
+export type BudgetInvitation = {
+  id: string;
+  budget_id: string;
+  email: string | null;
+  role: BudgetInvitationRole;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  invitation_link?: string | null;
+};
+
 export type IncomeScheduleFrequency = "WEEKLY" | "FORTNIGHTLY" | "MONTHLY";
 export type IncomeScheduleStatus =
   "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED";
@@ -160,6 +173,28 @@ export const spendwiseApi = {
     token: string,
     ownerTransfers: { budgetId: string; targetMemberId: string }[],
   ) => request<void>(token, "/me/deletion", jsonBody({ ownerTransfers })),
+  listBudgetInvitations: (token: string, budgetId: string) =>
+    request<BudgetInvitation[]>(token, `/budgets/${budgetId}/invitations`),
+  createBudgetInvitation: (
+    token: string,
+    budgetId: string,
+    input: { email: string; role: BudgetInvitationRole },
+  ) =>
+    request<BudgetInvitation>(
+      token,
+      `/budgets/${budgetId}/invitations`,
+      jsonBody(input),
+    ),
+  revokeBudgetInvitation: (
+    token: string,
+    budgetId: string,
+    invitationId: string,
+  ) =>
+    request<BudgetInvitation>(
+      token,
+      `/budgets/${budgetId}/invitations/${invitationId}/revoke`,
+      { method: "POST" },
+    ),
   listBudgets: (token: string) => request<Budget[]>(token, "/budgets"),
   createBudget: (
     token: string,

@@ -38,6 +38,18 @@ type MovementState = {
   }[];
 };
 
+type InvitationState = {
+  id: string;
+  budget_id: string;
+  email: string | null;
+  role: "CONTRIBUTOR" | "VIEWER";
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  invitation_link?: string | null;
+};
+
 async function enableEnglish(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem("spendwise.language", "en");
@@ -128,6 +140,7 @@ async function mockBudgetApi(page: Page) {
       archived_at: null;
     }[];
     movements: MovementState;
+    invitations: InvitationState[];
     profile: {
       user_id: string;
       email: string;
@@ -142,6 +155,7 @@ async function mockBudgetApi(page: Page) {
     periods: [],
     categories: [],
     movements: { incomes: [], expenses: [], adjustments: [] },
+    invitations: [],
     profile: {
       user_id: accountId,
       email: "pilot@example.test",
@@ -226,10 +240,71 @@ async function mockBudgetApi(page: Page) {
     }
 
     const resource = path.match(
-      /^\/budgets\/[^/]+\/(periods|categories|allocation-sets|income-schedules|incomes|expenses|adjustments)(?:\/(.*))?$/,
+      /^\/budgets\/[^/]+\/(periods|categories|allocation-sets|income-schedules|incomes|expenses|adjustments|invitations)(?:\/(.*))?$/,
     );
     if (!resource) return respond({ error: "Unexpected test request" }, 404);
     const [, name, resourceId] = resource;
+
+    if (name === "invitations" && method === "GET") {
+      return respond(
+        state.invitations.map(
+          ({
+            id,
+            budget_id,
+            email,
+            role,
+            expires_at,
+            accepted_at,
+            revoked_at,
+            created_at,
+          }) => ({
+            id,
+            budget_id,
+            email,
+            role,
+            expires_at,
+            accepted_at,
+            revoked_at,
+            created_at,
+          }),
+        ),
+      );
+    }
+    if (name === "invitations" && method === "POST" && !resourceId) {
+      const input = request.postDataJSON() as {
+        email: string;
+        role: "CONTRIBUTOR" | "VIEWER";
+      };
+      const invitation = {
+        id: "iiiiiiii-iiii-4iii-8iii-iiiiiiiiiiii",
+        budget_id: budgetId,
+        email: input.email,
+        role: input.role,
+        expires_at: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        accepted_at: null,
+        revoked_at: null,
+        created_at: new Date().toISOString(),
+        invitation_link:
+          "https://spendwise.example.test/invitations/accept#token=synthetic-one-time-token",
+      };
+      state.invitations = [...state.invitations, invitation];
+      return respond(invitation, 201);
+    }
+    if (
+      name === "invitations" &&
+      method === "POST" &&
+      resourceId?.endsWith("/revoke")
+    ) {
+      const invitationId = resourceId.split("/")[0];
+      state.invitations = state.invitations.map((item) =>
+        item.id === invitationId
+          ? { ...item, revoked_at: new Date().toISOString() }
+          : item,
+      );
+      return respond(state.invitations[0]);
+    }
 
     if (name === "periods" && method === "GET") return respond(state.periods);
     if (name === "periods" && method === "POST") {
@@ -487,4 +562,41 @@ test("accepts a one-time shared-budget invitation", async ({ page }) => {
       "Invitation accepted. Your membership in the shared budget is now active.",
     ),
   ).toBeVisible();
+});
+
+test("creates and revokes a one-time invitation for a shared budget", async ({
+  page,
+}) => {
+  const year = new Date().getFullYear();
+  await enableEnglish(page);
+  await mockSignIn(page);
+  await mockBudgetApi(page);
+  await page.goto("/");
+  await signIn(page);
+
+  await page.getByLabel("Budget name").fill("Shared pilot");
+  await page.getByRole("button", { name: "Shared" }).click();
+  await page.getByLabel("Currency (ISO code, e.g. EUR)").fill("EUR");
+  await page.getByLabel("Start date (YYYY-MM-DD)").fill(`${year}-01-01`);
+  await page.getByLabel("End date (YYYY-MM-DD)").fill(`${year}-12-31`);
+  await page.getByLabel("Category name").fill("General");
+  await page.getByRole("button", { name: "Save budget" }).click();
+
+  await expect(page.getByText("Manage invitations")).toBeVisible();
+  await page.getByLabel("Invited email").fill("friend@example.test");
+  await page.getByRole("radio", { name: "View only" }).click();
+  await page.getByRole("button", { name: "Create invitation" }).click();
+
+  await expect(
+    page.getByText(/Invitation created\. Copy or share the link now/),
+  ).toBeVisible();
+  await expect(page.getByText(/#token=synthetic-one-time-token/)).toBeVisible();
+  await expect(page.getByText("friend@example.test")).toBeVisible();
+  await page.getByRole("button", { name: "Hide link" }).click();
+  await expect(page.getByText(/#token=synthetic-one-time-token/)).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "Revoke" }).click();
+  await expect(page.getByText("Invitation revoked.")).toBeVisible();
+  await expect(page.getByText(/· Revoked/)).toBeVisible();
 });
