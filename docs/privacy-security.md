@@ -32,6 +32,10 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 - Views são avaliadas quanto a `security_invoker`/RLS e grants; funções com `SECURITY DEFINER` são exceção, não padrão, e exigem `search_path` fixo, autorização explícita e revisão de segurança.
 - Testar cada política com utilizador A, utilizador B, membro removido, owner, contributor, viewer e visitante não autenticado. Testes cobrem leitura, escrita, alteração de proprietário/IDs e acesso a identificadores adivinhados (BOLA/IDOR).
 
+## Exportação de dados pessoais
+
+O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados do perfil próprio e dos orçamentos que a pessoa consegue ler naquele momento. A API encaminha o JWT original à Data API; RLS continua a filtrar perfil e orçamento e a autorização do domínio valida cada orçamento. O pacote contém configuração, períodos, categorias, alocações, rendimentos com snapshots, despesas, ajustes e agendamentos recorrentes. Em dados partilhados, os IDs de membro que identificam a autoria de movimentos e agendamentos são omitidos. A resposta define `Cache-Control: no-store`; tokens e segredos não integram o ficheiro. A exportação não substitui um processo operacional para verificar, registar e responder aos pedidos de titulares.
+
 ## Autenticação e sessão
 
 - Supabase Auth gere credenciais e recuperação; a aplicação nunca armazena palavras-passe.

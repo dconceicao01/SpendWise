@@ -30,6 +30,10 @@ Para executar os testes:
 .\mvnw.cmd verify
 ```
 
+## Exportação de dados pessoais
+
+`GET /api/v1/me/export` exige um Bearer JWT válido e devolve um anexo `application/json` chamado `spendwise-data-export.json`. Inclui o email do próprio JWT e os dados do perfil próprio; para cada orçamento visível ao utilizador, inclui configuração, períodos, categorias, versões de alocação, rendimentos, despesas, ajustes e agendamentos. As listas são paginadas internamente até ao fim. Em orçamentos partilhados, a exportação respeita exatamente a visibilidade atual via Data API/RLS e omite os identificadores que indicam qual membro criou cada movimento/agendamento. A resposta usa `Cache-Control: no-store`; o cliente deve guardar o ficheiro apenas onde o utilizador escolher.
+
 O teste opcional `SupabaseDataApiLocalIntegrationTest` comprova a passagem do JWT pelo cliente Java até ao gateway Supabase e o isolamento de perfis via RLS. Para o executar, inicia a stack local em `Database/`, define no processo atual `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SPENDWISE_LOCAL_SUPABASE_ADMIN_KEY` (a `SERVICE_ROLE_KEY` obtida do estado local apenas para criar/apagar utilizadores sintéticos) e corre:
 
 ```powershell
