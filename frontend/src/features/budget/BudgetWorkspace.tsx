@@ -1440,4 +1440,3 @@ const styles = StyleSheet.create({
   entryTitle: { color: "#26382d", fontSize: 14, fontWeight: "600" },
   entryAmount: { color: "#18291f", fontSize: 14, fontWeight: "700" },
 });
-
