@@ -60,8 +60,6 @@ O workflow `.github/workflows/ci.yml` corre nos pull requests e em `develop`/`ma
 | Frontend       | Preview por PR e URL de staging.                                                               | Deploy do mesmo commit aprovado. Lovable pode apoiar previews; não é autoridade de produção enquanto região, contratos e processo de rollback não forem avaliados. |
 | Segredos       | Environment secrets de staging apenas.                                                         | GitHub Environment de produção, menor privilégio e acesso restrito; nunca nos logs.                                                                                |
 
-O piloto pessoal pode usar Vercel Hobby nos termos documentados em [configuração do piloto](vercel-pilot.md): projetos separados para web/API, API em container na região Paris e Supabase independente com dados sintéticos. A Vercel não substitui staging ou produção aprovados e não deve receber segredos de produção em previews.
-
 Não copiar dados de produção para ambientes inferiores. Não executar `ddl-auto=update` em produção; Flyway (ou ferramenta de migrações escolhida) é a fonte reproduzível do esquema. Migrações de remoção/alteração incompatível usam sequência expand/contract e plano de recuperação. Rollback de aplicação não implica rollback cego de dados.
 
 ## Release e incidentes de deploy
@@ -75,9 +73,9 @@ Não copiar dados de produção para ambientes inferiores. Não executar `ddl-au
 
 ### Piloto e recuperação
 
-O piloto inicial pode usar Supabase Free em Paris para baixa afluência. A equipa aceita que o plano Free pode pausar projetos inativos e não oferece backups geridos; não prometer SLA. Vercel Hobby foi aceite apenas para um piloto pessoal limitado; os seus limites, comportamento de escala a zero e runtime de containers em beta estão descritos em `vercel-pilot.md`. Lovable serve para protótipos/previews, sem backend/Lovable Cloud; o seu hosting não é o destino aprovado para este piloto nem para produção.
+O piloto inicial pode usar Supabase Free em Paris para baixa afluência. A equipa aceita que o plano Free pode pausar projetos inativos e não oferece backups geridos; não prometer SLA. Lovable serve para protótipos/previews, sem backend/Lovable Cloud; o seu hosting não é ainda o destino aprovado para produção.
 
-Objetivos aprovados: RPO ≤24h, RTO ≤8h e retenção de 7 dias, com cópias cifradas no cliente para Cloudflare R2 sob jurisdição EU, limitadas à quota gratuita. O job deve falhar/alertar antes de qualquer overage. A cópia deve incluir a base de dados e Auth; `supabase db dump` padrão exclui o schema `auth`, pelo que a implementação tem de cobrir essa lacuna. Alertar se a cópia válida mais recente ultrapassar 24h e executar exercício trimestral. GitHub Actions schedule é best effort e não constitui por si só garantia de RPO.
+Objetivos aprovados: RPO ≤24h, RTO ≤8h e retenção de 7 dias, com cópias cifradas no cliente para Cloudflare R2 sob jurisdição EU, limitadas à quota gratuita. O job deve falhar/alertar antes de qualquer overage. A documentação Supabase de migração declara que o dump inclui `auth.users` e dados relacionados, mas a cobertura tem de ser verificada no artefacto e num restauro isolado. Settings operacionais de Auth são recuperados separadamente do gestor de segredos. Alertar se a cópia válida mais recente ultrapassar 24h e executar exercício trimestral. GitHub Actions schedule é best effort e não constitui por si só garantia de RPO. Ver [runbook de recuperação](disaster-recovery.md).
 
 Antes de produção/aceitação de dados reais, concluir revisão contratual/DPA e subprocessadores, demonstrar restauro completo de base de dados + Auth dentro do RTO, verificar retenção e eliminação, e rever se o plano Free continua adequado. Até ao exercício, RPO/RTO são metas, não garantias.
 
