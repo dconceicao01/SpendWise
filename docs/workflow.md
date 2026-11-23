@@ -36,28 +36,27 @@ flowchart LR
 
 ### Em cada pull request
 
-1. Formatação/lint e verificação de tipos do frontend.
-2. Build React e testes unitários.
-3. Java compile, Checkstyle/format, testes unitários Spring e análise de dependências.
-4. Testes de integração da API com PostgreSQL descartável; autenticação positiva/negativa e autorização por papel.
-5. Aplicar migrações desde base vazia e testar as migrações contra staging antes da promoção. Testes SQL de RLS confirmam casos permitidos e negados para cada papel e para `anon`.
-6. Verificar OpenAPI, dependências vulneráveis, secret scanning e configuração de container.
-7. Criar preview sem dados reais. Não disponibilizar segredos de produção a workflows de PR, forks ou código não confiável.
+1. Formatação/lint, verificação de tipos e testes unitários/componentes do frontend.
+2. Testes E2E Playwright em Chromium desktop e viewport Pixel 7 emulada; axe verifica WCAG 2.0/2.1 A/AA nos ecrãs cobertos. A suíte usa dados sintéticos e intercepta Auth/API, sem aceder a projetos Supabase reais.
+3. Build web e auditoria de dependências de produção.
+4. Compilação e testes Maven, incluindo integração da API com Supabase Auth/RLS local e credenciais efémeras.
+5. Aplicar migrações desde uma base local vazia e executar pgTAP para validar RLS e grants.
+6. Construir o container e verificar dependências, segredos, configuração e vulnerabilidades Trivy.
 
-Os comandos e versões concretos são fixados em lockfiles/Gradle wrapper e workflow. Pin de GitHub Actions por SHA, `permissions` mínimos, environments protegidos e concorrência de deploy por ambiente. Mudanças no CLI Supabase devem ser verificadas contra changelog; a versão 3 alterou o comportamento do CLI para local por defeito, pelo que a versão e os comandos de CI não devem flutuar.
+Os comandos e versões concretos são fixados nos lockfiles pnpm, Maven Wrapper e workflow. GitHub Actions ficam pinadas por SHA, com `permissions` mínimos e concorrência por workflow/branch. Mudanças no CLI Supabase devem ser verificadas contra o changelog e a versão/comandos usados na CI não devem flutuar.
 
-O workflow `.github/workflows/ci.yml` corre nos pull requests e em `develop`/`main`. Usa Actions fixadas por SHA e permissão `contents: read`. O job de dados inicia Supabase local, aplica migrations, executa pgTAP e o teste de integração Spring/Auth/RLS com credenciais locais efémeras; não usa segredos de produção. A pipeline também executa testes frontend, verificações Maven, auditoria de dependências, análise de segredos/configuração e build/scan da imagem Docker. A promoção/deploy para staging ou produção permanece noutras tarefas.
+O workflow `.github/workflows/ci.yml` corre nos pull requests e em `develop`/`main`. O job frontend inicia Expo para os testes E2E locais; os testes usam mocks e nunca usam dados ou segredos de produção. O job de dados inicia Supabase local, aplica migrations, executa pgTAP e o teste de integração Spring/Auth/RLS com credenciais locais efémeras. A pipeline também executa build web, testes Maven, auditorias, scans de segurança e build Docker. A emulação Pixel verifica o layout web responsivo e não substitui testes nativos em Android/iOS ou testes em staging. A promoção/deploy para staging ou produção permanece noutras tarefas.
 
 ## Staging e produção
 
-| Passo | Staging | Produção |
-|---|---|---|
-| Infraestrutura | Ambiente persistente isolado e preview efémero sem dados reais. | Ambiente separado e restrito. |
-| Supabase | Projeto, Auth, base de dados, chaves e URLs próprios em Paris (`eu-west-3`); dados sintéticos. | Projeto, credenciais, Auth e URLs próprios. Plano/contratos reavaliados antes do lançamento/escala. |
-| Migrações | Aplicar automaticamente após os checks, com cópia descartável ou branch de validação. | Job dedicado com aprovação protegida, backup recente e migração compatível/expand-contract. |
-| API | Imagem Docker etiquetada por commit; smoke tests. | Mesma imagem validada, promovida sem rebuild; health checks e rollback. |
-| Frontend | Preview por PR e URL de staging. | Deploy do mesmo commit aprovado. Lovable pode apoiar previews; não é autoridade de produção enquanto região, contratos e processo de rollback não forem avaliados. |
-| Segredos | Environment secrets de staging apenas. | GitHub Environment de produção, menor privilégio e acesso restrito; nunca nos logs. |
+| Passo          | Staging                                                                                        | Produção                                                                                                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Infraestrutura | Ambiente persistente isolado e preview efémero sem dados reais.                                | Ambiente separado e restrito.                                                                                                                                      |
+| Supabase       | Projeto, Auth, base de dados, chaves e URLs próprios em Paris (`eu-west-3`); dados sintéticos. | Projeto, credenciais, Auth e URLs próprios. Plano/contratos reavaliados antes do lançamento/escala.                                                                |
+| Migrações      | Aplicar automaticamente após os checks, com cópia descartável ou branch de validação.          | Job dedicado com aprovação protegida, backup recente e migração compatível/expand-contract.                                                                        |
+| API            | Imagem Docker etiquetada por commit; smoke tests.                                              | Mesma imagem validada, promovida sem rebuild; health checks e rollback.                                                                                            |
+| Frontend       | Preview por PR e URL de staging.                                                               | Deploy do mesmo commit aprovado. Lovable pode apoiar previews; não é autoridade de produção enquanto região, contratos e processo de rollback não forem avaliados. |
+| Segredos       | Environment secrets de staging apenas.                                                         | GitHub Environment de produção, menor privilégio e acesso restrito; nunca nos logs.                                                                                |
 
 Não copiar dados de produção para ambientes inferiores. Não executar `ddl-auto=update` em produção; Flyway (ou ferramenta de migrações escolhida) é a fonte reproduzível do esquema. Migrações de remoção/alteração incompatível usam sequência expand/contract e plano de recuperação. Rollback de aplicação não implica rollback cego de dados.
 

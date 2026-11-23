@@ -152,24 +152,27 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     );
   }, [accessToken]);
 
-  const loadWorkspace = useCallback(async () => {
-    if (!selectedBudgetId) return;
-    const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
-      spendwiseApi.listPeriods(accessToken, selectedBudgetId),
-      spendwiseApi.listCategories(accessToken, selectedBudgetId),
-      allPages((offset) =>
-        spendwiseApi.listIncomeSchedules(accessToken, selectedBudgetId, offset),
-      ),
-    ]);
-    setPeriods(nextPeriods);
-    setCategories(nextCategories);
-    setIncomeSchedules(nextSchedules);
-    setSelectedPeriodId((current) =>
-      nextPeriods.some((period) => period.id === current)
-        ? current
-        : (nextPeriods[0]?.id ?? ""),
-    );
-  }, [accessToken, selectedBudgetId]);
+  const loadWorkspace = useCallback(
+    async (budgetId = selectedBudgetId) => {
+      if (!budgetId) return;
+      const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
+        spendwiseApi.listPeriods(accessToken, budgetId),
+        spendwiseApi.listCategories(accessToken, budgetId),
+        allPages((offset) =>
+          spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
+        ),
+      ]);
+      setPeriods(nextPeriods);
+      setCategories(nextCategories);
+      setIncomeSchedules(nextSchedules);
+      setSelectedPeriodId((current) =>
+        nextPeriods.some((period) => period.id === current)
+          ? current
+          : (nextPeriods[0]?.id ?? ""),
+      );
+    },
+    [accessToken, selectedBudgetId],
+  );
 
   const loadMovements = useCallback(async () => {
     if (!selectedBudgetId || !selectedPeriodId) return;
@@ -322,12 +325,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           budget.id,
           allocation.id,
         );
-        await Promise.all([loadBudgets(), loadWorkspace()]);
+        await Promise.all([loadBudgets(), loadWorkspace(budget.id)]);
         setNotice(t("budget.setupComplete"));
       } catch {
         setIsError(true);
         setNotice(t("budget.setupIncomplete"));
-        await loadWorkspace().catch(() => undefined);
+        await loadWorkspace(budget.id).catch(() => undefined);
       }
     } catch {
       setIsError(true);

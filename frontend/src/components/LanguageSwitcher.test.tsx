@@ -6,8 +6,11 @@ jest.mock("@/i18n/i18n", () => ({ changeLanguage: jest.fn() }));
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
     i18n: { language: "pt" },
-    t: (_key: string, options: { language: string }) =>
-      `Mudar idioma para ${options.language}`,
+    t: (key: string, options?: { language: string }) => {
+      if (key === "common.languagePortuguese") return "português";
+      if (key === "common.languageEnglish") return "inglês";
+      return `Mudar idioma para ${options?.language}`;
+    },
   }),
 }));
 
@@ -21,14 +24,16 @@ describe("LanguageSwitcher", () => {
     const { getByRole } = await render(<LanguageSwitcher />);
 
     expect(
-      getByRole("button", { name: "Mudar idioma para English" }),
+      getByRole("button", { name: "EN. Mudar idioma para inglês" }),
     ).toHaveTextContent("EN");
   });
 
   it("changes to English when the Portuguese switch is pressed", async () => {
     const { getByRole } = await render(<LanguageSwitcher />);
 
-    fireEvent.press(getByRole("button", { name: "Mudar idioma para English" }));
+    fireEvent.press(
+      getByRole("button", { name: "EN. Mudar idioma para inglês" }),
+    );
 
     await waitFor(() => {
       expect(changeLanguage).toHaveBeenCalledWith("en");
