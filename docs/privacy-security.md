@@ -29,8 +29,22 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 - A ligação de dados opera com claims verificados e contexto de transação `authenticated` ou passa o JWT à Data API. Testar que contexto não vaza entre conexões pooled. **Não** operar pedidos comuns com `service_role`, superuser ou papel que contorne RLS.
 - `OWNER`, `CONTRIBUTOR`, `VIEWER` são papéis locais ao orçamento. Guardar a relação no banco e validar sempre o papel atual; não confiar em role fornecida pelo cliente nem em `user_metadata` de JWT.
 - Convites têm token imprevisível, guardar apenas hash, validade limitada, uso único, revogação, rate limiting e resposta que não revele se um e-mail já tem conta.
+- Limitar inscrição, verificação, recuperação e refresh através dos controlos de Supabase Auth e rever os valores de cada projeto antes do deploy. Triggers Postgres aplicam 120 transações de escrita por utilizador em janela móvel de 60 segundos, partilhadas entre instâncias; o estado mínimo fica privado e expira após 24 horas. A API converte o limite para HTTP 429. Os limites de convites são adicionais.
 - Views são avaliadas quanto a `security_invoker`/RLS e grants; funções com `SECURITY DEFINER` são exceção, não padrão, e exigem `search_path` fixo, autorização explícita e revisão de segurança.
+
+## Região, plano de piloto e recuperação
+
+- O projeto Supabase fica em Paris (`eu-west-3`). O plano Free é aceite para desenvolvimento/staging e piloto inicial de baixa afluência, tendo em conta que pode pausar após inatividade e não inclui backups geridos. Isto não é uma garantia de SLA nem uma aprovação para escalar ou operar produção com dados reais sem reavaliação.
+- Meta operacional aprovada: RPO ≤24 horas, RTO ≤8 horas, retenção de 7 dias. Cópias destinadas ao Cloudflare R2 devem usar jurisdição EU, cifragem antes do upload e quota gratuita apenas; impedir overage, interrompendo novas cópias e alertando antes de exceder o limite.
+- A cópia tem dados pessoais e deve ser considerada tratamento de dados: acesso mínimo, chaves fora do bucket, monitorização, expiração verificável e documentação de que a eliminação em cópias ocorre no máximo após a retenção aprovada.
+- Dump PostgreSQL comum não inclui o schema gerido `auth`. O plano só satisfaz recuperação quando inclui utilizadores/tabelas Auth e configuração necessária, e quando um restauro completo num projeto isolado foi exercitado. O RPO/RTO continua por validar até esse teste.
+- Um agendamento GitHub Actions é best effort; monitorizar a data/hora da última cópia e alertar se exceder 24 horas. Executar restauro trimestral e registar duração, integridade e lacunas.
+- Rever DPA, subprocessadores e localização para Supabase e Cloudflare antes de aceitar dados reais em produção. Região EU não equivale a conformidade RGPD.
 - Testar cada política com utilizador A, utilizador B, membro removido, owner, contributor, viewer e visitante não autenticado. Testes cobrem leitura, escrita, alteração de proprietário/IDs e acesso a identificadores adivinhados (BOLA/IDOR).
+
+## Exportação de dados pessoais
+
+O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados do perfil próprio e dos orçamentos que a pessoa consegue ler naquele momento. A API encaminha o JWT original à Data API; RLS continua a filtrar perfil e orçamento e a autorização do domínio valida cada orçamento. O pacote contém configuração, períodos, categorias, alocações, rendimentos com snapshots, despesas, ajustes e agendamentos recorrentes. Em dados partilhados, os IDs de membro que identificam a autoria de movimentos e agendamentos são omitidos. A resposta define `Cache-Control: no-store`; tokens e segredos não integram o ficheiro. A exportação não substitui um processo operacional para verificar, registar e responder aos pedidos de titulares.
 
 ## Autenticação e sessão
 

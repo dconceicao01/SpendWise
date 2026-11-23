@@ -62,14 +62,16 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
 
     @Override
     public Optional<IncomeEntryResponse> recordIncome(UUID budgetId, CreateIncomeRequest request) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("p_budget_id", budgetId);
+        body.put("p_period_id", request.periodId());
+        body.put("p_amount", request.amount());
+        body.put("p_occurred_on", request.occurredOn().toString());
+        body.put("p_schedule_id", null);
+        body.put("p_scheduled_for", null);
+        body.put("p_recorder_member_id", null);
         UUID incomeId = dataApiClient.callFunction(
-                "record_income",
-                Map.of(
-                        "p_budget_id", budgetId,
-                        "p_period_id", request.periodId(),
-                        "p_amount", request.amount(),
-                        "p_occurred_on", request.occurredOn().toString()),
-                UUID_RESULT);
+                "record_income", body, UUID_RESULT);
         if (incomeId == null) {
             return Optional.empty();
         }

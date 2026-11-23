@@ -61,6 +61,51 @@ export type BudgetAdjustment = {
   occurred_on: string;
 };
 
+export type UserProfile = {
+  user_id: string;
+  email: string | null;
+  full_name: string;
+  phone_e164: string | null;
+  default_currency: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AccountDeletionOption = {
+  budgetId: string;
+  budgetName: string;
+  transferTargets: { memberId: string; displayName: string | null }[];
+};
+
+export type BudgetInvitationRole = "CONTRIBUTOR" | "VIEWER";
+export type BudgetInvitation = {
+  id: string;
+  budget_id: string;
+  email: string | null;
+  role: BudgetInvitationRole;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  invitation_link?: string | null;
+};
+
+export type IncomeScheduleFrequency = "WEEKLY" | "FORTNIGHTLY" | "MONTHLY";
+export type IncomeScheduleStatus =
+  "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED";
+export type MonthlyShortMonthBehavior = "LAST_DAY" | "SKIP";
+export type IncomeSchedule = {
+  id: string;
+  budget_id: string;
+  amount: number;
+  frequency: IncomeScheduleFrequency;
+  monthly_short_month_behavior: MonthlyShortMonthBehavior;
+  start_date: string;
+  end_date: string | null;
+  next_occurrence_on: string;
+  status: IncomeScheduleStatus;
+};
+
 export class SpendWiseApiError extends Error {
   constructor(readonly status: number) {
     super("SpendWise API request failed");
@@ -99,6 +144,10 @@ function jsonBody(value: unknown): Pick<RequestInit, "method" | "body"> {
   return { method: "POST", body: JSON.stringify(value) };
 }
 
+function jsonPutBody(value: unknown): Pick<RequestInit, "method" | "body"> {
+  return { method: "PUT", body: JSON.stringify(value) };
+}
+
 function movementQuery(periodId: string, offset = 0) {
   const params = new URLSearchParams({
     periodId,
@@ -109,6 +158,43 @@ function movementQuery(periodId: string, offset = 0) {
 }
 
 export const spendwiseApi = {
+  getProfile: (token: string) => request<UserProfile>(token, "/me/profile"),
+  updateProfile: (
+    token: string,
+    input: {
+      fullName: string;
+      phoneE164: string | null;
+      defaultCurrency: string;
+    },
+  ) => request<UserProfile>(token, "/me/profile", jsonPutBody(input)),
+  getAccountDeletionOptions: (token: string) =>
+    request<AccountDeletionOption[]>(token, "/me/deletion-options"),
+  deleteAccount: (
+    token: string,
+    ownerTransfers: { budgetId: string; targetMemberId: string }[],
+  ) => request<void>(token, "/me/deletion", jsonBody({ ownerTransfers })),
+  listBudgetInvitations: (token: string, budgetId: string) =>
+    request<BudgetInvitation[]>(token, `/budgets/${budgetId}/invitations`),
+  createBudgetInvitation: (
+    token: string,
+    budgetId: string,
+    input: { email: string; role: BudgetInvitationRole },
+  ) =>
+    request<BudgetInvitation>(
+      token,
+      `/budgets/${budgetId}/invitations`,
+      jsonBody(input),
+    ),
+  revokeBudgetInvitation: (
+    token: string,
+    budgetId: string,
+    invitationId: string,
+  ) =>
+    request<BudgetInvitation>(
+      token,
+      `/budgets/${budgetId}/invitations/${invitationId}/revoke`,
+      { method: "POST" },
+    ),
   listBudgets: (token: string) => request<Budget[]>(token, "/budgets"),
   createBudget: (
     token: string,
@@ -171,6 +257,38 @@ export const spendwiseApi = {
       token,
       `/budgets/${budgetId}/incomes`,
       jsonBody(input),
+    ),
+  listIncomeSchedules: (token: string, budgetId: string, offset = 0) =>
+    request<IncomeSchedule[]>(
+      token,
+      `/budgets/${budgetId}/income-schedules?limit=100&offset=${offset}`,
+    ),
+  createIncomeSchedule: (
+    token: string,
+    budgetId: string,
+    input: {
+      amount: number;
+      frequency: IncomeScheduleFrequency;
+      monthlyShortMonthBehavior: MonthlyShortMonthBehavior;
+      startDate: string;
+      endDate: string | null;
+    },
+  ) =>
+    request<IncomeSchedule>(
+      token,
+      `/budgets/${budgetId}/income-schedules`,
+      jsonBody(input),
+    ),
+  updateIncomeSchedule: (
+    token: string,
+    budgetId: string,
+    scheduleId: string,
+    status: Exclude<IncomeScheduleStatus, "COMPLETED">,
+  ) =>
+    request<IncomeSchedule>(
+      token,
+      `/budgets/${budgetId}/income-schedules/${scheduleId}`,
+      { method: "PATCH", body: JSON.stringify({ status }) },
     ),
   listExpenses: (
     token: string,

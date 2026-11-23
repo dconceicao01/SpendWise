@@ -1,5 +1,7 @@
 # Arquitetura e módulos
 
+O backend usa Java 21, Spring Boot 4.2 e springdoc-openapi 3.2. A linha Spring Boot 4 traz Jackson 3; manter as anotações específicas de databind no namespace `tools.jackson` e confirmar que os contratos JSON continuam a serializar os nomes e formatos previstos.
+
 ## Visão de contexto
 
 ```mermaid
@@ -45,6 +47,8 @@ O redirect de confirmação e recuperação usa `spendwise://auth/callback` em a
 
 As funções `private.current_budget_member_id` e `private.current_budget_member_role` usam `SECURITY DEFINER` apenas para evitar recursão da policy de `budget_members`; estão num schema não exposto, com `search_path` fixo, sem argumento `user_id` e com execução limitada a `authenticated`. As RPCs de domínio continuam `SECURITY INVOKER`, com uma exceção restrita para `public.create_budget`: a FK OWNER diferida exige criar orçamento e membership na mesma transação; a função usa `auth.uid()`, `search_path` fixo e não aceita identidade fornecida pelo cliente. Execução é concedida apenas a `authenticated`. A migration retira os grants Data API a `anon` e limita os grants de `authenticated` por tabela/coluna; outras operações com garantias transacionais específicas terão RPCs próprias.
 
+Escritas autenticadas têm um limite partilhado de 120 transações por utilizador em janela móvel de 60 segundos. Triggers nas tabelas de domínio registam uma vez por transação Postgres, independentemente das linhas escritas. O estado mínimo vive em `private`, não está exposto pela Data API e é apagado após 24 horas; os helpers usam `auth.uid()` e execução revogada para os papéis da aplicação. Spring converte a rejeição da base de dados para HTTP 429. Supabase Auth aplica os seus próprios limites de inscrição, verificação, recuperação e refresh, que devem ser confirmados em cada projeto. Os limites de convites do MVP-16 são independentes.
+
 ## Módulos de domínio
 
 | Módulo | Entidades principais | Regras e limites |
@@ -54,7 +58,7 @@ As funções `private.current_budget_member_id` e `private.current_budget_member
 | Períodos | `budget_periods` | Cada período tem datas inicial/final definidas pelo utilizador; rendimentos, despesas e ajustes pertencem a um período explícito. Os períodos são independentes: nenhum saldo positivo ou negativo transita para o seguinte. Constraint GiST impede sobreposição; triggers com lock transacional serializam alterações ao intervalo e movimentos, impedindo datas fora do período. Estatísticas anuais agregam movimentos pela data efetiva e podem incluir saldos negativos. Orçamentos arquivados continuam a aceitar movimentos dos membros ativos. |
 | Convites | `budget_invitations` | Papéis por orçamento; convite com token aleatório, hash armazenado, expiração e uso único; owner só muda por transferência explícita. |
 | Categorias e alocações | `budget_categories`, `budget_allocation_sets`, `budget_allocation_items` | Categorias e percentagens definidas pelo utilizador. Cada novo rascunho recebe uma versão sequencial e pode ser editado até à ativação. A ativação só aceita categorias ativas e percentagens que somam exatamente 100%; regista `effective_from` na data da ativação. Versões ativas/retiradas são imutáveis. Uma categoria usada na versão ativa só pode ser arquivada depois de ativar uma nova versão sem ela. |
-| Rendimentos | `income_entries`, `income_allocation_snapshots`, `income_schedules` | Registos virtuais com valor positivo e período explícito; `record_income` usa a alocação ativa no momento do registo, mesmo para uma data efetiva anterior, e grava snapshots determinísticos cuja soma reconcilia exatamente o rendimento. A versão usada é imutável no rendimento. Agendamentos só geram registos no SpendWise, sem movimentação real. |
+| Rendimentos | `income_entries`, `income_allocation_snapshots`, `income_schedules` | Registos virtuais com valor positivo e período explícito; `record_income` usa a alocação ativa no momento do registo, mesmo para uma data efetiva anterior, e grava snapshots determinísticos cuja soma reconcilia exatamente o rendimento. A versão usada é imutável no rendimento. Um job diário `pg_cron` processa agendamentos através de uma função privada de acesso restrito; sem período compatível, a ocorrência permanece pendente na data original. Em recorrências mensais, o utilizador escolhe se usa o último dia ou salta o mês quando o dia âncora não existe. Se o criador perder permissões para registar, o agendamento é pausado automaticamente. Agendamentos só geram registos no SpendWise, sem movimentação real. |
 | Despesas e ajustes | `expense_entries`, `budget_adjustments` | Despesa ligada a uma categoria e período; correções ligadas a uma despesa usam a mesma categoria, período e data efetiva originais, preservando também a data/hora em que o ajuste foi registado. O movimento original não é apagado. |
 | Dashboard | Consultas agregadas | Saldo do período = alocações de rendimento + ajustes − despesas desse período; não há saldo de abertura vindo de períodos anteriores. Estatísticas anuais podem agregar os movimentos pela respetiva data efetiva dentro do ano, mesmo quando um período atravessa dois anos. Não expor views que contornem RLS. |
 | Notificações | `budget_reminder_preferences` | Opt-in e preferências por finalidade; sem conteúdo de valores/categorias em notificações de lock screen. Outbox transacional fica para quando a entrega de notificações for implementada. |
@@ -96,7 +100,18 @@ flowchart TB
   MIG -->|Após validação e aprovação| PROD
 ```
 
-Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos independentes. Staging usa dados sintéticos. A seleção da região europeia e do plano Supabase é pré-requisito de produção: verificar disponibilidade, backups/PITR, localização de backups, subprocessadores, DPA e transferências no contrato efetivamente escolhido. Localização EU, por si só, não garante conformidade RGPD.
+Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos independentes. Staging usa dados sintéticos. A região escolhida é Paris (`eu-west-3`); Supabase Free é aceite para desenvolvimento/staging e piloto inicial de baixa afluência. O plano Free pode pausar projetos inativos e não inclui backups geridos; não há compromisso de SLA e o piloto deve ser promovido/reavaliado antes de aumentar a utilização. A escolha da região não garante conformidade RGPD.
+
+### Cópias de segurança e recuperação
+
+- Objetivos aprovados: RPO até 24 horas, RTO até 8 horas e retenção de 7 dias.
+- Destino planeado: Cloudflare R2 com jurisdição EU, usando exclusivamente a quota gratuita (10 GB-mês na data desta decisão). Cifrar o artefacto no cliente antes do upload; guardar chaves de cifragem separadas do bucket e com acesso operacional restrito.
+- Parar o envio e alertar antes de ultrapassar a quota gratuita; não ativar faturação/overage. A disponibilidade da cópia não pode depender apenas de um cron de GitHub Actions, pois os horários podem atrasar ou falhar: monitorizar frescura e alertar quando a última cópia válida exceder 24 horas.
+- Um dump PostgreSQL padrão da CLI Supabase exclui schemas geridos como `auth`; portanto, backup da aplicação sozinho não cumpre recuperação. O procedimento deve capturar e validar separadamente `auth.users` e tabelas relacionadas, definir restauro seguro num projeto limpo, e preservar/configurar separadamente settings Auth, chaves e segredos. Tokens ativos podem deixar de ser válidos após migração.
+- Cópias incluem dados pessoais e valores virtuais: controlar acesso, cifrar antes da saída, testar a eliminação por expiração após 7 dias e documentar que pedidos de apagamento podem permanecer nas cópias até essa expiração.
+- Realizar exercício de restauro trimestral. RPO/RTO são alvos aprovados, não garantias, até se demonstrar um restauro completo de dados e Auth dentro dos tempos definidos.
+
+Lovable fica limitado a prototipagem/preview, sem Lovable Cloud/backend. A produção web via hosting Lovable não está aprovada; frontend e backend de produção continuam sem fornecedor selecionado.
 
 ## Requisitos não funcionais
 
@@ -105,15 +120,15 @@ Cada ambiente tem projeto Supabase, chaves, URLs, contas de serviço e segredos 
 - RLS habilitada em cada tabela do schema exposto, grants mínimos, políticas por operação e testes positivos/negativos por papel.
 - Paginação e limites de tamanho; validação server-side; limites de pedido e rate limiting em login, recuperação, convites e escrita.
 - CORS por allowlist dos domínios de cada ambiente; CSP restritiva; prevenção de XSS e dependências com lockfiles.
-- Backups, retenção, RPO/RTO e teste periódico de restauro definidos antes de produção. Backup não substitui exportação/eliminação aplicável.
+- Backups: decisões para piloto definidas acima; automação, cópia completa de Auth, alertas de frescura e teste periódico de restauro ainda por implementar/validar. Backup não substitui exportação/eliminação aplicável.
 - Métricas e logs com IDs de correlação pseudónimos. Não incluir access tokens, e-mails completos, payloads de rendimentos/despesas ou secrets.
 - Objetivos de latência são metas a medir em staging/produção; o requisito antigo `<200 ms` não é garantia sem carga, região e percentil definidos.
 
 ## Decisões ainda abertas
 
-- Fornecedor e região exatos para frontend/API de produção; Lovable é prototipagem/preview até essa seleção.
+- Fornecedor de hosting para frontend/API de produção; Lovable é prototipagem/preview, sem backend.
 - Versões de Java/Spring suportadas no início da implementação e política de atualização.
 - Alojamento de email, analytics, logging e gestão de segredos; cada fornecedor precisa de avaliação de dados e contrato.
-- Retenção por tipo de dado, critérios de arquivo e processo de eliminação em backups.
+- Contratos/DPA e subprocessadores dos fornecedores selecionados; processo operacional de eliminação em backups após a retenção de 7 dias.
 - Se e como habilitar MFA por defeito, exigência de MFA para funções privilegiadas e duração de sessão.
 - AIPD/DPIA: documentar avaliação de necessidade e conclusão antes do lançamento.

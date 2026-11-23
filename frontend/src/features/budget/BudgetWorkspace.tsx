@@ -11,6 +11,14 @@ import {
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
+  calculateAnnualSummary,
+  calculatePeriodCategoryBalances,
+  periodsOverlappingYear,
+  type AnnualSummary,
+} from "@/features/budget/budget-summary";
+import { AccountSettings } from "@/features/profile/AccountSettings";
+import { BudgetInvitations } from "@/features/budget/BudgetInvitations";
+import {
   spendwiseApi,
   type Budget,
   type BudgetAdjustment,
@@ -18,12 +26,14 @@ import {
   type BudgetPeriod,
   type ExpenseEntry,
   type IncomeEntry,
+  type IncomeSchedule,
+  type IncomeScheduleFrequency,
+  type MonthlyShortMonthBehavior,
 } from "@/lib/spendwise-api";
 
 type Props = { accessToken: string; onSignOut: () => void; userEmail?: string };
 type DraftCategory = { name: string; percentage: string };
 type MovementTab = "income" | "expense" | "adjustment";
-type AnnualSummary = { income: number; expense: number; adjustment: number };
 
 const today = () => {
   const date = new Date();
@@ -60,6 +70,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [incomes, setIncomes] = useState<IncomeEntry[]>([]);
+  const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [adjustments, setAdjustments] = useState<BudgetAdjustment[]>([]);
   const [annualYear, setAnnualYear] = useState(
@@ -72,6 +83,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [isLoadingAnnual, setIsLoadingAnnual] = useState(false);
   const [tab, setTab] = useState<MovementTab>("income");
   const [isLoading, setIsLoading] = useState(true);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
@@ -89,6 +101,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   ]);
   const [amount, setAmount] = useState("");
   const [movementDate, setMovementDate] = useState(today());
+  const [scheduleFrequency, setScheduleFrequency] =
+    useState<IncomeScheduleFrequency>("MONTHLY");
+  const [shortMonthBehavior, setShortMonthBehavior] =
+    useState<MonthlyShortMonthBehavior>("LAST_DAY");
+  const [scheduleEndDate, setScheduleEndDate] = useState("");
+  const [incomeRecurring, setIncomeRecurring] = useState(false);
   const [movementCategoryId, setMovementCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [adjustmentSign, setAdjustmentSign] = useState<1 | -1>(1);
@@ -106,29 +124,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     0,
   );
 
-  const categoryBalances = activeCategories.map((category) => {
-    const allocated = incomes.reduce(
-      (total, income) =>
-        total +
-        income.allocation_snapshot
-          .filter((allocation) => allocation.category_id === category.id)
-          .reduce((sum, allocation) => sum + allocation.allocated_amount, 0),
-      0,
-    );
-    const spent = expenses
-      .filter((expense) => expense.category_id === category.id)
-      .reduce((total, expense) => total + expense.amount, 0);
-    const adjusted = adjustments
-      .filter((adjustment) => adjustment.category_id === category.id)
-      .reduce((total, adjustment) => total + adjustment.amount_delta, 0);
-    return {
-      category,
-      allocated,
-      spent,
-      adjusted,
-      balance: allocated - spent + adjusted,
-    };
-  });
+  const categoryBalances = calculatePeriodCategoryBalances(
+    activeCategories,
+    incomes,
+    expenses,
+    adjustments,
+  );
 
   const loadBudgets = useCallback(async () => {
     const nextBudgets = await spendwiseApi.listBudgets(accessToken);
@@ -140,20 +141,27 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     );
   }, [accessToken]);
 
-  const loadWorkspace = useCallback(async () => {
-    if (!selectedBudgetId) return;
-    const [nextPeriods, nextCategories] = await Promise.all([
-      spendwiseApi.listPeriods(accessToken, selectedBudgetId),
-      spendwiseApi.listCategories(accessToken, selectedBudgetId),
-    ]);
-    setPeriods(nextPeriods);
-    setCategories(nextCategories);
-    setSelectedPeriodId((current) =>
-      nextPeriods.some((period) => period.id === current)
-        ? current
-        : (nextPeriods[0]?.id ?? ""),
-    );
-  }, [accessToken, selectedBudgetId]);
+  const loadWorkspace = useCallback(
+    async (budgetId = selectedBudgetId) => {
+      if (!budgetId) return;
+      const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
+        spendwiseApi.listPeriods(accessToken, budgetId),
+        spendwiseApi.listCategories(accessToken, budgetId),
+        allPages((offset) =>
+          spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
+        ),
+      ]);
+      setPeriods(nextPeriods);
+      setCategories(nextCategories);
+      setIncomeSchedules(nextSchedules);
+      setSelectedPeriodId((current) =>
+        nextPeriods.some((period) => period.id === current)
+          ? current
+          : (nextPeriods[0]?.id ?? ""),
+      );
+    },
+    [accessToken, selectedBudgetId],
+  );
 
   const loadMovements = useCallback(async () => {
     if (!selectedBudgetId || !selectedPeriodId) return;
@@ -306,12 +314,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           budget.id,
           allocation.id,
         );
-        await Promise.all([loadBudgets(), loadWorkspace()]);
+        await Promise.all([loadBudgets(), loadWorkspace(budget.id)]);
         setNotice(t("budget.setupComplete"));
       } catch {
         setIsError(true);
         setNotice(t("budget.setupIncomplete"));
-        await loadWorkspace().catch(() => undefined);
+        await loadWorkspace(budget.id).catch(() => undefined);
       }
     } catch {
       setIsError(true);
@@ -339,12 +347,38 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     setNotice("");
     try {
       if (tab === "income") {
-        await spendwiseApi.createIncome(accessToken, selectedBudgetId, {
-          period_id: selectedPeriodId,
-          amount: parsedAmount,
-          occurred_on: movementDate,
-        });
-        setNotice(t("movement.incomeSaved"));
+        if (incomeRecurring) {
+          if (
+            scheduleEndDate &&
+            (!datePattern.test(scheduleEndDate) ||
+              scheduleEndDate < movementDate)
+          ) {
+            setIsError(true);
+            setNotice(t("schedule.invalid"));
+            return;
+          }
+          await spendwiseApi.createIncomeSchedule(
+            accessToken,
+            selectedBudgetId,
+            {
+              amount: parsedAmount,
+              frequency: scheduleFrequency,
+              monthlyShortMonthBehavior: shortMonthBehavior,
+              startDate: movementDate,
+              endDate: scheduleEndDate || null,
+            },
+          );
+          setNotice(t("schedule.created"));
+          setScheduleEndDate("");
+          await loadWorkspace();
+        } else {
+          await spendwiseApi.createIncome(accessToken, selectedBudgetId, {
+            period_id: selectedPeriodId,
+            amount: parsedAmount,
+            occurred_on: movementDate,
+          });
+          setNotice(t("movement.incomeSaved"));
+        }
       } else if (tab === "expense") {
         if (!movementCategoryId) throw new Error("Choose a category");
         await spendwiseApi.createExpense(accessToken, selectedBudgetId, {
@@ -375,6 +409,30 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     } catch {
       setIsError(true);
       setNotice(t("movement.saveError"));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function setIncomeScheduleStatus(
+    schedule: IncomeSchedule,
+    status: "ACTIVE" | "PAUSED" | "CANCELLED",
+  ) {
+    if (!selectedBudgetId) return;
+    setIsSaving(true);
+    setIsError(false);
+    setNotice("");
+    try {
+      await spendwiseApi.updateIncomeSchedule(
+        accessToken,
+        selectedBudgetId,
+        schedule.id,
+        status,
+      );
+      await loadWorkspace();
+    } catch {
+      setIsError(true);
+      setNotice(t("schedule.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -424,18 +482,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       return;
     }
     const year = Number(annualYear);
-    const from = `${annualYear}-01-01`;
-    const to = `${annualYear}-12-31`;
-    const relevantPeriods = periods.filter(
-      (period) => period.starts_on <= to && period.ends_on >= from,
-    );
+    const relevantPeriods = periodsOverlappingYear(periods, year);
     setIsLoadingAnnual(true);
     setIsError(false);
     setNotice("");
     try {
-      let incomeTotal = 0;
-      let expenseTotal = 0;
-      let adjustmentTotal = 0;
+      const annualIncomes: IncomeEntry[] = [];
+      const annualExpenses: ExpenseEntry[] = [];
+      const annualAdjustments: BudgetAdjustment[] = [];
       for (const period of relevantPeriods) {
         const [periodIncomes, periodExpenses, periodAdjustments] =
           await Promise.all([
@@ -464,21 +518,18 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               ),
             ),
           ]);
-        incomeTotal += periodIncomes
-          .filter((item) => item.occurred_on.startsWith(`${year}-`))
-          .reduce((total, item) => total + item.amount, 0);
-        expenseTotal += periodExpenses
-          .filter((item) => item.spent_on.startsWith(`${year}-`))
-          .reduce((total, item) => total + item.amount, 0);
-        adjustmentTotal += periodAdjustments
-          .filter((item) => item.occurred_on.startsWith(`${year}-`))
-          .reduce((total, item) => total + item.amount_delta, 0);
+        annualIncomes.push(...periodIncomes);
+        annualExpenses.push(...periodExpenses);
+        annualAdjustments.push(...periodAdjustments);
       }
-      setAnnualSummary({
-        income: incomeTotal,
-        expense: expenseTotal,
-        adjustment: adjustmentTotal,
-      });
+      setAnnualSummary(
+        calculateAnnualSummary(
+          year,
+          annualIncomes,
+          annualExpenses,
+          annualAdjustments,
+        ),
+      );
       setAnnualSummaryBudgetId(selectedBudgetId);
     } catch {
       setIsError(true);
@@ -524,6 +575,16 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     );
   }
 
+  if (showAccountSettings) {
+    return (
+      <AccountSettings
+        accessToken={accessToken}
+        onBack={() => setShowAccountSettings(false)}
+        onSignOut={onSignOut}
+      />
+    );
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.page}
@@ -536,6 +597,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         </View>
         <View style={styles.headerActions}>
           <LanguageSwitcher />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowAccountSettings(true)}
+          >
+            <Text style={styles.link}>{t("account.openSettings")}</Text>
+          </Pressable>
           <Pressable onPress={onSignOut} accessibilityRole="button">
             <Text style={styles.link}>{t("common.signOut")}</Text>
           </Pressable>
@@ -575,6 +642,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 : t("budget.personal")}{" "}
               · {selectedBudget.currency_code}
             </Text>
+          ) : null}
+          {selectedBudget?.budget_type === "SHARED" ? (
+            <BudgetInvitations
+              accessToken={accessToken}
+              budgetId={selectedBudget.id}
+            />
           ) : null}
           {periods.length ? (
             <>
@@ -619,6 +692,89 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ) : null}
           {canRecordMovements ? (
             <>
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>{t("schedule.title")}</Text>
+                <Text style={styles.muted}>{t("schedule.description")}</Text>
+                {incomeSchedules.length ? (
+                  <View style={styles.scheduleList}>
+                    {incomeSchedules.map((schedule) => {
+                      const pending =
+                        schedule.status === "ACTIVE" &&
+                        schedule.next_occurrence_on <= today();
+                      return (
+                        <View key={schedule.id} style={styles.scheduleItem}>
+                          <View style={styles.entryText}>
+                            <Text style={styles.entryTitle}>
+                              {formatAmount.format(schedule.amount)} ·{" "}
+                              {t(`schedule.frequencies.${schedule.frequency}`)}
+                            </Text>
+                            <Text style={styles.muted}>
+                              {t(`schedule.statuses.${schedule.status}`)} ·{" "}
+                              {t("schedule.nextDate")}:{" "}
+                              {schedule.next_occurrence_on}
+                            </Text>
+                            {schedule.frequency === "MONTHLY" ? (
+                              <Text style={styles.muted}>
+                                {t("schedule.shortMonths")}:{" "}
+                                {t(
+                                  `schedule.shortMonthBehaviors.${schedule.monthly_short_month_behavior}`,
+                                )}
+                              </Text>
+                            ) : null}
+                            {pending ? (
+                              <Text style={styles.error}>
+                                {t("schedule.pendingNoPeriod")}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {schedule.status === "ACTIVE" ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={isSaving}
+                              onPress={() =>
+                                void setIncomeScheduleStatus(schedule, "PAUSED")
+                              }
+                            >
+                              <Text style={styles.link}>
+                                {t("schedule.pause")}
+                              </Text>
+                            </Pressable>
+                          ) : schedule.status === "PAUSED" ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={isSaving}
+                              onPress={() =>
+                                void setIncomeScheduleStatus(schedule, "ACTIVE")
+                              }
+                            >
+                              <Text style={styles.link}>
+                                {t("schedule.resume")}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {schedule.status === "ACTIVE" ||
+                          schedule.status === "PAUSED" ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={isSaving}
+                              onPress={() =>
+                                void setIncomeScheduleStatus(
+                                  schedule,
+                                  "CANCELLED",
+                                )
+                              }
+                            >
+                              <Text style={styles.link}>
+                                {t("schedule.cancel")}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.sectionTitle}>
                 {t("dashboard.periodBalances")}
               </Text>
@@ -744,9 +900,25 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   )}
                 </Text>
                 {tab === "income" ? (
-                  <Text style={styles.muted}>
-                    {t("movement.activeAllocation")}
-                  </Text>
+                  <>
+                    <View style={styles.rowWrap}>
+                      <Choice
+                        label={t("schedule.single")}
+                        selected={!incomeRecurring}
+                        onPress={() => setIncomeRecurring(false)}
+                      />
+                      <Choice
+                        label={t("schedule.recurring")}
+                        selected={incomeRecurring}
+                        onPress={() => setIncomeRecurring(true)}
+                      />
+                    </View>
+                    <Text style={styles.muted}>
+                      {incomeRecurring
+                        ? t("schedule.recurringDescription")
+                        : t("movement.activeAllocation")}
+                    </Text>
+                  </>
                 ) : (
                   <>
                     <Text style={styles.label}>{t("movement.category")}</Text>
@@ -777,14 +949,71 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   style={styles.input}
                   value={amount}
                 />
-                <Text style={styles.label}>{t("movement.date")}</Text>
+                <Text style={styles.label}>
+                  {tab === "income" && incomeRecurring
+                    ? t("schedule.startDate")
+                    : t("movement.date")}
+                </Text>
                 <TextInput
-                  accessibilityLabel={t("movement.date")}
+                  accessibilityLabel={
+                    tab === "income" && incomeRecurring
+                      ? t("schedule.startDate")
+                      : t("movement.date")
+                  }
                   onChangeText={setMovementDate}
                   placeholder="AAAA-MM-DD"
                   style={styles.input}
                   value={movementDate}
                 />
+                {tab === "income" && incomeRecurring ? (
+                  <>
+                    <Text style={styles.label}>{t("schedule.frequency")}</Text>
+                    <View style={styles.rowWrap}>
+                      {(["WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const).map(
+                        (frequency) => (
+                          <Choice
+                            key={frequency}
+                            label={t(`schedule.frequencies.${frequency}`)}
+                            selected={scheduleFrequency === frequency}
+                            onPress={() => setScheduleFrequency(frequency)}
+                          />
+                        ),
+                      )}
+                    </View>
+                    {scheduleFrequency === "MONTHLY" ? (
+                      <>
+                        <Text style={styles.label}>
+                          {t("schedule.shortMonths")}
+                        </Text>
+                        <Text style={styles.muted}>
+                          {t("schedule.shortMonthDescription")}
+                        </Text>
+                        <View style={styles.rowWrap}>
+                          {(["LAST_DAY", "SKIP"] as const).map((behavior) => (
+                            <Choice
+                              key={behavior}
+                              label={t(
+                                `schedule.shortMonthBehaviors.${behavior}`,
+                              )}
+                              selected={shortMonthBehavior === behavior}
+                              onPress={() => setShortMonthBehavior(behavior)}
+                            />
+                          ))}
+                        </View>
+                      </>
+                    ) : null}
+                    <Text style={styles.label}>
+                      {t("schedule.endDateOptional")}
+                    </Text>
+                    <TextInput
+                      accessibilityLabel={t("schedule.endDateOptional")}
+                      onChangeText={setScheduleEndDate}
+                      placeholder="AAAA-MM-DD"
+                      style={styles.input}
+                      value={scheduleEndDate}
+                    />
+                  </>
+                ) : null}
                 {tab === "expense" ? (
                   <>
                     <Text style={styles.label}>
@@ -832,7 +1061,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                     (tab !== "income" && !movementCategoryId) ||
                     (tab === "adjustment" && !reason.trim())
                   }
-                  label={isSaving ? t("common.saving") : t("common.save")}
+                  label={
+                    isSaving
+                      ? t("common.saving")
+                      : tab === "income" && incomeRecurring
+                        ? t("schedule.create")
+                        : t("common.save")
+                  }
                   onPress={submitMovement}
                 />
               </View>
@@ -1180,6 +1415,18 @@ const styles = StyleSheet.create({
   annualRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   yearInput: { width: 100 },
   list: { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 14 },
+  scheduleList: { marginTop: 8, borderTopColor: "#edf1ed", borderTopWidth: 1 },
+  scheduleItem: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomColor: "#edf1ed",
+    borderBottomWidth: 1,
+  },
   entry: {
     minHeight: 56,
     flexDirection: "row",

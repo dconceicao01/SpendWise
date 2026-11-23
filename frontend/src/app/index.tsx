@@ -18,6 +18,11 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { BudgetWorkspace } from "@/features/budget/BudgetWorkspace";
+import type { Metadata } from "expo-router/server";
+
+export function generateMetadata(): Metadata {
+  return { title: "SpendWise" };
+}
 
 type AuthMode = "signIn" | "signUp" | "recover";
 
@@ -220,7 +225,7 @@ export default function HomeScreen() {
                     accessibilityLabel={t("auth.password")}
                     autoCapitalize="none"
                     autoComplete={
-                      mode === "signUp" ? "new-password" : "password"
+                      mode === "signUp" ? "new-password" : "current-password"
                     }
                     onChangeText={setPassword}
                     onSubmitEditing={submitAuth}

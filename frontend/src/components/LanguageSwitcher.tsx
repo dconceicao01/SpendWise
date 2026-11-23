@@ -7,7 +7,11 @@ export function LanguageSwitcher() {
   const { i18n, t } = useTranslation();
   const [isChanging, setIsChanging] = useState(false);
   const nextLanguage = i18n.language.startsWith("pt") ? "en" : "pt";
-  const nextLanguageName = nextLanguage === "pt" ? "Português" : "English";
+  const nextLanguageName = t(
+    nextLanguage === "pt"
+      ? "common.languagePortuguese"
+      : "common.languageEnglish",
+  );
 
   async function selectLanguage() {
     if (isChanging) return;
@@ -21,9 +25,7 @@ export function LanguageSwitcher() {
 
   return (
     <Pressable
-      accessibilityLabel={t("common.switchLanguage", {
-        language: nextLanguageName,
-      })}
+      accessibilityLabel={`${nextLanguage.toUpperCase()}. ${t("common.switchLanguage", { language: nextLanguageName })}`}
       accessibilityRole="button"
       disabled={isChanging}
       onPress={selectLanguage}

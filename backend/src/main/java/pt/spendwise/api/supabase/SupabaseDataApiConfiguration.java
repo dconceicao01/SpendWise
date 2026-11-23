@@ -13,6 +13,20 @@ public class SupabaseDataApiConfiguration {
     RestClient supabaseDataApiRestClient(
             RestClient.Builder builder,
             @Value("${SUPABASE_URL}") String supabaseUrl) {
+        validateSupabaseUrl(supabaseUrl);
+        String baseUrl = supabaseUrl.replaceAll("/+$", "") + "/rest/v1";
+        return builder.baseUrl(baseUrl).build();
+    }
+
+    @Bean
+    RestClient supabaseAuthAdminRestClient(
+            RestClient.Builder builder,
+            @Value("${SUPABASE_URL}") String supabaseUrl) {
+        validateSupabaseUrl(supabaseUrl);
+        return builder.baseUrl(supabaseUrl.replaceAll("/+$", "") + "/auth/v1").build();
+    }
+
+    private void validateSupabaseUrl(String supabaseUrl) {
         URI baseUri = URI.create(supabaseUrl);
         if (baseUri.getHost() == null || baseUri.getRawQuery() != null || baseUri.getRawFragment() != null) {
             throw new IllegalArgumentException("Supabase URL must be an absolute URL without query or fragment");
@@ -20,9 +34,6 @@ public class SupabaseDataApiConfiguration {
         if (!"https".equalsIgnoreCase(baseUri.getScheme()) && !isLoopbackHttp(baseUri)) {
             throw new IllegalArgumentException("Supabase URL must use HTTPS outside local development");
         }
-
-        String baseUrl = supabaseUrl.replaceAll("/+$", "") + "/rest/v1";
-        return builder.baseUrl(baseUrl).build();
     }
 
     private boolean isLoopbackHttp(URI uri) {

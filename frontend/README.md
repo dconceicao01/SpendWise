@@ -16,7 +16,11 @@ Sessões móveis ficam em Expo SecureStore; sessões web em `sessionStorage` e t
 
 ## Idiomas
 
-O produto deve suportar português e inglês. O ecrã de aceitação de convite escolhe a língua do dispositivo; a preferência global e a biblioteca de tradução devem ser consolidadas antes de ampliar a interface. Manter o texto novo num ponto central por fluxo e não espalhado por componentes.
+O produto suporta português e inglês através de `i18next` e `react-i18next`; os ecrãs de autenticação, orçamento, convites e perfil usam as traduções em `src/i18n/locales/`. Manter o texto novo nas traduções centrais, com chaves equivalentes nos dois idiomas.
+
+## Perfil e privacidade
+
+Com sessão autenticada, abre **Perfil e privacidade** para consultar e editar nome, telemóvel opcional e moeda predefinida. O mesmo ecrã permite pedir a eliminação da conta. Se a pessoa for OWNER de um orçamento partilhado, apresenta os membros ativos para escolher quem recebe a propriedade; sem outro membro ativo, o pedido fica bloqueado até ser adicionado um membro. A confirmação explica que os orçamentos pessoais serão apagados e que o histórico partilhado será pseudonimizado. Estes valores são apenas virtuais e a aplicação não movimenta dinheiro real.
 
 ## Requisitos
 
@@ -42,14 +46,18 @@ pnpm android
 pnpm ios
 ```
 
-Para verificar tipos e exportar a versão web:
+Para executar testes unitários, E2E e verificar tipos/exportar a versão web:
 
 ```powershell
+pnpm test
+pnpm test:e2e
 pnpm lint
 pnpm typecheck
 pnpm format:check
 pnpm build:web
 ```
+
+Os testes E2E iniciam a aplicação web em `localhost:8081` e usam autenticação, API e dados sintéticos interceptados pelo Playwright; não contactam um projeto Supabase real. A suíte corre em Chromium desktop e em emulação de viewport Pixel 7, com axe a verificar critérios WCAG 2.0/2.1 A/AA nos ecrãs cobertos. Para preparar Chromium localmente, executar `pnpm exec playwright install chromium`. A emulação móvel valida a interface web responsiva; não substitui testes numa aplicação nativa iOS/Android nem no staging.
 
 ## Publicação móvel
 

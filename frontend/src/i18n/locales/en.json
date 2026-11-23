@@ -7,6 +7,8 @@
     "retry": "Try again",
     "signOut": "Sign out",
     "switchLanguage": "Change language to {{language}}",
+    "languagePortuguese": "Portuguese",
+    "languageEnglish": "English",
     "error": "We couldn't complete this action. Please try again."
   },
   "auth": {
@@ -57,7 +59,44 @@
     "accept": "Accept invitation",
     "accepted": "Invitation accepted. Your membership in the shared budget is now active.",
     "invalid": "We couldn't accept this invitation. Check the account and try again.",
-    "missing": "This link does not contain a valid invitation."
+    "missing": "This link does not contain a valid invitation.",
+    "manageTitle": "Manage invitations",
+    "manageDescription": "Create a one-time invitation link for a confirmed email address. SpendWise does not send the email; share the link with the invited person yourself.",
+    "email": "Invited email",
+    "emailPlaceholder": "name@example.com",
+    "role": "Access level",
+    "contributor": "Can record movements",
+    "viewer": "View only",
+    "create": "Create invitation",
+    "created": "Invitation created. Copy or share the link now; it is shown only once.",
+    "createError": "We couldn't create the invitation. Check the email and try again.",
+    "emailInvalid": "Enter a valid email address.",
+    "linkReady": "One-time invitation link",
+    "linkWarning": "Treat this link like a secret. Only the invited person can accept it using the confirmed email address above.",
+    "copyLink": "Copy link",
+    "shareLink": "Share link",
+    "hideLink": "Hide link",
+    "copied": "Invitation link copied.",
+    "copyError": "Clipboard access is unavailable. Select and copy the link above.",
+    "shareError": "We couldn't open the share options. Try copying the link instead.",
+    "pendingTitle": "Invitations",
+    "empty": "There are no invitations for this budget yet.",
+    "loadError": "We couldn't load invitations. Try again.",
+    "recipientUnavailable": "Recipient email unavailable",
+    "expiresAt": "Expires {{date}}",
+    "revoke": "Revoke",
+    "revoked": "Invitation revoked.",
+    "revokeError": "We couldn't revoke this invitation. Try again.",
+    "statuses": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
+    "roles": {
+      "CONTRIBUTOR": "Can record movements",
+      "VIEWER": "View only"
+    }
   },
   "budget": {
     "title": "Your budgets",
@@ -127,6 +166,42 @@
     "amountInvalid": "Enter a positive amount with up to four decimal places.",
     "adjustmentSign": "Choose whether the adjustment increases or reduces the category balance."
   },
+  "schedule": {
+    "title": "Recurring income",
+    "description": "Recurring income consists of virtual entries created automatically. SpendWise does not move money.",
+    "single": "One-time",
+    "recurring": "Recurring",
+    "recurringDescription": "Cron creates virtual entries at the selected frequency and assigns each one to the matching period; if none exists, it stays pending.",
+    "frequency": "Frequency",
+    "frequencies": {
+      "WEEKLY": "Weekly",
+      "FORTNIGHTLY": "Fortnightly",
+      "MONTHLY": "Monthly"
+    },
+    "shortMonths": "When the selected day is unavailable",
+    "shortMonthDescription": "For example, day 31 in February.",
+    "shortMonthBehaviors": {
+      "LAST_DAY": "Use the last day of the month",
+      "SKIP": "Skip that month"
+    },
+    "startDate": "First entry date (YYYY-MM-DD)",
+    "endDateOptional": "End date (optional, YYYY-MM-DD)",
+    "create": "Create recurring income",
+    "created": "Recurring income created.",
+    "invalid": "Check the amount and dates for this recurring income.",
+    "saveError": "We couldn't save this recurring income.",
+    "statuses": {
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "CANCELLED": "Cancelled",
+      "COMPLETED": "Completed"
+    },
+    "nextDate": "Next date",
+    "pendingNoPeriod": "Pending: the virtual entry has not been created for this date yet.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel"
+  },
   "dashboard": {
     "periodBalances": "Virtual balances for this period",
     "allocated": "Allocated",
@@ -139,5 +214,29 @@
     "netChange": "Virtual change",
     "invalidYear": "Enter a valid four-digit year.",
     "loadError": "We couldn't load the annual summary."
+  },
+  "account": {
+    "openSettings": "Profile and privacy",
+    "title": "Profile and privacy",
+    "back": "Back to budget",
+    "profileTitle": "My profile",
+    "profileDescription": "Update your profile details. Your email address is managed by the authentication service.",
+    "email": "Email",
+    "fullName": "Name",
+    "phone": "Phone (optional)",
+    "phonePlaceholder": "+351912345678",
+    "currency": "Default currency (3-letter code)",
+    "profileSaved": "Profile updated.",
+    "profileSaveError": "We couldn't update the profile. Check the name, currency, and phone format.",
+    "loadError": "We couldn't load your profile and deletion details.",
+    "deleteTitle": "Delete account",
+    "deleteDescription": "This action is permanent. Your personal budgets and related data will be deleted. In shared budgets, your history will remain pseudonymized while the budget exists. SpendWise stores virtual amounts and does not move real money.",
+    "transferBudget": "Choose who receives ownership of “{{name}}”:",
+    "unnamedMember": "Member without a profile name",
+    "noTransferTargets": "This budget has no other active member. Add a member before requesting account deletion.",
+    "acknowledge": "I understand this action is permanent and my personal data will be erased; shared history will be pseudonymized.",
+    "deleting": "Deleting account…",
+    "deleteButton": "Request account deletion",
+    "deleteError": "We couldn't complete deletion. If the request is already pending, try again later."
   }
 }

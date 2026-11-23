@@ -6,12 +6,15 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriBuilder;
 
 @Component
@@ -101,7 +104,14 @@ public class SupabaseDataApiClient {
             request.contentType(MediaType.APPLICATION_JSON).body(requestBody);
         }
 
-        return request.retrieve().body(responseType);
+        try {
+            return request.retrieve().body(responseType);
+        } catch (RestClientResponseException exception) {
+            if (exception.getResponseBodyAsString().contains("write_rate_limited")) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many write requests");
+            }
+            throw exception;
+        }
     }
 
     private String requireCurrentAccessToken() {

@@ -1,6 +1,6 @@
 # SpendWise API
 
-API de domínio do SpendWise, construída com Java 21, Spring Boot 3.5 e Maven.
+API de domínio do SpendWise, construída com Java 21, Spring Boot 4.2 e Maven. A linha 4 usa Jackson 3; manter as anotações Jackson core em `com.fasterxml.jackson.annotation` e as anotações de databind em `tools.jackson.databind.annotation`.
 
 ## Pré-requisitos
 
@@ -17,18 +17,45 @@ No PowerShell, a partir de `backend/`:
 $env:SUPABASE_ISSUER_URI = "http://127.0.0.1:54321/auth/v1"
 $env:SUPABASE_URL = "http://127.0.0.1:54321"
 $env:SUPABASE_PUBLISHABLE_KEY = "<chave publishable do projeto>"
+$env:SUPABASE_SERVICE_ROLE_KEY = "<chave secreta apenas no servidor>"
 .\mvnw.cmd spring-boot:run
 ```
 
 Spring Security Resource Server obtém as chaves públicas em `{SUPABASE_ISSUER_URI}/.well-known/jwks.json` e valida assinatura, `iss`, `exp` e `aud=authenticated`; tokens anónimos (`aud=anon`) são recusados. O projeto Supabase deve emitir tokens com uma chave de assinatura publicada no JWKS; uma chave legacy simétrica não satisfaz este fluxo. `GET /api/v1/health` é público; os restantes endpoints exigem Bearer JWT válido. Os erros de autenticação não incluem tokens nem claims na resposta. A API mantém erros técnicos independentes do idioma; a interface deve traduzir os códigos/estados para a língua selecionada pelo utilizador.
 
-Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados; não configurar nem encaminhar uma `service_role` key.
+CORS está limitado por omissão às origens locais `http://localhost:8081` e `http://127.0.0.1:8081`. Em staging/produção, define `SPENDWISE_CORS_ALLOWED_ORIGINS` como lista separada por vírgulas de origens HTTPS exatas (scheme, host e porta quando aplicável), por exemplo `https://app.example.com`; não usar `*`. A API não aceita credenciais por cookies e permite apenas os métodos/headers usados pelo cliente. O hosting do frontend deve configurar CSP e restantes cabeçalhos HTTP no documento web, uma vez que estes cabeçalhos não são efetivos quando enviados pela API.
+
+Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados. `SUPABASE_SERVICE_ROLE_KEY` só é usada pelo endpoint de eliminação para a chamada Auth Admin, depois de a limpeza transacional de dados terminar; nunca a configurar no frontend nem em pedidos normais.
 
 Para executar os testes:
 
 ```powershell
 .\mvnw.cmd verify
 ```
+
+Para construir a imagem do container localmente, a partir de `backend/`:
+
+```powershell
+docker build -t spendwise-api:local .
+```
+
+A imagem usa Java 21 JRE e executa como utilizador sem privilégios. A CI constrói a imagem e verifica vulnerabilidades altas/críticas; a imagem ainda não é publicada nem implantada por este workflow.
+
+### Piloto pessoal na Vercel (opcional)
+
+A Vercel pode alojar o piloto pessoal através de dois projetos independentes: um para o frontend web estático e outro para a API Spring Boot. A API usa o runtime de containers da Vercel, que está em beta. O projeto da API deve usar `backend/` como diretório raiz; `backend/vercel.json` seleciona o runtime container na região Paris (`cdg1`) e `Dockerfile.vercel` usa o build Java 21 da imagem local. Configurar `PORT=8080` nas variáveis runtime do projeto API. A aplicação usa 8080 como fallback local.
+
+No projeto da API, selecionar a região Paris (`cdg1`) e definir apenas no ambiente server-side: `SUPABASE_ISSUER_URI`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SPENDWISE_CORS_ALLOWED_ORIGINS` e `SPENDWISE_INVITATION_BASE_URL`. A origem CORS e a URL de convite devem corresponder exatamente ao domínio do projeto web e usar HTTPS. O projeto web recebe `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `EXPO_PUBLIC_SPENDWISE_API_URL` como variáveis de build. Nunca colocar a chave `service_role` em variáveis `EXPO_PUBLIC_*`, no frontend ou em previews.
+
+O projeto web deve usar a raiz `frontend/`; `frontend/vercel.json` define `pnpm build:web` e publica `dist/`. O `package.json` fixa pnpm 12.20 e Node.js 24. Configurar os URLs de redirecionamento do Supabase Auth para o domínio de piloto e os callbacks realmente usados. Usar um projeto Supabase separado, com contas e dados sintéticos; nunca apontar previews para dados reais. Hobby só é adequado ao uso pessoal não comercial, sem SLA; containers escalam a zero e têm quotas/faturação próprias. Rever limites e termos antes de qualquer utilização fora do piloto. Esta configuração não constitui autorização para produção.
+
+## Exportação de dados pessoais
+
+`GET /api/v1/me/export` exige um Bearer JWT válido e devolve um anexo `application/json` chamado `spendwise-data-export.json`. Inclui o email do próprio JWT e os dados do perfil próprio; para cada orçamento visível ao utilizador, inclui configuração, períodos, categorias, versões de alocação, rendimentos, despesas, ajustes e agendamentos. As listas são paginadas internamente até ao fim. Em orçamentos partilhados, a exportação respeita exatamente a visibilidade atual via Data API/RLS e omite os identificadores que indicam qual membro criou cada movimento/agendamento. A resposta usa `Cache-Control: no-store`; o cliente deve guardar o ficheiro apenas onde o utilizador escolher.
+
+`GET` e `PUT /api/v1/me/profile` consultam e atualizam o perfil do utilizador atual. Nome e moeda (código de três letras maiúsculas) são obrigatórios; telefone E.164 é opcional. O email vem do JWT Auth e não é alterado por este endpoint. Respostas não são guardadas em cache.
+
+`GET /api/v1/me/deletion-options` devolve apenas os orçamentos partilhados onde a pessoa atual é OWNER e os membros ativos elegíveis para receber cada orçamento. `POST /api/v1/me/deletion` recebe `{"ownerTransfers":[{"budgetId":"…","targetMemberId":"…"}]}`. Para cada orçamento partilhado em que a pessoa é OWNER, é obrigatório indicar um membro ativo para receber a propriedade. A RPC deriva a identidade de `auth.uid()`, valida todas as transferências, apaga os orçamentos pessoais, revoga convites abertos, remove preferências de lembretes, pausa agendamentos que perdem um criador elegível, remove o perfil e pseudonimiza as memberships partilhadas numa única transação. A aplicação só chama Auth Admin após essa transação. Se Auth Admin estiver indisponível, a tabela privada de pedidos pendentes bloqueia nova leitura/escrita do utilizador e permite repetir o pedido depois de corrigida a configuração. A eliminação Auth remove a identidade e impede novas sessões; JWTs já emitidos podem permanecer criptograficamente válidos até expirarem, mas as policies e helpers da base de dados bloqueiam a conta pendente e a membership é removida antes da chamada Admin. Ver [política de dados e migração](../Database/README.md).
 
 O teste opcional `SupabaseDataApiLocalIntegrationTest` comprova a passagem do JWT pelo cliente Java até ao gateway Supabase e o isolamento de perfis via RLS. Para o executar, inicia a stack local em `Database/`, define no processo atual `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SPENDWISE_LOCAL_SUPABASE_ADMIN_KEY` (a `SERVICE_ROLE_KEY` obtida do estado local apenas para criar/apagar utilizadores sintéticos) e corre:
 
@@ -45,6 +72,8 @@ O endpoint de disponibilidade é `GET /api/v1/health` e devolve `{"status":"UP"}
 ### Rendimentos, despesas e ajustes
 
 Movimentos usam `GET/POST /api/v1/budgets/{budgetId}/incomes`, `GET/POST .../expenses` e `GET/POST .../adjustments`. As listagens aceitam `periodId` opcional, `limit` (máximo 100) e `offset`. Cada escrita exige papel `OWNER` ou `CONTRIBUTOR`; o membro que regista é sempre derivado do JWT atual, não do corpo do pedido. O registo de rendimento chama `record_income` numa transação e devolve o snapshot das percentagens e montantes da versão ativa no momento do registo. Rendimentos retroativos usam essa versão ativa, mas mantêm a data efetiva e o período selecionado. Despesas e ajustes usam RPCs `SECURITY INVOKER`; a base de dados valida autorização, período e consistência. Um ajuste ligado a uma despesa corrigida tem de preservar a data efetiva, categoria e período originais. São registos virtuais para acompanhamento; não movimentam dinheiro.
+
+As escritas autenticadas são limitadas no PostgreSQL a 120 transações por utilizador em janela móvel de 60 segundos; várias linhas alteradas numa transação só contam uma vez. Quando o limite é atingido, a API devolve HTTP 429 sem incluir o detalhe interno da base de dados. Registos técnicos do limite não contêm IP nem payload e são removidos após 24 horas.
 
 ## Limites deste scaffold
 
