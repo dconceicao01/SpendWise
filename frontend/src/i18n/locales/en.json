@@ -175,5 +175,29 @@
     "netChange": "Virtual change",
     "invalidYear": "Enter a valid four-digit year.",
     "loadError": "We couldn't load the annual summary."
+  },
+  "account": {
+    "openSettings": "Profile and privacy",
+    "title": "Profile and privacy",
+    "back": "Back to budget",
+    "profileTitle": "My profile",
+    "profileDescription": "Update your profile details. Your email address is managed by the authentication service.",
+    "email": "Email",
+    "fullName": "Name",
+    "phone": "Phone (optional)",
+    "phonePlaceholder": "+351912345678",
+    "currency": "Default currency (3-letter code)",
+    "profileSaved": "Profile updated.",
+    "profileSaveError": "We couldn't update the profile. Check the name, currency, and phone format.",
+    "loadError": "We couldn't load your profile and deletion details.",
+    "deleteTitle": "Delete account",
+    "deleteDescription": "This action is permanent. Your personal budgets and related data will be deleted. In shared budgets, your history will remain pseudonymized while the budget exists. SpendWise stores virtual amounts and does not move real money.",
+    "transferBudget": "Choose who receives ownership of “{{name}}”:",
+    "unnamedMember": "Member without a profile name",
+    "noTransferTargets": "This budget has no other active member. Add a member before requesting account deletion.",
+    "acknowledge": "I understand this action is permanent and my personal data will be erased; shared history will be pseudonymized.",
+    "deleting": "Deleting account…",
+    "deleteButton": "Request account deletion",
+    "deleteError": "We couldn't complete deletion. If the request is already pending, try again later."
   }
 }

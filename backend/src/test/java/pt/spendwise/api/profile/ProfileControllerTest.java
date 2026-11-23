@@ -46,6 +46,9 @@ class ProfileControllerTest {
     @MockitoBean
     private AccountDeletionService accountDeletionService;
 
+    @MockitoBean
+    private AccountDeletionOptionsService accountDeletionOptionsService;
+
     @Test
     void profileRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/me/profile"))
@@ -108,6 +111,22 @@ class ProfileControllerTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
 
         verify(accountDeletionService).deleteCurrent(new DeleteAccountRequest(List.of()));
+    }
+
+    @Test
+    void deletionOptionsRequireAuthenticationAndAreNotCached() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        when(accountDeletionOptionsService.forCurrentUser()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/me/deletion-options"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/me/deletion-options")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
+
+        verify(accountDeletionOptionsService).forCurrentUser();
     }
 
     private ProfileResponse profile() {

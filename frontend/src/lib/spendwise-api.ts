@@ -61,6 +61,22 @@ export type BudgetAdjustment = {
   occurred_on: string;
 };
 
+export type UserProfile = {
+  user_id: string;
+  email: string | null;
+  full_name: string;
+  phone_e164: string | null;
+  default_currency: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AccountDeletionOption = {
+  budgetId: string;
+  budgetName: string;
+  transferTargets: { memberId: string; displayName: string | null }[];
+};
+
 export type IncomeScheduleFrequency = "WEEKLY" | "FORTNIGHTLY" | "MONTHLY";
 export type IncomeScheduleStatus =
   "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED";
@@ -115,6 +131,10 @@ function jsonBody(value: unknown): Pick<RequestInit, "method" | "body"> {
   return { method: "POST", body: JSON.stringify(value) };
 }
 
+function jsonPutBody(value: unknown): Pick<RequestInit, "method" | "body"> {
+  return { method: "PUT", body: JSON.stringify(value) };
+}
+
 function movementQuery(periodId: string, offset = 0) {
   const params = new URLSearchParams({
     periodId,
@@ -125,6 +145,21 @@ function movementQuery(periodId: string, offset = 0) {
 }
 
 export const spendwiseApi = {
+  getProfile: (token: string) => request<UserProfile>(token, "/me/profile"),
+  updateProfile: (
+    token: string,
+    input: {
+      fullName: string;
+      phoneE164: string | null;
+      defaultCurrency: string;
+    },
+  ) => request<UserProfile>(token, "/me/profile", jsonPutBody(input)),
+  getAccountDeletionOptions: (token: string) =>
+    request<AccountDeletionOption[]>(token, "/me/deletion-options"),
+  deleteAccount: (
+    token: string,
+    ownerTransfers: { budgetId: string; targetMemberId: string }[],
+  ) => request<void>(token, "/me/deletion", jsonBody({ ownerTransfers })),
   listBudgets: (token: string) => request<Budget[]>(token, "/budgets"),
   createBudget: (
     token: string,
