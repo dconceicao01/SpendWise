@@ -41,6 +41,17 @@ function numberValue(value: string) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function allPages<T>(
+  page: (offset: number) => Promise<T[]>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const current = await page(offset);
+    rows.push(...current);
+    if (current.length < 100) return rows;
+  }
+}
+
 export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const { t, i18n } = useTranslation();
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -147,16 +158,29 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const loadMovements = useCallback(async () => {
     if (!selectedBudgetId || !selectedPeriodId) return;
     const [nextIncomes, nextExpenses, nextAdjustments] = await Promise.all([
-      spendwiseApi.listIncomes(accessToken, selectedBudgetId, selectedPeriodId),
-      spendwiseApi.listExpenses(
-        accessToken,
-        selectedBudgetId,
-        selectedPeriodId,
+      allPages((offset) =>
+        spendwiseApi.listIncomes(
+          accessToken,
+          selectedBudgetId,
+          selectedPeriodId,
+          offset,
+        ),
       ),
-      spendwiseApi.listAdjustments(
-        accessToken,
-        selectedBudgetId,
-        selectedPeriodId,
+      allPages((offset) =>
+        spendwiseApi.listExpenses(
+          accessToken,
+          selectedBudgetId,
+          selectedPeriodId,
+          offset,
+        ),
+      ),
+      allPages((offset) =>
+        spendwiseApi.listAdjustments(
+          accessToken,
+          selectedBudgetId,
+          selectedPeriodId,
+          offset,
+        ),
       ),
     ]);
     setIncomes(nextIncomes);
@@ -412,16 +436,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       let incomeTotal = 0;
       let expenseTotal = 0;
       let adjustmentTotal = 0;
-      async function allPages<T>(
-        page: (offset: number) => Promise<T[]>,
-      ): Promise<T[]> {
-        const rows: T[] = [];
-        for (let offset = 0; ; offset += 100) {
-          const current = await page(offset);
-          rows.push(...current);
-          if (current.length < 100) return rows;
-        }
-      }
       for (const period of relevantPeriods) {
         const [periodIncomes, periodExpenses, periodAdjustments] =
           await Promise.all([
