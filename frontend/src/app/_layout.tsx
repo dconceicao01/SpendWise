@@ -25,9 +25,14 @@ export default function RootLayout() {
     const unsubscribe = subscribeRuntimeConfig(() => {
       setRuntimeConfigVersion((version) => version + 1);
     });
-    const appStateSubscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refreshRuntimeConfig().catch(() => undefined);
-    });
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (state) => {
+        if (state === "active") {
+          void refreshRuntimeConfig().catch(() => undefined);
+        }
+      },
+    );
 
     void Promise.all([initializeLanguage(), initializeRuntimeConfig()])
       .catch(() => undefined)
