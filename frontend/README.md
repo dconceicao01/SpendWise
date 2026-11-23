@@ -46,9 +46,10 @@ pnpm android
 pnpm ios
 ```
 
-Para verificar tipos e exportar a versão web:
+Para executar testes unitários e verificar tipos/exportar a versão web:
 
 ```powershell
+pnpm test
 pnpm lint
 pnpm typecheck
 pnpm format:check
