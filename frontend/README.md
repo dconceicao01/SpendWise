@@ -59,8 +59,17 @@ pnpm build:web
 
 Os testes E2E iniciam a aplicação web em `localhost:8081` e usam autenticação, API e dados sintéticos interceptados pelo Playwright; não contactam um projeto Supabase real. A suíte corre em Chromium desktop e em emulação de viewport Pixel 7, com axe a verificar critérios WCAG 2.0/2.1 A/AA nos ecrãs cobertos. Para preparar Chromium localmente, executar `pnpm exec playwright install chromium`. A emulação móvel valida a interface web responsiva; não substitui testes numa aplicação nativa iOS/Android nem no staging.
 
-## Publicação móvel
+## Builds e publicação móvel
 
-O projeto já inclui alvos Expo para Android e iOS, mas ainda não está pronto para publicação. Antes de distribuir nas lojas, definir identificadores únicos (`android.package` e `ios.bundleIdentifier`), contas de developer, credenciais de assinatura, ícones/splash de marca, políticas de privacidade e pipelines de build/release. Não guardar credenciais nos ficheiros versionados.
+O projeto inclui `eas.json` com perfis EAS separados:
+
+- `preview` gera builds internas para validação, usando o ambiente Expo `preview`.
+- `production` prepara builds para as lojas, usando o ambiente Expo `production` e incremento remoto do número de build. O perfil não submete nem publica automaticamente nas lojas.
+
+Definir em cada ambiente Expo as variáveis públicas necessárias: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_SPENDWISE_API_URL` e `EXPO_PUBLIC_RUNTIME_CONFIG_URL`. Usar valores Supabase e API isolados para preview/staging e valores de produção apenas no ambiente production. A URL runtime é o endereço HTTPS estável `/api/runtime-config` no domínio web; esse domínio ainda tem de ser configurado no projeto Vercel antes de builds móveis.
+
+Os identificadores iniciais são `com.dconceicao01.spendwise` para Android (`android.package`) e iOS (`ios.bundleIdentifier`), derivados do proprietário atual do repositório. Antes da primeira publicação, confirmar que estão disponíveis nas contas Google Play e Apple Developer e manter o mesmo identificador após a publicação. O projeto ainda tem de ser ligado a uma conta Expo. Também são necessários os contratos/contas developer Apple e Google, credenciais de assinatura, ícones/splash de marca, políticas de privacidade e associação dos links HTTPS. Não guardar credenciais nos ficheiros versionados.
+
+O EAS Free inclui atualmente até 15 builds Android e 15 builds iOS por mês; a quota é sem overage no plano gratuito. Se a quota terminar, aguardar a reposição mensal ou fazer builds locais, sem ativar um plano pago. Confirmar quotas e condições atuais antes de usar.
 
 O ecrã de aceitação de convite envia o token no corpo de um pedido autenticado à API. Antes de publicar, configurar `SPENDWISE_INVITATION_BASE_URL` com a rota HTTPS hospedada do frontend. Para abrir links HTTPS diretamente nas aplicações móveis, configurar também Universal Links/App Links e as associações de domínio Apple/Android.

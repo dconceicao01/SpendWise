@@ -7,7 +7,8 @@
     "icon": "./assets/images/icon.png",
     "scheme": "spendwise",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.dconceicao01.spendwise"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +27,8 @@
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
-      ]
+      ],
+      "package": "com.dconceicao01.spendwise"
     },
     "userInterfaceStyle": "automatic",
     "web": {
