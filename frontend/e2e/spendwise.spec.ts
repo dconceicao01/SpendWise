@@ -437,6 +437,7 @@ async function signIn(page: Page) {
   await expect(
     page.getByText("Start by creating your first budget"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Create my first budget" }).click();
 }
 
 test("authentication controls are labeled and keyboard accessible", async ({
