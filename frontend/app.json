@@ -23,16 +23,9 @@
           "action": "VIEW",
           "autoVerify": false,
           "data": [
-            {
-              "scheme": "spendwise",
-              "host": "auth",
-              "pathPrefix": "/callback"
-            }
+            { "scheme": "spendwise", "host": "auth", "pathPrefix": "/callback" }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ],
       "package": "com.dconceicao01.spendwise"
