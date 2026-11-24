@@ -62,6 +62,7 @@ Os testes E2E iniciam a aplicação web em `localhost:8081` e usam autenticaçã
 ## Builds e publicação móvel
 
 O projeto inclui `eas.json` com perfis EAS separados:
+
 - `preview` gera builds internas para validação, usando o ambiente Expo `preview`.
 - `production` prepara builds para as lojas, usando o ambiente Expo `production` e incremento remoto do número de build. O perfil não submete nem publica automaticamente nas lojas.
 
