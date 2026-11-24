@@ -75,7 +75,7 @@ Não copiar dados de produção para ambientes inferiores. Não executar `ddl-au
 
 O piloto inicial pode usar Supabase Free em Paris para baixa afluência. A equipa aceita que o plano Free pode pausar projetos inativos e não oferece backups geridos; não prometer SLA. Lovable serve para protótipos/previews, sem backend/Lovable Cloud; o seu hosting não é ainda o destino aprovado para produção.
 
-Objetivos aprovados: RPO ≤24h, RTO ≤8h e retenção de 7 dias, com cópias cifradas no cliente para Cloudflare R2 sob jurisdição EU e quota gratuita. O workflow escolhido segue o guia de restauro para Supabase self-hosted e falha se não encontrar os marcadores Auth esperados. O job está preparado, mas depende de secrets, bucket/lifecycle e ativação manual; não garante RPO/RTO até validar um backup e restauro completo. GitHub Actions schedule é best effort. Ver [runbook de recuperação](disaster-recovery.md).
+Objetivos aprovados: RPO ≤24h, RTO ≤8h e retenção de 7 dias, com cópias cifradas no cliente para Cloudflare R2 sob jurisdição EU e quota gratuita. O workflow usa `--schema auth,public,private` nos dumps de schema e dados, seguindo o guia de restauro para Supabase self-hosted; falha se não encontrar os marcadores Auth esperados. O job está preparado, mas depende de secrets, bucket/lifecycle e ativação manual; não garante RPO/RTO até validar um backup e restauro completo. GitHub Actions schedule é best effort. Ver [runbook de recuperação](disaster-recovery.md).
 
 Antes de produção/aceitação de dados reais, concluir revisão contratual/DPA e subprocessadores, demonstrar restauro completo de base de dados + Auth dentro do RTO, verificar retenção e eliminação, e rever se o plano Free continua adequado. Até ao exercício, RPO/RTO são metas, não garantias.
 
