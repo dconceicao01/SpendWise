@@ -99,11 +99,11 @@ jobs:
             echo "::error::Supabase role dump failed; provider output was suppressed."
             exit 1
           fi
-          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work_dir/schema.sql" > "$work_dir/cli.log" 2>&1; then
+          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" --schema auth,public,private -f "$work_dir/schema.sql" > "$work_dir/cli.log" 2>&1; then
             echo "::error::Supabase schema dump failed; provider output was suppressed."
             exit 1
           fi
-          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work_dir/data.sql" --use-copy --data-only > "$work_dir/cli.log" 2>&1; then
+          if ! pnpm exec supabase db dump --db-url "$SUPABASE_DB_URL" --schema auth,public,private -f "$work_dir/data.sql" --use-copy --data-only > "$work_dir/cli.log" 2>&1; then
             echo "::error::Supabase data dump failed; provider output was suppressed."
             exit 1
           fi
