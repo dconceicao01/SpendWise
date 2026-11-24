@@ -435,8 +435,9 @@ async function signIn(page: Page) {
   await page.getByLabel("Password").fill("Spendwise-test-Password-1!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(
-    page.getByText("You don't have a budget yet. Create one to get started."),
+    page.getByText("Start by creating your first budget"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Create my first budget" }).click();
 }
 
 test("authentication controls are labeled and keyboard accessible", async ({

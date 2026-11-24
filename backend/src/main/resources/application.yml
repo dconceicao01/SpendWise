@@ -7,6 +7,9 @@ spring:
         jwt:
           issuer-uri: ${SUPABASE_ISSUER_URI}
           jwk-set-uri: ${SUPABASE_ISSUER_URI}/.well-known/jwks.json
+          jws-algorithms:
+            - ES256
+            - RS256
           audiences:
             - authenticated
   mvc:
