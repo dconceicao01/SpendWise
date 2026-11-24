@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -20,6 +21,7 @@ import { AccountSettings } from "@/features/profile/AccountSettings";
 import { BudgetInvitations } from "@/features/budget/BudgetInvitations";
 import {
   spendwiseApi,
+  SpendWiseApiError,
   type Budget,
   type BudgetAdjustment,
   type BudgetCategory,
@@ -64,6 +66,8 @@ async function allPages<T>(
 
 export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const { t, i18n } = useTranslation();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 600;
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
   const [periods, setPeriods] = useState<BudgetPeriod[]>([]);
@@ -84,6 +88,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [tab, setTab] = useState<MovementTab>("income");
   const [isLoading, setIsLoading] = useState(true);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [isCreatingBudget, setIsCreatingBudget] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
@@ -210,10 +215,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             : (visible[0]?.id ?? ""),
         );
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (active) {
           setIsError(true);
-          setNotice(t("budget.setupError"));
+          setNotice(
+            error instanceof SpendWiseApiError && error.status === 401
+              ? t("budget.sessionError")
+              : t("budget.setupError"),
+          );
         }
       })
       .finally(() => active && setIsLoading(false));
@@ -284,6 +293,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       });
       setBudgets((current) => [budget, ...current]);
       setSelectedBudgetId(budget.id);
+      setIsCreatingBudget(false);
       try {
         await spendwiseApi.createPeriod(accessToken, budget.id, {
           startsOn,
@@ -321,9 +331,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         setNotice(t("budget.setupIncomplete"));
         await loadWorkspace(budget.id).catch(() => undefined);
       }
-    } catch {
+    } catch (error) {
       setIsError(true);
-      setNotice(t("budget.setupError"));
+      setNotice(
+        error instanceof SpendWiseApiError && error.status === 401
+          ? t("budget.sessionError")
+          : t("budget.setupError"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -587,16 +601,30 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.page}
+      contentContainerStyle={[styles.page, isCompact && styles.pageCompact]}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.header}>
+      <View style={[styles.header, isCompact && styles.headerCompact]}>
         <View>
           <Text style={styles.eyebrow}>SPENDWISE</Text>
           <Text style={styles.brand}>{t("budget.title")}</Text>
         </View>
-        <View style={styles.headerActions}>
+        <View
+          style={[
+            styles.headerActions,
+            isCompact && styles.headerActionsCompact,
+          ]}
+        >
           <LanguageSwitcher />
+          {budgets.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsCreatingBudget(true)}
+              style={styles.headerCreateButton}
+            >
+              <Text style={styles.link}>{t("budget.new")}</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => setShowAccountSettings(true)}
@@ -622,7 +650,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         </Text>
       ) : null}
 
-      {budgets.length > 0 ? (
+      {budgets.length > 0 && !isCreatingBudget ? (
         <>
           <Text style={styles.sectionTitle}>{t("budget.select")}</Text>
           <View style={styles.rowWrap}>
@@ -1102,9 +1130,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             </>
           ) : null}
         </>
-      ) : (
+      ) : isCreatingBudget ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>{t("budget.empty")}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setIsCreatingBudget(false)}
+            style={styles.formBack}
+          >
+            <Text style={styles.link}>{t("common.cancel")}</Text>
+          </Pressable>
+          <Text style={styles.sectionTitle}>{t("budget.setupTitle")}</Text>
+          <Text style={styles.muted}>{t("budget.setupDescription")}</Text>
           <Text style={styles.label}>{t("budget.name")}</Text>
           <TextInput
             accessibilityLabel={t("budget.name")}
@@ -1203,6 +1239,24 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             disabled={isSaving}
             label={isSaving ? t("common.saving") : t("budget.setup")}
             onPress={createBudgetAndSetup}
+          />
+        </View>
+      ) : (
+        <View style={[styles.emptyCard, isCompact && styles.emptyCardCompact]}>
+          <View style={styles.emptyIcon}>
+            <Text style={styles.emptyIconText}>＋</Text>
+          </View>
+          <Text style={styles.emptyTitle}>{t("budget.emptyTitle")}</Text>
+          <Text style={styles.emptyDescription}>
+            {t("budget.emptyDescription")}
+          </Text>
+          <View style={styles.emptySteps}>
+            <Text style={styles.emptyStep}>{t("budget.emptyStepOne")}</Text>
+            <Text style={styles.emptyStep}>{t("budget.emptyStepTwo")}</Text>
+          </View>
+          <ActionButton
+            label={t("budget.createFirst")}
+            onPress={() => setIsCreatingBudget(true)}
           />
         </View>
       )}
@@ -1304,6 +1358,7 @@ const styles = StyleSheet.create({
     gap: 14,
     backgroundColor: "#f5f7f2",
   },
+  pageCompact: { paddingHorizontal: 16, paddingTop: 18 },
   centered: {
     flex: 1,
     alignItems: "center",
@@ -1318,6 +1373,17 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerCompact: { alignItems: "flex-start", flexDirection: "column" },
+  headerActionsCompact: {
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    rowGap: 10,
+  },
+  headerCreateButton: {
+    minHeight: 40,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
   eyebrow: {
     color: "#35684b",
     fontSize: 12,
@@ -1357,6 +1423,34 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 7,
   },
+  emptyCard: {
+    padding: 28,
+    backgroundColor: "#fff",
+    borderColor: "#dce5dd",
+    borderWidth: 1,
+    borderRadius: 18,
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  emptyCardCompact: { padding: 20 },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#e6f0e7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyIconText: { color: "#285c3c", fontSize: 28, lineHeight: 32 },
+  emptyTitle: { color: "#18291f", fontSize: 22, fontWeight: "700" },
+  emptyDescription: { color: "#4c5d52", fontSize: 15, lineHeight: 23 },
+  emptySteps: { gap: 8, paddingTop: 4 },
+  emptyStep: { color: "#365643", fontSize: 14, lineHeight: 21 },
+  formBack: {
+    minHeight: 40,
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
   input: {
     minHeight: 46,
     borderColor: "#bdcbbf",
@@ -1381,7 +1475,12 @@ const styles = StyleSheet.create({
   choiceSelected: { backgroundColor: "#e6f0e7", borderColor: "#43805a" },
   choiceText: { color: "#34473b", fontSize: 14 },
   choiceTextSelected: { color: "#234b34", fontWeight: "700" },
-  categoryRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
   categoryName: { flex: 1 },
   percentage: { width: 76, textAlign: "right" },
   percent: { color: "#627168" },
