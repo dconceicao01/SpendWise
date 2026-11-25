@@ -156,6 +156,8 @@
     "setupComplete": "Orçamento configurado.",
     "noPeriods": "Este orçamento ainda não tem períodos configurados.",
     "noAllocation": "Este orçamento ainda não tem categorias e percentagens ativas.",
+    "openList": "Ver todos os orçamentos",
+    "summaryLoadError": "Não foi possível carregar as percentagens deste orçamento.",
     "periodRequired": "Escolhe um período para consultar ou registar movimentos.",
     "select": "Seleciona um orçamento",
     "removeCategory": "Remover categoria",

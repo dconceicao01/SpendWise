@@ -156,6 +156,8 @@
     "setupComplete": "Budget configured.",
     "noPeriods": "This budget does not have any periods yet.",
     "noAllocation": "This budget does not have active categories and percentages yet.",
+    "openList": "View all budgets",
+    "summaryLoadError": "Couldn't load this budget's percentages.",
     "periodRequired": "Choose a period to view or record movements.",
     "select": "Select a budget",
     "removeCategory": "Remove category",

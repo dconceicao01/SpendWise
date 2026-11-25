@@ -34,6 +34,7 @@ import {
   type BudgetAdjustment,
   type BudgetCategory,
   type BudgetPeriod,
+  type AllocationSet,
   type ExpenseEntry,
   type IncomeCorrection,
   type IncomeEntry,
@@ -47,6 +48,30 @@ type DraftCategory = { name: string; percentage: string };
 type MovementTab = "income" | "expense" | "adjustment";
 type WorkspaceView = "budgets" | "dashboard" | "movement" | "statistics";
 type MobileDestination = WorkspaceView | "profile";
+type BudgetAllocationSummary = {
+  items: { categoryId: string; name: string; percentage: number }[];
+  loading: boolean;
+  failed: boolean;
+};
+
+function summarizeAllocations(
+  categories: BudgetCategory[],
+  allocationSets: AllocationSet[],
+): BudgetAllocationSummary["items"] {
+  const activeSet = allocationSets.find((item) => item.status === "ACTIVE");
+  if (!activeSet) return [];
+  const percentages = new Map(
+    activeSet.items.map((item) => [item.categoryId, item.percentage]),
+  );
+  return categories
+    .filter((category) => !category.archived_at)
+    .flatMap((category) => {
+      const percentage = percentages.get(category.id);
+      return percentage === undefined
+        ? []
+        : [{ categoryId: category.id, name: category.name, percentage }];
+    });
+}
 
 const today = () => {
   const date = new Date();
@@ -94,7 +119,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const isCompact = width < 600;
   const isNative = Platform.OS !== "web";
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [budgetAllocationSummaries, setBudgetAllocationSummaries] = useState<
+    Record<string, BudgetAllocationSummary>
+  >({});
+  const budgetSummaryRequests = useRef(new Set<string>());
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
+  const [allocationSets, setAllocationSets] = useState<AllocationSet[]>([]);
   const [periods, setPeriods] = useState<BudgetPeriod[]>([]);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
@@ -181,6 +211,22 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const selectedBudget = budgets.find(
     (budget) => budget.id === selectedBudgetId,
   );
+  const activeAllocationSet = allocationSets.find(
+    (allocationSet) => allocationSet.status === "ACTIVE",
+  );
+  const activeAllocationPercentages = new Map(
+    activeAllocationSet?.items.map((item) => [
+      item.categoryId,
+      item.percentage,
+    ]) ?? [],
+  );
+  const percentageFormat = useMemo(
+    () =>
+      new Intl.NumberFormat(i18n.language, {
+        maximumFractionDigits: 2,
+      }),
+    [i18n.language],
+  );
   const activeCategories = categories.filter(
     (category) => !category.archived_at,
   );
@@ -246,17 +292,28 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       setIsLoadingWorkspace(true);
       setWorkspaceLoadFailed(false);
       try {
-        const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
-          spendwiseApi.listPeriods(accessToken, budgetId),
-          spendwiseApi.listCategories(accessToken, budgetId),
-          allPages((offset) =>
-            spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
-          ),
-        ]);
+        const [nextPeriods, nextCategories, nextSchedules, nextAllocationSets] =
+          await Promise.all([
+            spendwiseApi.listPeriods(accessToken, budgetId),
+            spendwiseApi.listCategories(accessToken, budgetId),
+            allPages((offset) =>
+              spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
+            ),
+            spendwiseApi.listAllocationSets(accessToken, budgetId),
+          ]);
         if (requestId !== workspaceRequestId.current) return;
         setPeriods(nextPeriods);
         setCategories(nextCategories);
         setIncomeSchedules(nextSchedules);
+        setAllocationSets(nextAllocationSets);
+        setBudgetAllocationSummaries((current) => ({
+          ...current,
+          [budgetId]: {
+            items: summarizeAllocations(nextCategories, nextAllocationSets),
+            loading: false,
+            failed: false,
+          },
+        }));
         setSelectedPeriodId((current) =>
           nextPeriods.some((period) => period.id === current)
             ? current
@@ -363,6 +420,62 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   }, [accessToken, t]);
 
   useEffect(() => {
+    if (workspaceView !== "budgets" || !budgets.length) return;
+    const missingBudgets = budgets.filter(
+      (budget) =>
+        !budgetAllocationSummaries[budget.id] &&
+        !budgetSummaryRequests.current.has(budget.id),
+    );
+    if (!missingBudgets.length) return;
+
+    for (const budget of missingBudgets) {
+      budgetSummaryRequests.current.add(budget.id);
+    }
+    setBudgetAllocationSummaries((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        missingBudgets.map((budget) => [
+          budget.id,
+          { items: [], loading: true, failed: false },
+        ]),
+      ),
+    }));
+
+    void Promise.all(
+      missingBudgets.map(async (budget) => {
+        try {
+          const [nextCategories, nextAllocationSets] = await Promise.all([
+            spendwiseApi.listCategories(accessToken, budget.id),
+            spendwiseApi.listAllocationSets(accessToken, budget.id),
+          ]);
+          return {
+            budgetId: budget.id,
+            summary: {
+              items: summarizeAllocations(nextCategories, nextAllocationSets),
+              loading: false,
+              failed: false,
+            },
+          };
+        } catch {
+          return {
+            budgetId: budget.id,
+            summary: { items: [], loading: false, failed: true },
+          };
+        } finally {
+          budgetSummaryRequests.current.delete(budget.id);
+        }
+      }),
+    ).then((results) => {
+      setBudgetAllocationSummaries((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          results.map(({ budgetId, summary }) => [budgetId, summary]),
+        ),
+      }));
+    });
+  }, [accessToken, budgetAllocationSummaries, budgets, workspaceView]);
+
+  useEffect(() => {
     if (!selectedBudgetId) return;
     const timer = setTimeout(() => {
       void loadWorkspace().catch((error: unknown) => {
@@ -382,6 +495,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   }, [loadWorkspace, selectedBudgetId, t]);
 
   useEffect(() => {
+    if (workspaceView === "budgets") return;
     const timer = setTimeout(() => {
       void loadMovements().catch((error: unknown) => {
         setIsError(true);
@@ -397,7 +511,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       });
     }, 0);
     return () => clearTimeout(timer);
-  }, [loadMovements, t]);
+  }, [loadMovements, t, workspaceView]);
 
   const formatAmount = useMemo(
     () =>
@@ -868,16 +982,24 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       !selectedBudgetId ||
       !periods.length ||
       !/^\d{4}$/.test(annualYear) ||
-      Number(annualYear) < 1
+      Number(annualYear) < 1 ||
+      (workspaceView !== "dashboard" && workspaceView !== "statistics")
     )
       return;
-    void Promise.resolve().then(loadAnnualSummary);
+    const timer = setTimeout(
+      () => {
+        void Promise.resolve().then(loadAnnualSummary);
+      },
+      workspaceView === "dashboard" ? 450 : 0,
+    );
+    return () => clearTimeout(timer);
   }, [
     annualRefreshKey,
     annualYear,
     loadAnnualSummary,
     periods.length,
     selectedBudgetId,
+    workspaceView,
   ]);
 
   const handleLoadAnnualSummary = () => {
@@ -943,6 +1065,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     setSelectedPeriodId("");
     setPeriods([]);
     setCategories([]);
+    setAllocationSets([]);
     setIncomes([]);
     setIncomeCorrections([]);
     setExpenses([]);
@@ -1094,6 +1217,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           <View style={styles.budgetHub}>
             <Text style={styles.sectionTitle}>{t("budget.title")}</Text>
             <Text style={styles.muted}>{t("budget.select")}</Text>
+            {!isNative ? (
+              <SecondaryActionButton
+                label={t("dashboard.backToDashboard")}
+                onPress={() => setWorkspaceView("dashboard")}
+              />
+            ) : null}
             {budgets.length ? (
               budgets.map((budget) => (
                 <Pressable
@@ -1120,6 +1249,33 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                         : t("budget.personal")}{" "}
                       · {budget.currency_code}
                     </Text>
+                    {budgetAllocationSummaries[budget.id]?.loading ? (
+                      <Text style={styles.budgetAllocationHint}>
+                        {t("common.loading")}
+                      </Text>
+                    ) : budgetAllocationSummaries[budget.id]?.failed ? (
+                      <Text style={styles.budgetAllocationHint}>
+                        {t("budget.summaryLoadError")}
+                      </Text>
+                    ) : budgetAllocationSummaries[budget.id]?.items.length ? (
+                      <View style={styles.budgetAllocationTags}>
+                        {budgetAllocationSummaries[budget.id].items.map(
+                          (item) => (
+                            <Text
+                              key={item.categoryId}
+                              style={styles.budgetAllocationTag}
+                            >
+                              {item.name} ·{" "}
+                              {percentageFormat.format(item.percentage)}%
+                            </Text>
+                          ),
+                        )}
+                      </View>
+                    ) : (
+                      <Text style={styles.budgetAllocationHint}>
+                        {t("budget.noAllocation")}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.budgetHubArrow}>›</Text>
                 </Pressable>
@@ -1188,6 +1344,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   : t("budget.personal")}{" "}
                 · {selectedBudget.currency_code}
               </Text>
+            ) : null}
+            {!isNative && workspaceView === "dashboard" ? (
+              <SecondaryActionButton
+                label={t("budget.openList")}
+                onPress={() => setWorkspaceView("budgets")}
+              />
             ) : null}
             {isNative && workspaceView === "movement" ? (
               <MovementTypeSelector
@@ -1401,6 +1563,11 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                             <View style={styles.entryText}>
                               <Text style={styles.entryTitle}>
                                 {item.category.name}
+                                {activeAllocationPercentages.has(
+                                  item.category.id,
+                                )
+                                  ? ` · ${percentageFormat.format(activeAllocationPercentages.get(item.category.id) ?? 0)}%`
+                                  : ""}
                               </Text>
                               <Text style={styles.muted}>
                                 {t("dashboard.allocated")}:{" "}
@@ -2216,8 +2383,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           </>
         ) : isCreatingBudget ? (
           <View style={styles.card}>
-            <Pressable
-              accessibilityRole="button"
+            <SecondaryActionButton
+              label={t("common.cancel")}
               onPress={() => {
                 setIsCreatingBudget(false);
                 setFieldErrors({});
@@ -2225,10 +2392,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 setCategoryPercentageErrors([]);
                 setAllocationTotalError(false);
               }}
-              style={styles.formBack}
-            >
-              <Text style={styles.link}>{t("common.cancel")}</Text>
-            </Pressable>
+            />
             <Text style={styles.sectionTitle}>{t("budget.setupTitle")}</Text>
             <Text style={styles.muted}>{t("budget.setupDescription")}</Text>
             <Text style={styles.label}>{t("budget.name")}</Text>
@@ -2600,6 +2764,25 @@ function ActionButton({
     </Pressable>
   );
 }
+
+function SecondaryActionButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.secondaryAction}
+    >
+      <Text style={styles.secondaryActionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function Summary({
   label,
   value,
@@ -2968,7 +3151,7 @@ const styles = StyleSheet.create({
   budgetHubItem: {
     minHeight: 76,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 16,
@@ -2980,6 +3163,37 @@ const styles = StyleSheet.create({
   },
   budgetHubItemSelected: { borderColor: "#285c3c", backgroundColor: "#f7faf7" },
   budgetHubArrow: { color: "#285c3c", fontSize: 28, lineHeight: 30 },
+  budgetAllocationTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 7,
+  },
+  budgetAllocationTag: {
+    overflow: "hidden",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#c8dccb",
+    backgroundColor: "#edf5ee",
+    color: "#285c3c",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  budgetAllocationHint: { color: "#68766c", fontSize: 12, marginTop: 6 },
+  secondaryAction: {
+    minHeight: 44,
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#9fb8a4",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  secondaryActionText: { color: "#285c3c", fontSize: 15, fontWeight: "700" },
   page: {
     paddingHorizontal: 22,
     paddingTop: 24,
