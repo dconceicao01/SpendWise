@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Circle, default as Svg } from "react-native-svg";
 import {
@@ -44,7 +45,8 @@ import {
 type Props = { accessToken: string; onSignOut: () => void; userEmail?: string };
 type DraftCategory = { name: string; percentage: string };
 type MovementTab = "income" | "expense" | "adjustment";
-type WorkspaceView = "dashboard" | "movement" | "statistics";
+type WorkspaceView = "budgets" | "dashboard" | "movement" | "statistics";
+type MobileDestination = WorkspaceView | "profile";
 
 const today = () => {
   const date = new Date();
@@ -976,6 +978,29 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   }
 
   if (showAccountSettings) {
+    if (isNative) {
+      return (
+        <View style={styles.mobileWorkspaceShell}>
+          <AccountSettings
+            accessToken={accessToken}
+            onBack={() => setShowAccountSettings(false)}
+            onSignOut={onSignOut}
+            showBack={false}
+          />
+          {!isCreatingBudget ? (
+            <MobileNavigation
+              current="profile"
+              onSelect={(destination) => {
+                if (destination === "profile") return;
+                setShowAccountSettings(false);
+                setWorkspaceView(destination);
+              }}
+              t={t}
+            />
+          ) : null}
+        </View>
+      );
+    }
     return (
       <AccountSettings
         accessToken={accessToken}
@@ -986,109 +1011,165 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.page, isCompact && styles.pageCompact]}
-      keyboardShouldPersistTaps="handled"
-      stickyHeaderIndices={
-        isNative && budgets.length > 0 && !isCreatingBudget ? [1] : undefined
-      }
-      showsVerticalScrollIndicator={!isNative}
-    >
-      <View style={[styles.header, isCompact && styles.headerCompact]}>
-        <View>
-          {!isNative ? <Text style={styles.eyebrow}>SPENDWISE</Text> : null}
-          <Text style={[styles.brand, isCompact && styles.brandCompact]}>
-            {t("budget.title")}
+    <View style={styles.mobileWorkspaceShell}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.page,
+          isCompact && styles.pageCompact,
+          isNative && styles.pageNative,
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={!isNative}
+      >
+        <View style={[styles.header, isCompact && styles.headerCompact]}>
+          <View>
+            {!isNative ? <Text style={styles.eyebrow}>SPENDWISE</Text> : null}
+            <Text style={[styles.brand, isCompact && styles.brandCompact]}>
+              {t("budget.title")}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.headerActions,
+              isCompact && styles.headerActionsCompact,
+            ]}
+          >
+            <LanguageSwitcher />
+            {!isNative && budgets.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setIsCreatingBudget(true)}
+                style={styles.headerCreateButton}
+              >
+                <Text style={styles.link}>{t("budget.new")}</Text>
+              </Pressable>
+            ) : null}
+            {!isNative ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("account.openSettings")}
+                  onPress={() => setShowAccountSettings(true)}
+                >
+                  <Text style={styles.link}>{t("account.openSettings")}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onSignOut}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.signOut")}
+                >
+                  <Text style={styles.link}>{t("common.signOut")}</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        </View>
+        {userEmail && !isNative ? (
+          <Text style={styles.muted}>{userEmail}</Text>
+        ) : null}
+        <View style={[styles.disclaimer, isNative && styles.disclaimerCompact]}>
+          <Text style={styles.disclaimerTitle}>{t("budget.virtualTitle")}</Text>
+          <Text style={styles.disclaimerText}>{t("budget.virtualNotice")}</Text>
+        </View>
+        {notice && !budgetLoadFailed ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={isError ? styles.error : styles.notice}
+          >
+            {notice}
           </Text>
-        </View>
-        <View
-          style={[
-            styles.headerActions,
-            isCompact && styles.headerActionsCompact,
-          ]}
-        >
-          <LanguageSwitcher />
-          {!isNative && budgets.length > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setIsCreatingBudget(true)}
-              style={styles.headerCreateButton}
-            >
-              <Text style={styles.link}>{t("budget.new")}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("account.openSettings")}
-            onPress={() => setShowAccountSettings(true)}
-            style={isNative && styles.headerIconButton}
-          >
-            <Text style={isNative ? styles.headerIcon : styles.link}>
-              {isNative ? "⚙" : t("account.openSettings")}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={onSignOut}
-            accessibilityRole="button"
-            accessibilityLabel={t("common.signOut")}
-            style={isNative && styles.headerIconButton}
-          >
-            <Text style={isNative ? styles.headerIcon : styles.link}>
-              {isNative ? "↪" : t("common.signOut")}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-      {isNative && budgets.length > 0 && !isCreatingBudget ? (
-        <View style={styles.mobileTabBar} accessibilityRole="tablist">
-          <MobileTab
-            label={t("mobileNav.home")}
-            selected={workspaceView === "dashboard"}
-            onPress={() => setWorkspaceView("dashboard")}
-          />
-          <MobileTab
-            label={t("mobileNav.movements")}
-            selected={workspaceView === "movement"}
-            onPress={() => setWorkspaceView("movement")}
-          />
-          <MobileTab
-            label={t("mobileNav.statistics")}
-            selected={workspaceView === "statistics"}
-            onPress={() => setWorkspaceView("statistics")}
-          />
-        </View>
-      ) : null}
-      {userEmail && !isNative ? (
-        <Text style={styles.muted}>{userEmail}</Text>
-      ) : null}
-      <View style={[styles.disclaimer, isNative && styles.disclaimerCompact]}>
-        <Text style={styles.disclaimerTitle}>{t("budget.virtualTitle")}</Text>
-        <Text style={styles.disclaimerText}>{t("budget.virtualNotice")}</Text>
-      </View>
-      {notice && !budgetLoadFailed ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          style={isError ? styles.error : styles.notice}
-        >
-          {notice}
-        </Text>
-      ) : null}
+        ) : null}
 
-      {budgetLoadFailed ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>{t("budget.apiErrorTitle")}</Text>
-          <Text style={styles.emptyDescription}>{notice}</Text>
-          <ActionButton
-            disabled={isLoading}
-            label={t("common.retry")}
-            onPress={() => void retryBudgetLoad()}
-          />
-        </View>
-      ) : budgets.length > 0 && !isCreatingBudget ? (
-        <>
-          <Text style={styles.sectionTitle}>{t("budget.select")}</Text>
-          {isNative ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {budgetLoadFailed ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>{t("budget.apiErrorTitle")}</Text>
+            <Text style={styles.emptyDescription}>{notice}</Text>
+            <ActionButton
+              disabled={isLoading}
+              label={t("common.retry")}
+              onPress={() => void retryBudgetLoad()}
+            />
+          </View>
+        ) : workspaceView === "budgets" && !isCreatingBudget ? (
+          <View style={styles.budgetHub}>
+            <Text style={styles.sectionTitle}>{t("budget.title")}</Text>
+            <Text style={styles.muted}>{t("budget.select")}</Text>
+            {budgets.length ? (
+              budgets.map((budget) => (
+                <Pressable
+                  key={budget.id}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    selected: budget.id === selectedBudgetId,
+                  }}
+                  onPress={() => {
+                    selectBudget(budget.id);
+                    setWorkspaceView("dashboard");
+                  }}
+                  style={[
+                    styles.budgetHubItem,
+                    budget.id === selectedBudgetId &&
+                      styles.budgetHubItemSelected,
+                  ]}
+                >
+                  <View style={styles.entryText}>
+                    <Text style={styles.entryTitle}>{budget.name}</Text>
+                    <Text style={styles.muted}>
+                      {budget.budget_type === "SHARED"
+                        ? t("budget.shared")
+                        : t("budget.personal")}{" "}
+                      · {budget.currency_code}
+                    </Text>
+                  </View>
+                  <Text style={styles.budgetHubArrow}>›</Text>
+                </Pressable>
+              ))
+            ) : (
+              <View
+                style={[styles.emptyCard, isCompact && styles.emptyCardCompact]}
+              >
+                <Text style={styles.emptyTitle}>{t("budget.emptyTitle")}</Text>
+                <Text style={styles.emptyDescription}>
+                  {t("budget.emptyDescription")}
+                </Text>
+                <ActionButton
+                  label={t("budget.createFirst")}
+                  onPress={() => setIsCreatingBudget(true)}
+                />
+              </View>
+            )}
+            {budgets.length ? (
+              <ActionButton
+                label={t("budget.new")}
+                onPress={() => setIsCreatingBudget(true)}
+              />
+            ) : null}
+          </View>
+        ) : budgets.length > 0 && !isCreatingBudget ? (
+          <>
+            <Text style={styles.sectionTitle}>{t("budget.select")}</Text>
+            {isNative ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.rowWrap}>
+                  {budgets.map((budget) => (
+                    <Choice
+                      key={budget.id}
+                      label={budget.name}
+                      selected={budget.id === selectedBudgetId}
+                      onPress={() => selectBudget(budget.id)}
+                    />
+                  ))}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("budget.new")}
+                    onPress={() => setIsCreatingBudget(true)}
+                    style={[styles.choice, styles.newBudgetChoice]}
+                  >
+                    <Text style={styles.choiceText}>＋</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            ) : (
               <View style={styles.rowWrap}>
                 {budgets.map((budget) => (
                   <Choice
@@ -1098,1242 +1179,1271 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                     onPress={() => selectBudget(budget.id)}
                   />
                 ))}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("budget.new")}
-                  onPress={() => setIsCreatingBudget(true)}
-                  style={[styles.choice, styles.newBudgetChoice]}
-                >
-                  <Text style={styles.choiceText}>＋</Text>
-                </Pressable>
               </View>
-            </ScrollView>
-          ) : (
-            <View style={styles.rowWrap}>
-              {budgets.map((budget) => (
-                <Choice
-                  key={budget.id}
-                  label={budget.name}
-                  selected={budget.id === selectedBudgetId}
-                  onPress={() => selectBudget(budget.id)}
-                />
-              ))}
-            </View>
-          )}
-          {selectedBudget ? (
-            <Text style={styles.muted}>
-              {selectedBudget.budget_type === "SHARED"
-                ? t("budget.shared")
-                : t("budget.personal")}{" "}
-              · {selectedBudget.currency_code}
-            </Text>
-          ) : null}
-          {workspaceView !== "dashboard" ? (
-            <View style={styles.detailHeader}>
-              {!isNative ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setWorkspaceView("dashboard")}
-                  style={styles.formBack}
-                >
-                  <Text style={styles.link}>
-                    {t("dashboard.backToDashboard")}
-                  </Text>
-                </Pressable>
-              ) : null}
-              <Text style={styles.sectionTitle}>
-                {workspaceView === "statistics"
-                  ? t("dashboard.statisticsTitle")
-                  : t(`movement.${tab}`)}
-              </Text>
+            )}
+            {selectedBudget ? (
               <Text style={styles.muted}>
-                {t("dashboard.detailDescription")}
+                {selectedBudget.budget_type === "SHARED"
+                  ? t("budget.shared")
+                  : t("budget.personal")}{" "}
+                · {selectedBudget.currency_code}
               </Text>
-            </View>
-          ) : null}
-          {selectedBudget?.budget_type === "SHARED" ? (
-            <BudgetInvitations
-              accessToken={accessToken}
-              budgetId={selectedBudget.id}
-            />
-          ) : null}
-          {isLoadingWorkspace ? (
-            <View style={styles.card}>
-              <Text style={styles.muted}>{t("common.loading")}</Text>
-            </View>
-          ) : workspaceLoadFailed ? (
-            <View style={styles.card}>
-              <Text style={styles.error}>{t("budget.loadError")}</Text>
-              <ActionButton
-                label={t("common.retry")}
-                onPress={() => void loadWorkspace().catch(() => undefined)}
-              />
-            </View>
-          ) : periods.length ? (
-            <>
-              <Text style={styles.sectionTitle}>{t("budget.period")}</Text>
-              <View style={styles.rowWrap}>
-                {periods.map((period) => (
-                  <Choice
-                    key={period.id}
-                    label={`${period.starts_on} – ${period.ends_on}`}
-                    selected={period.id === selectedPeriodId}
-                    disabled={workspaceView === "dashboard"}
-                    onPress={() => selectPeriod(period.id)}
-                  />
-                ))}
-              </View>
-            </>
-          ) : (
-            <View style={styles.card}>
-              <Text style={styles.muted}>{t("budget.noPeriods")}</Text>
-              <TextInput
-                accessibilityLabel={t("budget.startsOn")}
-                onChangeText={(value) => {
-                  setAdditionalPeriodStart(value);
-                  clearFieldError("additionalPeriodStart");
-                  clearFieldError("additionalPeriodEnd");
+            ) : null}
+            {isNative && workspaceView === "movement" ? (
+              <MovementTypeSelector
+                selected={tab}
+                onSelect={(item) => {
+                  setTab(item);
+                  setFieldErrors({});
                 }}
-                placeholder={t("budget.startsOn")}
-                style={[
-                  styles.input,
-                  fieldErrors.additionalPeriodStart && styles.inputInvalid,
-                ]}
-                value={additionalPeriodStart}
+                t={t}
               />
-              <FieldError message={fieldErrors.additionalPeriodStart} />
-              <TextInput
-                accessibilityLabel={t("budget.endsOn")}
-                onChangeText={(value) => {
-                  setAdditionalPeriodEnd(value);
-                  clearFieldError("additionalPeriodEnd");
-                }}
-                placeholder={t("budget.endsOn")}
-                style={[
-                  styles.input,
-                  fieldErrors.additionalPeriodEnd && styles.inputInvalid,
-                ]}
-                value={additionalPeriodEnd}
-              />
-              <FieldError message={fieldErrors.additionalPeriodEnd} />
-              <ActionButton
-                disabled={isSaving}
-                label={isSaving ? t("common.saving") : t("budget.addPeriod")}
-                onPress={addPeriod}
-              />
-            </View>
-          )}
-          {!activeCategories.length ? (
-            <Text style={styles.muted}>{t("budget.noAllocation")}</Text>
-          ) : null}
-          {canRecordMovements ? (
-            <>
-              {workspaceView === "dashboard" ? (
-                <>
-                  <View
-                    style={[
-                      styles.summaryCards,
-                      isCompact && styles.summaryCardsCompact,
-                    ]}
-                  >
-                    <DashboardCard
-                      label={t("dashboard.incomeCardTitle")}
-                      value={
-                        dashboardStatsReady
-                          ? formatAmount.format(
-                              currentMonthSummary?.income ?? 0,
-                            )
-                          : "—"
-                      }
-                      recent={currentMonthIncomes.slice(0, 2).map((item) => ({
-                        label: t("movement.income"),
-                        date: item.occurred_on,
-                        amount: item.amount,
-                      }))}
-                      empty={t("dashboard.recentIncomeEmpty")}
-                      format={formatAmount}
-                      compact={isCompact}
-                      onPress={() => {
-                        setTab("income");
-                        setWorkspaceView("movement");
-                      }}
-                    />
-                    <DashboardCard
-                      label={t("dashboard.expenseCardTitle")}
-                      value={
-                        dashboardStatsReady
-                          ? formatAmount.format(
-                              currentMonthSummary?.expense ?? 0,
-                            )
-                          : "—"
-                      }
-                      recent={currentMonthExpenses.slice(0, 2).map((item) => ({
-                        label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.expense")} · ${item.description ?? ""}`,
-                        date: item.spent_on,
-                        amount: -item.amount,
-                      }))}
-                      empty={t("dashboard.recentExpenseEmpty")}
-                      format={formatAmount}
-                      compact={isCompact}
-                      onPress={() => {
-                        setTab("expense");
-                        setWorkspaceView("movement");
-                      }}
-                    />
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setWorkspaceView("statistics")}
-                      style={[
-                        styles.summaryItem,
-                        isCompact && styles.summaryItemWideCompact,
-                      ]}
-                    >
-                      <Text style={styles.muted}>
-                        {t("dashboard.remainingTitle")}
-                      </Text>
-                      <Text style={styles.summaryValue}>
-                        {dashboardStatsReady
-                          ? formatAmount.format(
-                              currentMonthSummary?.remaining ?? 0,
-                            )
-                          : "—"}
-                      </Text>
-                      <Text style={styles.cardHint}>
-                        {t("dashboard.remainingDescription")}
-                      </Text>
-                      <Text style={styles.link}>
-                        {t("dashboard.openDetails")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                  <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>
-                      {t("dashboard.periodBalances")}
-                    </Text>
-                    <Text style={styles.muted}>
-                      {t("dashboard.periodLabel", {
-                        start:
-                          periods.find(
-                            (period) => period.id === selectedPeriodId,
-                          )?.starts_on ?? "",
-                        end:
-                          periods.find(
-                            (period) => period.id === selectedPeriodId,
-                          )?.ends_on ?? "",
-                      })}
-                    </Text>
-                    <View style={styles.list}>
-                      {categoryBalances.map((item) => (
-                        <View key={item.category.id} style={styles.entry}>
-                          <View style={styles.entryText}>
-                            <Text style={styles.entryTitle}>
-                              {item.category.name}
-                            </Text>
-                            <Text style={styles.muted}>
-                              {t("dashboard.allocated")}:{" "}
-                              {formatAmount.format(item.allocated)} ·{" "}
-                              {t("dashboard.spent")}:{" "}
-                              {formatAmount.format(item.spent)} ·{" "}
-                              {t("dashboard.adjusted")}:{" "}
-                              {formatAmount.format(item.adjusted)}
-                            </Text>
-                          </View>
-                          <View style={styles.balanceValue}>
-                            <Text style={styles.muted}>
-                              {t("dashboard.balance")}
-                            </Text>
-                            <Text style={styles.entryAmount}>
-                              {formatAmount.format(item.balance)}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => {
-                        setTab("adjustment");
-                        setWorkspaceView("movement");
-                      }}
-                      style={styles.inlineAction}
-                    >
-                      <Text style={styles.link}>
-                        {t("movement.saveAdjustment")}
-                      </Text>
-                    </Pressable>
-                  </View>
+            ) : null}
+            {workspaceView !== "dashboard" ? (
+              <View style={styles.detailHeader}>
+                {!isNative ? (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t("dashboard.viewStatistics")}
-                    onPress={() => setWorkspaceView("statistics")}
-                    style={styles.statisticsPreview}
+                    onPress={() => setWorkspaceView("dashboard")}
+                    style={styles.formBack}
                   >
-                    <View style={styles.statisticsHeading}>
-                      <View style={styles.entryText}>
-                        <Text style={styles.sectionTitle}>
-                          {t("dashboard.previewTitle")}
-                        </Text>
-                        <Text style={styles.muted}>
-                          {t("dashboard.monthSummary", {
-                            month: currentMonthLabel,
-                          })}
-                        </Text>
-                      </View>
-                      <Text style={styles.link}>
-                        {t("dashboard.viewStatistics")}
-                      </Text>
-                    </View>
-                    {dashboardStatsReady ? (
-                      <View style={styles.monthSummaryRow}>
-                        <Summary
-                          label={t("movement.income")}
-                          value={currentMonthSummary?.income ?? 0}
-                          format={formatAmount}
-                        />
-                        <Summary
-                          label={t("movement.expense")}
-                          value={currentMonthSummary?.expense ?? 0}
-                          format={formatAmount}
-                        />
-                        <Summary
-                          label={t("dashboard.remainingTitle")}
-                          value={currentMonthSummary?.remaining ?? 0}
-                          format={formatAmount}
-                        />
-                      </View>
-                    ) : (
-                      <Text style={styles.muted}>{t("common.loading")}</Text>
-                    )}
-                    {isLoadingAnnual ? (
-                      <Text style={styles.muted}>{t("common.loading")}</Text>
-                    ) : annualHasActivity ? (
-                      <AnnualBarChart months={annualMonths} />
-                    ) : (
-                      <Text style={styles.muted}>
-                        {t("dashboard.noChartData")}
-                      </Text>
-                    )}
+                    <Text style={styles.link}>
+                      {t("dashboard.backToDashboard")}
+                    </Text>
                   </Pressable>
-                </>
-              ) : null}
-              {workspaceView === "movement" ? (
-                <>
-                  {tab === "income" ? (
-                    <>
-                      <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>
-                          {t("schedule.title")}
-                        </Text>
+                ) : null}
+                <Text style={styles.sectionTitle}>
+                  {workspaceView === "statistics"
+                    ? t("dashboard.statisticsTitle")
+                    : t(`movement.${tab}`)}
+                </Text>
+                <Text style={styles.muted}>
+                  {t("dashboard.detailDescription")}
+                </Text>
+              </View>
+            ) : null}
+            {selectedBudget?.budget_type === "SHARED" ? (
+              <BudgetInvitations
+                accessToken={accessToken}
+                budgetId={selectedBudget.id}
+              />
+            ) : null}
+            {isLoadingWorkspace ? (
+              <View style={styles.card}>
+                <Text style={styles.muted}>{t("common.loading")}</Text>
+              </View>
+            ) : workspaceLoadFailed ? (
+              <View style={styles.card}>
+                <Text style={styles.error}>{t("budget.loadError")}</Text>
+                <ActionButton
+                  label={t("common.retry")}
+                  onPress={() => void loadWorkspace().catch(() => undefined)}
+                />
+              </View>
+            ) : periods.length ? (
+              <>
+                <Text style={styles.sectionTitle}>{t("budget.period")}</Text>
+                <View style={styles.rowWrap}>
+                  {periods.map((period) => (
+                    <Choice
+                      key={period.id}
+                      label={`${period.starts_on} – ${period.ends_on}`}
+                      selected={period.id === selectedPeriodId}
+                      disabled={workspaceView === "dashboard"}
+                      onPress={() => selectPeriod(period.id)}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.muted}>{t("budget.noPeriods")}</Text>
+                <TextInput
+                  accessibilityLabel={t("budget.startsOn")}
+                  onChangeText={(value) => {
+                    setAdditionalPeriodStart(value);
+                    clearFieldError("additionalPeriodStart");
+                    clearFieldError("additionalPeriodEnd");
+                  }}
+                  placeholder={t("budget.startsOn")}
+                  style={[
+                    styles.input,
+                    fieldErrors.additionalPeriodStart && styles.inputInvalid,
+                  ]}
+                  value={additionalPeriodStart}
+                />
+                <FieldError message={fieldErrors.additionalPeriodStart} />
+                <TextInput
+                  accessibilityLabel={t("budget.endsOn")}
+                  onChangeText={(value) => {
+                    setAdditionalPeriodEnd(value);
+                    clearFieldError("additionalPeriodEnd");
+                  }}
+                  placeholder={t("budget.endsOn")}
+                  style={[
+                    styles.input,
+                    fieldErrors.additionalPeriodEnd && styles.inputInvalid,
+                  ]}
+                  value={additionalPeriodEnd}
+                />
+                <FieldError message={fieldErrors.additionalPeriodEnd} />
+                <ActionButton
+                  disabled={isSaving}
+                  label={isSaving ? t("common.saving") : t("budget.addPeriod")}
+                  onPress={addPeriod}
+                />
+              </View>
+            )}
+            {!activeCategories.length ? (
+              <Text style={styles.muted}>{t("budget.noAllocation")}</Text>
+            ) : null}
+            {canRecordMovements ? (
+              <>
+                {workspaceView === "dashboard" ? (
+                  <>
+                    <View
+                      style={[
+                        styles.summaryCards,
+                        isCompact && styles.summaryCardsCompact,
+                      ]}
+                    >
+                      <DashboardCard
+                        label={t("dashboard.incomeCardTitle")}
+                        value={
+                          dashboardStatsReady
+                            ? formatAmount.format(
+                                currentMonthSummary?.income ?? 0,
+                              )
+                            : "—"
+                        }
+                        recent={currentMonthIncomes.slice(0, 2).map((item) => ({
+                          label: t("movement.income"),
+                          date: item.occurred_on,
+                          amount: item.amount,
+                        }))}
+                        empty={t("dashboard.recentIncomeEmpty")}
+                        format={formatAmount}
+                        compact={isCompact}
+                        onPress={() => {
+                          setTab("income");
+                          setWorkspaceView("movement");
+                        }}
+                      />
+                      <DashboardCard
+                        label={t("dashboard.expenseCardTitle")}
+                        value={
+                          dashboardStatsReady
+                            ? formatAmount.format(
+                                currentMonthSummary?.expense ?? 0,
+                              )
+                            : "—"
+                        }
+                        recent={currentMonthExpenses
+                          .slice(0, 2)
+                          .map((item) => ({
+                            label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.expense")} · ${item.description ?? ""}`,
+                            date: item.spent_on,
+                            amount: -item.amount,
+                          }))}
+                        empty={t("dashboard.recentExpenseEmpty")}
+                        format={formatAmount}
+                        compact={isCompact}
+                        onPress={() => {
+                          setTab("expense");
+                          setWorkspaceView("movement");
+                        }}
+                      />
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => setWorkspaceView("statistics")}
+                        style={[
+                          styles.summaryItem,
+                          isCompact && styles.summaryItemWideCompact,
+                        ]}
+                      >
                         <Text style={styles.muted}>
-                          {t("schedule.description")}
+                          {t("dashboard.remainingTitle")}
                         </Text>
-                        {incomeSchedules.length ? (
-                          <View style={styles.scheduleList}>
-                            {incomeSchedules.map((schedule) => {
-                              const pending =
-                                schedule.status === "ACTIVE" &&
-                                schedule.next_occurrence_on <= today();
-                              return (
-                                <View
-                                  key={schedule.id}
-                                  style={styles.scheduleItem}
-                                >
-                                  <View style={styles.entryText}>
-                                    <Text style={styles.entryTitle}>
-                                      {formatAmount.format(schedule.amount)} ·{" "}
-                                      {t(
-                                        `schedule.frequencies.${schedule.frequency}`,
-                                      )}
-                                    </Text>
-                                    <Text style={styles.muted}>
-                                      {t(
-                                        `schedule.statuses.${schedule.status}`,
-                                      )}{" "}
-                                      · {t("schedule.nextDate")}:{" "}
-                                      {schedule.next_occurrence_on}
-                                    </Text>
-                                    {schedule.description ? (
-                                      <Text style={styles.muted}>
-                                        {schedule.description}
-                                      </Text>
-                                    ) : null}
-                                    {schedule.frequency === "MONTHLY" ? (
-                                      <Text style={styles.muted}>
-                                        {t("schedule.shortMonths")}:{" "}
+                        <Text style={styles.summaryValue}>
+                          {dashboardStatsReady
+                            ? formatAmount.format(
+                                currentMonthSummary?.remaining ?? 0,
+                              )
+                            : "—"}
+                        </Text>
+                        <Text style={styles.cardHint}>
+                          {t("dashboard.remainingDescription")}
+                        </Text>
+                        <Text style={styles.link}>
+                          {t("dashboard.openDetails")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <View style={styles.card}>
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.periodBalances")}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {t("dashboard.periodLabel", {
+                          start:
+                            periods.find(
+                              (period) => period.id === selectedPeriodId,
+                            )?.starts_on ?? "",
+                          end:
+                            periods.find(
+                              (period) => period.id === selectedPeriodId,
+                            )?.ends_on ?? "",
+                        })}
+                      </Text>
+                      <View style={styles.list}>
+                        {categoryBalances.map((item) => (
+                          <View key={item.category.id} style={styles.entry}>
+                            <View style={styles.entryText}>
+                              <Text style={styles.entryTitle}>
+                                {item.category.name}
+                              </Text>
+                              <Text style={styles.muted}>
+                                {t("dashboard.allocated")}:{" "}
+                                {formatAmount.format(item.allocated)} ·{" "}
+                                {t("dashboard.spent")}:{" "}
+                                {formatAmount.format(item.spent)} ·{" "}
+                                {t("dashboard.adjusted")}:{" "}
+                                {formatAmount.format(item.adjusted)}
+                              </Text>
+                            </View>
+                            <View style={styles.balanceValue}>
+                              <Text style={styles.muted}>
+                                {t("dashboard.balance")}
+                              </Text>
+                              <Text style={styles.entryAmount}>
+                                {formatAmount.format(item.balance)}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setTab("adjustment");
+                          setWorkspaceView("movement");
+                        }}
+                        style={styles.inlineAction}
+                      >
+                        <Text style={styles.link}>
+                          {t("movement.saveAdjustment")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("dashboard.viewStatistics")}
+                      onPress={() => setWorkspaceView("statistics")}
+                      style={styles.statisticsPreview}
+                    >
+                      <View style={styles.statisticsHeading}>
+                        <View style={styles.entryText}>
+                          <Text style={styles.sectionTitle}>
+                            {t("dashboard.previewTitle")}
+                          </Text>
+                          <Text style={styles.muted}>
+                            {t("dashboard.monthSummary", {
+                              month: currentMonthLabel,
+                            })}
+                          </Text>
+                        </View>
+                        <Text style={styles.link}>
+                          {t("dashboard.viewStatistics")}
+                        </Text>
+                      </View>
+                      {dashboardStatsReady ? (
+                        <View style={styles.monthSummaryRow}>
+                          <Summary
+                            label={t("movement.income")}
+                            value={currentMonthSummary?.income ?? 0}
+                            format={formatAmount}
+                          />
+                          <Summary
+                            label={t("movement.expense")}
+                            value={currentMonthSummary?.expense ?? 0}
+                            format={formatAmount}
+                          />
+                          <Summary
+                            label={t("dashboard.remainingTitle")}
+                            value={currentMonthSummary?.remaining ?? 0}
+                            format={formatAmount}
+                          />
+                        </View>
+                      ) : (
+                        <Text style={styles.muted}>{t("common.loading")}</Text>
+                      )}
+                      {isLoadingAnnual ? (
+                        <Text style={styles.muted}>{t("common.loading")}</Text>
+                      ) : annualHasActivity ? (
+                        <AnnualBarChart months={annualMonths} />
+                      ) : (
+                        <Text style={styles.muted}>
+                          {t("dashboard.noChartData")}
+                        </Text>
+                      )}
+                    </Pressable>
+                  </>
+                ) : null}
+                {workspaceView === "movement" ? (
+                  <>
+                    {tab === "income" ? (
+                      <>
+                        <View style={styles.card}>
+                          <Text style={styles.sectionTitle}>
+                            {t("schedule.title")}
+                          </Text>
+                          <Text style={styles.muted}>
+                            {t("schedule.description")}
+                          </Text>
+                          {incomeSchedules.length ? (
+                            <View style={styles.scheduleList}>
+                              {incomeSchedules.map((schedule) => {
+                                const pending =
+                                  schedule.status === "ACTIVE" &&
+                                  schedule.next_occurrence_on <= today();
+                                return (
+                                  <View
+                                    key={schedule.id}
+                                    style={styles.scheduleItem}
+                                  >
+                                    <View style={styles.entryText}>
+                                      <Text style={styles.entryTitle}>
+                                        {formatAmount.format(schedule.amount)} ·{" "}
                                         {t(
-                                          `schedule.shortMonthBehaviors.${schedule.monthly_short_month_behavior}`,
+                                          `schedule.frequencies.${schedule.frequency}`,
                                         )}
                                       </Text>
-                                    ) : null}
-                                    {pending ? (
-                                      <Text style={styles.error}>
-                                        {t("schedule.pendingNoPeriod")}
+                                      <Text style={styles.muted}>
+                                        {t(
+                                          `schedule.statuses.${schedule.status}`,
+                                        )}{" "}
+                                        · {t("schedule.nextDate")}:{" "}
+                                        {schedule.next_occurrence_on}
                                       </Text>
+                                      {schedule.description ? (
+                                        <Text style={styles.muted}>
+                                          {schedule.description}
+                                        </Text>
+                                      ) : null}
+                                      {schedule.frequency === "MONTHLY" ? (
+                                        <Text style={styles.muted}>
+                                          {t("schedule.shortMonths")}:{" "}
+                                          {t(
+                                            `schedule.shortMonthBehaviors.${schedule.monthly_short_month_behavior}`,
+                                          )}
+                                        </Text>
+                                      ) : null}
+                                      {pending ? (
+                                        <Text style={styles.error}>
+                                          {t("schedule.pendingNoPeriod")}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                    {schedule.status === "ACTIVE" ? (
+                                      <Pressable
+                                        accessibilityRole="button"
+                                        disabled={isSaving}
+                                        onPress={() =>
+                                          void setIncomeScheduleStatus(
+                                            schedule,
+                                            "PAUSED",
+                                          )
+                                        }
+                                      >
+                                        <Text style={styles.link}>
+                                          {t("schedule.pause")}
+                                        </Text>
+                                      </Pressable>
+                                    ) : schedule.status === "PAUSED" ? (
+                                      <Pressable
+                                        accessibilityRole="button"
+                                        disabled={isSaving}
+                                        onPress={() =>
+                                          void setIncomeScheduleStatus(
+                                            schedule,
+                                            "ACTIVE",
+                                          )
+                                        }
+                                      >
+                                        <Text style={styles.link}>
+                                          {t("schedule.resume")}
+                                        </Text>
+                                      </Pressable>
+                                    ) : null}
+                                    {schedule.status === "ACTIVE" ||
+                                    schedule.status === "PAUSED" ? (
+                                      <Pressable
+                                        accessibilityRole="button"
+                                        disabled={isSaving}
+                                        onPress={() =>
+                                          void setIncomeScheduleStatus(
+                                            schedule,
+                                            "CANCELLED",
+                                          )
+                                        }
+                                      >
+                                        <Text style={styles.link}>
+                                          {t("schedule.cancel")}
+                                        </Text>
+                                      </Pressable>
                                     ) : null}
                                   </View>
-                                  {schedule.status === "ACTIVE" ? (
-                                    <Pressable
-                                      accessibilityRole="button"
-                                      disabled={isSaving}
-                                      onPress={() =>
-                                        void setIncomeScheduleStatus(
-                                          schedule,
-                                          "PAUSED",
-                                        )
-                                      }
-                                    >
-                                      <Text style={styles.link}>
-                                        {t("schedule.pause")}
-                                      </Text>
-                                    </Pressable>
-                                  ) : schedule.status === "PAUSED" ? (
-                                    <Pressable
-                                      accessibilityRole="button"
-                                      disabled={isSaving}
-                                      onPress={() =>
-                                        void setIncomeScheduleStatus(
-                                          schedule,
-                                          "ACTIVE",
-                                        )
-                                      }
-                                    >
-                                      <Text style={styles.link}>
-                                        {t("schedule.resume")}
-                                      </Text>
-                                    </Pressable>
-                                  ) : null}
-                                  {schedule.status === "ACTIVE" ||
-                                  schedule.status === "PAUSED" ? (
-                                    <Pressable
-                                      accessibilityRole="button"
-                                      disabled={isSaving}
-                                      onPress={() =>
-                                        void setIncomeScheduleStatus(
-                                          schedule,
-                                          "CANCELLED",
-                                        )
-                                      }
-                                    >
-                                      <Text style={styles.link}>
-                                        {t("schedule.cancel")}
-                                      </Text>
-                                    </Pressable>
-                                  ) : null}
-                                </View>
-                              );
-                            })}
-                          </View>
-                        ) : null}
-                      </View>
-                    </>
-                  ) : null}
-                  <View style={styles.tabs}>
-                    {(["income", "expense", "adjustment"] as const).map(
-                      (item) => (
-                        <Choice
-                          key={item}
-                          label={t(`movement.${item}`)}
-                          selected={tab === item}
-                          onPress={() => {
-                            setTab(item);
-                            setFieldErrors({});
-                          }}
-                        />
-                      ),
-                    )}
-                  </View>
-                  <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>
-                      {t(
-                        tab === "income"
-                          ? "movement.saveIncome"
-                          : tab === "expense"
-                            ? "movement.saveExpense"
-                            : "movement.saveAdjustment",
-                      )}
-                    </Text>
-                    {tab === "income" ? (
-                      <>
-                        <View style={styles.rowWrap}>
-                          <Choice
-                            label={t("schedule.single")}
-                            selected={!incomeRecurring}
-                            onPress={() => setIncomeRecurring(false)}
-                          />
-                          <Choice
-                            label={t("schedule.recurring")}
-                            selected={incomeRecurring}
-                            onPress={() => setIncomeRecurring(true)}
-                          />
+                                );
+                              })}
+                            </View>
+                          ) : null}
                         </View>
-                        <Text style={styles.muted}>
-                          {incomeRecurring
-                            ? t("schedule.recurringDescription")
-                            : t("movement.activeAllocation")}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.label}>
-                          {t("movement.category")}
-                        </Text>
-                        <View style={styles.rowWrap}>
-                          {activeCategories.map((category) => (
-                            <Choice
-                              key={category.id}
-                              label={category.name}
-                              selected={movementCategoryId === category.id}
-                              onPress={() => {
-                                setMovementCategoryId(category.id);
-                                clearFieldError("movementCategory");
-                              }}
-                            />
-                          ))}
-                        </View>
-                        <FieldError message={fieldErrors.movementCategory} />
-                      </>
-                    )}
-                    <Text style={styles.label}>
-                      {tab === "income"
-                        ? t("movement.incomeAmount")
-                        : tab === "expense"
-                          ? t("movement.expenseAmount")
-                          : t("movement.amount")}
-                    </Text>
-                    <TextInput
-                      accessibilityLabel={t("movement.amount")}
-                      keyboardType="decimal-pad"
-                      onChangeText={(value) => {
-                        setAmount(value);
-                        clearFieldError("movementAmount");
-                      }}
-                      placeholder="0,00"
-                      style={[
-                        styles.input,
-                        fieldErrors.movementAmount && styles.inputInvalid,
-                      ]}
-                      value={amount}
-                    />
-                    <FieldError message={fieldErrors.movementAmount} />
-                    <Text style={styles.label}>
-                      {tab === "income" && incomeRecurring
-                        ? t("schedule.startDate")
-                        : t("movement.date")}
-                    </Text>
-                    <TextInput
-                      accessibilityLabel={
-                        tab === "income" && incomeRecurring
-                          ? t("schedule.startDate")
-                          : t("movement.date")
-                      }
-                      onChangeText={(value) => {
-                        setMovementDate(value);
-                        clearFieldError("movementDate");
-                        clearFieldError("scheduleEndDate");
-                      }}
-                      placeholder="AAAA-MM-DD"
-                      style={[
-                        styles.input,
-                        fieldErrors.movementDate && styles.inputInvalid,
-                      ]}
-                      value={movementDate}
-                    />
-                    <FieldError message={fieldErrors.movementDate} />
-                    {tab === "income" ? (
-                      <>
-                        <Text style={styles.label}>
-                          {t("movement.incomeDescription")}
-                        </Text>
-                        <TextInput
-                          accessibilityLabel={t("movement.incomeDescription")}
-                          maxLength={500}
-                          onChangeText={setIncomeDescription}
-                          placeholder={t(
-                            "movement.incomeDescriptionPlaceholder",
-                          )}
-                          style={styles.input}
-                          value={incomeDescription}
-                        />
                       </>
                     ) : null}
-                    {tab === "income" && incomeRecurring ? (
-                      <>
-                        <Text style={styles.label}>
-                          {t("schedule.frequency")}
-                        </Text>
-                        <View style={styles.rowWrap}>
-                          {(["WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const).map(
-                            (frequency) => (
+                    {!isNative ? (
+                      <View style={styles.tabs}>
+                        {(["income", "expense", "adjustment"] as const).map(
+                          (item) => (
+                            <Choice
+                              key={item}
+                              label={t(`movement.${item}`)}
+                              selected={tab === item}
+                              onPress={() => {
+                                setTab(item);
+                                setFieldErrors({});
+                              }}
+                            />
+                          ),
+                        )}
+                      </View>
+                    ) : null}
+                    <View style={styles.card}>
+                      <Text style={styles.sectionTitle}>
+                        {t(
+                          tab === "income"
+                            ? "movement.saveIncome"
+                            : tab === "expense"
+                              ? "movement.saveExpense"
+                              : "movement.saveAdjustment",
+                        )}
+                      </Text>
+                      {tab === "income" ? (
+                        <>
+                          <View style={styles.rowWrap}>
+                            <Choice
+                              label={t("schedule.single")}
+                              selected={!incomeRecurring}
+                              onPress={() => setIncomeRecurring(false)}
+                            />
+                            <Choice
+                              label={t("schedule.recurring")}
+                              selected={incomeRecurring}
+                              onPress={() => setIncomeRecurring(true)}
+                            />
+                          </View>
+                          <Text style={styles.muted}>
+                            {incomeRecurring
+                              ? t("schedule.recurringDescription")
+                              : t("movement.activeAllocation")}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.label}>
+                            {t("movement.category")}
+                          </Text>
+                          <View style={styles.rowWrap}>
+                            {activeCategories.map((category) => (
+                              <Choice
+                                key={category.id}
+                                label={category.name}
+                                selected={movementCategoryId === category.id}
+                                onPress={() => {
+                                  setMovementCategoryId(category.id);
+                                  clearFieldError("movementCategory");
+                                }}
+                              />
+                            ))}
+                          </View>
+                          <FieldError message={fieldErrors.movementCategory} />
+                        </>
+                      )}
+                      <Text style={styles.label}>
+                        {tab === "income"
+                          ? t("movement.incomeAmount")
+                          : tab === "expense"
+                            ? t("movement.expenseAmount")
+                            : t("movement.amount")}
+                      </Text>
+                      <TextInput
+                        accessibilityLabel={t("movement.amount")}
+                        keyboardType="decimal-pad"
+                        onChangeText={(value) => {
+                          setAmount(value);
+                          clearFieldError("movementAmount");
+                        }}
+                        placeholder="0,00"
+                        style={[
+                          styles.input,
+                          fieldErrors.movementAmount && styles.inputInvalid,
+                        ]}
+                        value={amount}
+                      />
+                      <FieldError message={fieldErrors.movementAmount} />
+                      <Text style={styles.label}>
+                        {tab === "income" && incomeRecurring
+                          ? t("schedule.startDate")
+                          : t("movement.date")}
+                      </Text>
+                      <TextInput
+                        accessibilityLabel={
+                          tab === "income" && incomeRecurring
+                            ? t("schedule.startDate")
+                            : t("movement.date")
+                        }
+                        onChangeText={(value) => {
+                          setMovementDate(value);
+                          clearFieldError("movementDate");
+                          clearFieldError("scheduleEndDate");
+                        }}
+                        placeholder="AAAA-MM-DD"
+                        style={[
+                          styles.input,
+                          fieldErrors.movementDate && styles.inputInvalid,
+                        ]}
+                        value={movementDate}
+                      />
+                      <FieldError message={fieldErrors.movementDate} />
+                      {tab === "income" ? (
+                        <>
+                          <Text style={styles.label}>
+                            {t("movement.incomeDescription")}
+                          </Text>
+                          <TextInput
+                            accessibilityLabel={t("movement.incomeDescription")}
+                            maxLength={500}
+                            onChangeText={setIncomeDescription}
+                            placeholder={t(
+                              "movement.incomeDescriptionPlaceholder",
+                            )}
+                            style={styles.input}
+                            value={incomeDescription}
+                          />
+                        </>
+                      ) : null}
+                      {tab === "income" && incomeRecurring ? (
+                        <>
+                          <Text style={styles.label}>
+                            {t("schedule.frequency")}
+                          </Text>
+                          <View style={styles.rowWrap}>
+                            {(
+                              ["WEEKLY", "FORTNIGHTLY", "MONTHLY"] as const
+                            ).map((frequency) => (
                               <Choice
                                 key={frequency}
                                 label={t(`schedule.frequencies.${frequency}`)}
                                 selected={scheduleFrequency === frequency}
                                 onPress={() => setScheduleFrequency(frequency)}
                               />
-                            ),
-                          )}
-                        </View>
-                        {scheduleFrequency === "MONTHLY" ? (
-                          <>
-                            <Text style={styles.label}>
-                              {t("schedule.shortMonths")}
-                            </Text>
-                            <Text style={styles.muted}>
-                              {t("schedule.shortMonthDescription")}
-                            </Text>
-                            <View style={styles.rowWrap}>
-                              {(["LAST_DAY", "SKIP"] as const).map(
-                                (behavior) => (
-                                  <Choice
-                                    key={behavior}
-                                    label={t(
-                                      `schedule.shortMonthBehaviors.${behavior}`,
-                                    )}
-                                    selected={shortMonthBehavior === behavior}
-                                    onPress={() =>
-                                      setShortMonthBehavior(behavior)
-                                    }
-                                  />
-                                ),
-                              )}
-                            </View>
-                          </>
-                        ) : null}
-                        <Text style={styles.label}>
-                          {t("schedule.endDateOptional")}
-                        </Text>
-                        <TextInput
-                          accessibilityLabel={t("schedule.endDateOptional")}
-                          onChangeText={(value) => {
-                            setScheduleEndDate(value);
-                            clearFieldError("scheduleEndDate");
-                          }}
-                          placeholder="AAAA-MM-DD"
-                          style={[
-                            styles.input,
-                            fieldErrors.scheduleEndDate && styles.inputInvalid,
-                          ]}
-                          value={scheduleEndDate}
-                        />
-                        <FieldError message={fieldErrors.scheduleEndDate} />
-                      </>
-                    ) : null}
-                    {tab === "expense" ? (
-                      <>
-                        <Text style={styles.label}>
-                          {t("movement.description")}
-                        </Text>
-                        <TextInput
-                          accessibilityLabel={t("movement.description")}
-                          maxLength={500}
-                          onChangeText={setDescription}
-                          placeholder={t("movement.descriptionPlaceholder")}
-                          style={styles.input}
-                          value={description}
-                        />
-                      </>
-                    ) : null}
-                    {tab === "adjustment" ? (
-                      <>
-                        <Text style={styles.label}>
-                          {t("movement.adjustmentSign")}
-                        </Text>
-                        <View style={styles.rowWrap}>
-                          <Choice
-                            label={t("movement.positiveAdjustment")}
-                            selected={adjustmentSign === 1}
-                            onPress={() => setAdjustmentSign(1)}
-                          />
-                          <Choice
-                            label={t("movement.negativeAdjustment")}
-                            selected={adjustmentSign === -1}
-                            onPress={() => setAdjustmentSign(-1)}
-                          />
-                        </View>
-                        <Text style={styles.label}>{t("movement.reason")}</Text>
-                        <TextInput
-                          accessibilityLabel={t("movement.reason")}
-                          maxLength={500}
-                          onChangeText={(value) => {
-                            setReason(value);
-                            clearFieldError("movementReason");
-                          }}
-                          placeholder={t("movement.reasonPlaceholder")}
-                          style={[
-                            styles.input,
-                            fieldErrors.movementReason && styles.inputInvalid,
-                          ]}
-                          value={reason}
-                        />
-                        <FieldError message={fieldErrors.movementReason} />
-                      </>
-                    ) : null}
-                    <ActionButton
-                      disabled={isSaving}
-                      label={
-                        isSaving
-                          ? t("common.saving")
-                          : tab === "income" && incomeRecurring
-                            ? t("schedule.create")
-                            : t("common.save")
-                      }
-                      onPress={submitMovement}
-                    />
-                  </View>
-                  <Text style={styles.sectionTitle}>
-                    {t("movement.recent")}
-                  </Text>
-                  {tab === "income" ? (
-                    incomes.length ? (
-                      <View style={styles.list}>
-                        {incomes.map((income) => {
-                          const corrections = incomeCorrections.filter(
-                            (item) => item.income_entry_id === income.id,
-                          );
-                          return (
-                            <View key={income.id} style={styles.incomeRecord}>
-                              <View style={styles.entry}>
-                                <View style={styles.entryText}>
-                                  <Text style={styles.entryTitle}>
-                                    {t("movement.income")}
-                                  </Text>
-                                  <Text style={styles.muted}>
-                                    {income.occurred_on}
-                                  </Text>
-                                  {income.description ? (
-                                    <Text style={styles.muted}>
-                                      {income.description}
-                                    </Text>
-                                  ) : null}
-                                </View>
-                                <Text style={styles.entryAmount}>
-                                  {formatAmount.format(income.amount)}
-                                </Text>
-                              </View>
-                              {corrections.map((correction) => (
-                                <View
-                                  key={correction.id}
-                                  style={styles.incomeCorrectionEntry}
-                                >
-                                  <Text style={styles.muted}>
-                                    {t("movement.incomeCorrectionLabel")}:{" "}
-                                    {formatAmount.format(
-                                      correction.amount_delta,
-                                    )}
-                                  </Text>
-                                  <Text style={styles.muted}>
-                                    {correction.reason}
-                                  </Text>
-                                </View>
-                              ))}
-                              <Pressable
-                                accessibilityRole="button"
-                                onPress={() => {
-                                  setCorrectionEntryId(income.id);
-                                  setCorrectionAmount("");
-                                  setCorrectionReason("");
-                                  setCorrectionSign(1);
-                                  setCorrectionDate(today());
-                                  setFieldErrors({});
-                                }}
-                              >
-                                <Text style={styles.link}>
-                                  {t("movement.correctIncome")}
-                                </Text>
-                              </Pressable>
-                              {correctionEntryId === income.id ? (
-                                <View style={styles.correctionForm}>
-                                  <Pressable
-                                    accessibilityRole="button"
-                                    onPress={() => setCorrectionEntryId(null)}
-                                  >
-                                    <Text style={styles.link}>
-                                      {t("common.cancel")}
-                                    </Text>
-                                  </Pressable>
-                                  <View style={styles.rowWrap}>
+                            ))}
+                          </View>
+                          {scheduleFrequency === "MONTHLY" ? (
+                            <>
+                              <Text style={styles.label}>
+                                {t("schedule.shortMonths")}
+                              </Text>
+                              <Text style={styles.muted}>
+                                {t("schedule.shortMonthDescription")}
+                              </Text>
+                              <View style={styles.rowWrap}>
+                                {(["LAST_DAY", "SKIP"] as const).map(
+                                  (behavior) => (
                                     <Choice
-                                      label={t("movement.addToIncome")}
-                                      selected={correctionSign === 1}
-                                      onPress={() => setCorrectionSign(1)}
+                                      key={behavior}
+                                      label={t(
+                                        `schedule.shortMonthBehaviors.${behavior}`,
+                                      )}
+                                      selected={shortMonthBehavior === behavior}
+                                      onPress={() =>
+                                        setShortMonthBehavior(behavior)
+                                      }
                                     />
-                                    <Choice
-                                      label={t("movement.removeFromIncome")}
-                                      selected={correctionSign === -1}
-                                      onPress={() => setCorrectionSign(-1)}
+                                  ),
+                                )}
+                              </View>
+                            </>
+                          ) : null}
+                          <Text style={styles.label}>
+                            {t("schedule.endDateOptional")}
+                          </Text>
+                          <TextInput
+                            accessibilityLabel={t("schedule.endDateOptional")}
+                            onChangeText={(value) => {
+                              setScheduleEndDate(value);
+                              clearFieldError("scheduleEndDate");
+                            }}
+                            placeholder="AAAA-MM-DD"
+                            style={[
+                              styles.input,
+                              fieldErrors.scheduleEndDate &&
+                                styles.inputInvalid,
+                            ]}
+                            value={scheduleEndDate}
+                          />
+                          <FieldError message={fieldErrors.scheduleEndDate} />
+                        </>
+                      ) : null}
+                      {tab === "expense" ? (
+                        <>
+                          <Text style={styles.label}>
+                            {t("movement.description")}
+                          </Text>
+                          <TextInput
+                            accessibilityLabel={t("movement.description")}
+                            maxLength={500}
+                            onChangeText={setDescription}
+                            placeholder={t("movement.descriptionPlaceholder")}
+                            style={styles.input}
+                            value={description}
+                          />
+                        </>
+                      ) : null}
+                      {tab === "adjustment" ? (
+                        <>
+                          <Text style={styles.label}>
+                            {t("movement.adjustmentSign")}
+                          </Text>
+                          <View style={styles.rowWrap}>
+                            <Choice
+                              label={t("movement.positiveAdjustment")}
+                              selected={adjustmentSign === 1}
+                              onPress={() => setAdjustmentSign(1)}
+                            />
+                            <Choice
+                              label={t("movement.negativeAdjustment")}
+                              selected={adjustmentSign === -1}
+                              onPress={() => setAdjustmentSign(-1)}
+                            />
+                          </View>
+                          <Text style={styles.label}>
+                            {t("movement.reason")}
+                          </Text>
+                          <TextInput
+                            accessibilityLabel={t("movement.reason")}
+                            maxLength={500}
+                            onChangeText={(value) => {
+                              setReason(value);
+                              clearFieldError("movementReason");
+                            }}
+                            placeholder={t("movement.reasonPlaceholder")}
+                            style={[
+                              styles.input,
+                              fieldErrors.movementReason && styles.inputInvalid,
+                            ]}
+                            value={reason}
+                          />
+                          <FieldError message={fieldErrors.movementReason} />
+                        </>
+                      ) : null}
+                      <ActionButton
+                        disabled={isSaving}
+                        label={
+                          isSaving
+                            ? t("common.saving")
+                            : tab === "income" && incomeRecurring
+                              ? t("schedule.create")
+                              : t("common.save")
+                        }
+                        onPress={submitMovement}
+                      />
+                    </View>
+                    <Text style={styles.sectionTitle}>
+                      {t("movement.recent")}
+                    </Text>
+                    {tab === "income" ? (
+                      incomes.length ? (
+                        <View style={styles.list}>
+                          {incomes.map((income) => {
+                            const corrections = incomeCorrections.filter(
+                              (item) => item.income_entry_id === income.id,
+                            );
+                            return (
+                              <View key={income.id} style={styles.incomeRecord}>
+                                <View style={styles.entry}>
+                                  <View style={styles.entryText}>
+                                    <Text style={styles.entryTitle}>
+                                      {t("movement.income")}
+                                    </Text>
+                                    <Text style={styles.muted}>
+                                      {income.occurred_on}
+                                    </Text>
+                                    {income.description ? (
+                                      <Text style={styles.muted}>
+                                        {income.description}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                  <Text style={styles.entryAmount}>
+                                    {formatAmount.format(income.amount)}
+                                  </Text>
+                                </View>
+                                {corrections.map((correction) => (
+                                  <View
+                                    key={correction.id}
+                                    style={styles.incomeCorrectionEntry}
+                                  >
+                                    <Text style={styles.muted}>
+                                      {t("movement.incomeCorrectionLabel")}:{" "}
+                                      {formatAmount.format(
+                                        correction.amount_delta,
+                                      )}
+                                    </Text>
+                                    <Text style={styles.muted}>
+                                      {correction.reason}
+                                    </Text>
+                                  </View>
+                                ))}
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => {
+                                    setCorrectionEntryId(income.id);
+                                    setCorrectionAmount("");
+                                    setCorrectionReason("");
+                                    setCorrectionSign(1);
+                                    setCorrectionDate(today());
+                                    setFieldErrors({});
+                                  }}
+                                >
+                                  <Text style={styles.link}>
+                                    {t("movement.correctIncome")}
+                                  </Text>
+                                </Pressable>
+                                {correctionEntryId === income.id ? (
+                                  <View style={styles.correctionForm}>
+                                    <Pressable
+                                      accessibilityRole="button"
+                                      onPress={() => setCorrectionEntryId(null)}
+                                    >
+                                      <Text style={styles.link}>
+                                        {t("common.cancel")}
+                                      </Text>
+                                    </Pressable>
+                                    <View style={styles.rowWrap}>
+                                      <Choice
+                                        label={t("movement.addToIncome")}
+                                        selected={correctionSign === 1}
+                                        onPress={() => setCorrectionSign(1)}
+                                      />
+                                      <Choice
+                                        label={t("movement.removeFromIncome")}
+                                        selected={correctionSign === -1}
+                                        onPress={() => setCorrectionSign(-1)}
+                                      />
+                                    </View>
+                                    <Text style={styles.label}>
+                                      {t("movement.correctionAmount")}
+                                    </Text>
+                                    <TextInput
+                                      accessibilityLabel={t(
+                                        "movement.correctionAmount",
+                                      )}
+                                      keyboardType="decimal-pad"
+                                      onChangeText={(value) => {
+                                        setCorrectionAmount(value);
+                                        clearFieldError(
+                                          "incomeCorrectionAmount",
+                                        );
+                                      }}
+                                      placeholder="0,00"
+                                      style={[
+                                        styles.input,
+                                        fieldErrors.incomeCorrectionAmount &&
+                                          styles.inputInvalid,
+                                      ]}
+                                      value={correctionAmount}
+                                    />
+                                    <FieldError
+                                      message={
+                                        fieldErrors.incomeCorrectionAmount
+                                      }
+                                    />
+                                    <Text style={styles.label}>
+                                      {t("movement.correctionDate")}
+                                    </Text>
+                                    <Text style={styles.muted}>
+                                      {t("movement.correctionDateDescription")}
+                                    </Text>
+                                    <TextInput
+                                      accessibilityLabel={t(
+                                        "movement.correctionDate",
+                                      )}
+                                      onChangeText={(value) => {
+                                        setCorrectionDate(value);
+                                        clearFieldError("incomeCorrectionDate");
+                                      }}
+                                      placeholder="AAAA-MM-DD"
+                                      style={[
+                                        styles.input,
+                                        fieldErrors.incomeCorrectionDate &&
+                                          styles.inputInvalid,
+                                      ]}
+                                      value={correctionDate}
+                                    />
+                                    <FieldError
+                                      message={fieldErrors.incomeCorrectionDate}
+                                    />
+                                    <Text style={styles.label}>
+                                      {t("movement.correctionDescription")}
+                                    </Text>
+                                    <Text style={styles.muted}>
+                                      {t("movement.correctionDescriptionHelp")}
+                                    </Text>
+                                    <TextInput
+                                      accessibilityLabel={t(
+                                        "movement.correctionDescription",
+                                      )}
+                                      maxLength={500}
+                                      onChangeText={(value) => {
+                                        setCorrectionReason(value);
+                                        clearFieldError(
+                                          "incomeCorrectionReason",
+                                        );
+                                      }}
+                                      placeholder={t(
+                                        "movement.correctionDescriptionPlaceholder",
+                                      )}
+                                      style={[
+                                        styles.input,
+                                        fieldErrors.incomeCorrectionReason &&
+                                          styles.inputInvalid,
+                                      ]}
+                                      value={correctionReason}
+                                    />
+                                    <FieldError
+                                      message={
+                                        fieldErrors.incomeCorrectionReason
+                                      }
+                                    />
+                                    <ActionButton
+                                      disabled={isSaving}
+                                      label={
+                                        isSaving
+                                          ? t("common.saving")
+                                          : t("movement.saveIncomeCorrection")
+                                      }
+                                      onPress={() =>
+                                        void submitIncomeCorrection(income)
+                                      }
                                     />
                                   </View>
-                                  <Text style={styles.label}>
-                                    {t("movement.correctionAmount")}
-                                  </Text>
-                                  <TextInput
-                                    accessibilityLabel={t(
-                                      "movement.correctionAmount",
-                                    )}
-                                    keyboardType="decimal-pad"
-                                    onChangeText={(value) => {
-                                      setCorrectionAmount(value);
-                                      clearFieldError("incomeCorrectionAmount");
-                                    }}
-                                    placeholder="0,00"
-                                    style={[
-                                      styles.input,
-                                      fieldErrors.incomeCorrectionAmount &&
-                                        styles.inputInvalid,
-                                    ]}
-                                    value={correctionAmount}
-                                  />
-                                  <FieldError
-                                    message={fieldErrors.incomeCorrectionAmount}
-                                  />
-                                  <Text style={styles.label}>
-                                    {t("movement.correctionDate")}
-                                  </Text>
-                                  <Text style={styles.muted}>
-                                    {t("movement.correctionDateDescription")}
-                                  </Text>
-                                  <TextInput
-                                    accessibilityLabel={t(
-                                      "movement.correctionDate",
-                                    )}
-                                    onChangeText={(value) => {
-                                      setCorrectionDate(value);
-                                      clearFieldError("incomeCorrectionDate");
-                                    }}
-                                    placeholder="AAAA-MM-DD"
-                                    style={[
-                                      styles.input,
-                                      fieldErrors.incomeCorrectionDate &&
-                                        styles.inputInvalid,
-                                    ]}
-                                    value={correctionDate}
-                                  />
-                                  <FieldError
-                                    message={fieldErrors.incomeCorrectionDate}
-                                  />
-                                  <Text style={styles.label}>
-                                    {t("movement.correctionDescription")}
-                                  </Text>
-                                  <Text style={styles.muted}>
-                                    {t("movement.correctionDescriptionHelp")}
-                                  </Text>
-                                  <TextInput
-                                    accessibilityLabel={t(
-                                      "movement.correctionDescription",
-                                    )}
-                                    maxLength={500}
-                                    onChangeText={(value) => {
-                                      setCorrectionReason(value);
-                                      clearFieldError("incomeCorrectionReason");
-                                    }}
-                                    placeholder={t(
-                                      "movement.correctionDescriptionPlaceholder",
-                                    )}
-                                    style={[
-                                      styles.input,
-                                      fieldErrors.incomeCorrectionReason &&
-                                        styles.inputInvalid,
-                                    ]}
-                                    value={correctionReason}
-                                  />
-                                  <FieldError
-                                    message={fieldErrors.incomeCorrectionReason}
-                                  />
-                                  <ActionButton
-                                    disabled={isSaving}
-                                    label={
-                                      isSaving
-                                        ? t("common.saving")
-                                        : t("movement.saveIncomeCorrection")
-                                    }
-                                    onPress={() =>
-                                      void submitIncomeCorrection(income)
-                                    }
-                                  />
-                                </View>
-                              ) : null}
-                            </View>
-                          );
-                        })}
-                      </View>
+                                ) : null}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <Text style={styles.muted}>
+                          {t("movement.incomeEmpty")}
+                        </Text>
+                      )
                     ) : (
-                      <Text style={styles.muted}>
-                        {t("movement.incomeEmpty")}
-                      </Text>
-                    )
-                  ) : (
-                    <EntryList
-                      empty={t(`movement.${tab}Empty`)}
-                      items={
-                        tab === "expense"
-                          ? expenses.map((item) => ({
-                              label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.expense")} · ${item.description ?? ""}`,
-                              date: item.spent_on,
-                              amount: -item.amount,
-                            }))
-                          : adjustments.map((item) => ({
-                              label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.adjustment")} · ${item.reason}`,
-                              date: item.occurred_on,
-                              amount: item.amount_delta,
-                            }))
-                      }
-                      format={formatAmount}
-                    />
-                  )}
-                </>
-              ) : null}
-              {workspaceView === "statistics" ? (
-                <>
-                  <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>
-                      {t("dashboard.periodStatistics")}
-                    </Text>
-                    <Text style={styles.muted}>
-                      {t("dashboard.periodLabel", {
-                        start:
-                          periods.find(
-                            (period) => period.id === selectedPeriodId,
-                          )?.starts_on ?? "",
-                        end:
-                          periods.find(
-                            (period) => period.id === selectedPeriodId,
-                          )?.ends_on ?? "",
-                      })}
-                    </Text>
-                    <View style={styles.statisticsMetrics}>
-                      <StatisticsMetric
-                        label={t("movement.income")}
-                        value={formatAmount.format(periodIncomeTotal)}
-                      />
-                      <StatisticsMetric
-                        label={t("movement.expense")}
-                        value={formatAmount.format(periodExpenseTotal)}
-                      />
-                      <StatisticsMetric
-                        label={t("dashboard.remainingTitle")}
-                        value={formatAmount.format(periodRemaining)}
-                      />
-                      <StatisticsMetric
-                        label={t("movement.adjustment")}
-                        value={formatAmount.format(periodAdjustmentTotal)}
-                      />
-                    </View>
-                    <Text style={styles.sectionTitle}>
-                      {t("dashboard.expenseByCategory")}
-                    </Text>
-                    {expenseCategoryShares.length ? (
-                      <ExpenseCategoryDonut
-                        items={expenseCategoryShares}
-                        total={periodExpenseTotal}
+                      <EntryList
+                        empty={t(`movement.${tab}Empty`)}
+                        items={
+                          tab === "expense"
+                            ? expenses.map((item) => ({
+                                label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.expense")} · ${item.description ?? ""}`,
+                                date: item.spent_on,
+                                amount: -item.amount,
+                              }))
+                            : adjustments.map((item) => ({
+                                label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.adjustment")} · ${item.reason}`,
+                                date: item.occurred_on,
+                                amount: item.amount_delta,
+                              }))
+                        }
                         format={formatAmount}
                       />
-                    ) : (
-                      <Text style={styles.muted}>
-                        {t("dashboard.noCategoryExpenses")}
-                      </Text>
                     )}
-                    <Text style={styles.sectionTitle}>
-                      {t("dashboard.categoryProgress")}
-                    </Text>
-                    <CategoryProgressList
-                      balances={categoryBalances}
-                      format={formatAmount}
-                    />
-                  </View>
-                  <View style={styles.card}>
-                    <Text style={styles.muted}>
-                      {t("dashboard.annualDescription")}
-                    </Text>
-                    <View style={styles.annualRow}>
-                      <View style={styles.annualInput}>
-                        <Text style={styles.label}>{t("dashboard.year")}</Text>
-                        <TextInput
-                          accessibilityLabel={t("dashboard.year")}
-                          keyboardType="number-pad"
-                          maxLength={4}
-                          onChangeText={(value) => {
-                            setAnnualYear(value);
-                            setAnnualSummary(null);
-                            setAnnualMonths([]);
-                            setAnnualSummaryBudgetId("");
-                            clearFieldError("annualYear");
-                          }}
-                          style={[
-                            styles.input,
-                            styles.yearInput,
-                            fieldErrors.annualYear && styles.inputInvalid,
-                          ]}
-                          value={annualYear}
+                  </>
+                ) : null}
+                {workspaceView === "statistics" ? (
+                  <>
+                    <View style={styles.card}>
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.periodStatistics")}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {t("dashboard.periodLabel", {
+                          start:
+                            periods.find(
+                              (period) => period.id === selectedPeriodId,
+                            )?.starts_on ?? "",
+                          end:
+                            periods.find(
+                              (period) => period.id === selectedPeriodId,
+                            )?.ends_on ?? "",
+                        })}
+                      </Text>
+                      <View style={styles.statisticsMetrics}>
+                        <StatisticsMetric
+                          label={t("movement.income")}
+                          value={formatAmount.format(periodIncomeTotal)}
                         />
-                        <FieldError message={fieldErrors.annualYear} />
+                        <StatisticsMetric
+                          label={t("movement.expense")}
+                          value={formatAmount.format(periodExpenseTotal)}
+                        />
+                        <StatisticsMetric
+                          label={t("dashboard.remainingTitle")}
+                          value={formatAmount.format(periodRemaining)}
+                        />
+                        <StatisticsMetric
+                          label={t("movement.adjustment")}
+                          value={formatAmount.format(periodAdjustmentTotal)}
+                        />
                       </View>
-                      <ActionButton
-                        disabled={isLoadingAnnual}
-                        label={
-                          isLoadingAnnual
-                            ? t("common.loading")
-                            : t("dashboard.loadAnnual")
-                        }
-                        onPress={handleLoadAnnualSummary}
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.expenseByCategory")}
+                      </Text>
+                      {expenseCategoryShares.length ? (
+                        <ExpenseCategoryDonut
+                          items={expenseCategoryShares}
+                          total={periodExpenseTotal}
+                          format={formatAmount}
+                        />
+                      ) : (
+                        <Text style={styles.muted}>
+                          {t("dashboard.noCategoryExpenses")}
+                        </Text>
+                      )}
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.categoryProgress")}
+                      </Text>
+                      <CategoryProgressList
+                        balances={categoryBalances}
+                        format={formatAmount}
                       />
                     </View>
-                    {annualSummary &&
-                    annualSummaryBudgetId === selectedBudgetId ? (
-                      <View style={styles.monthSummaryRow}>
-                        <Summary
-                          label={t("movement.income")}
-                          value={annualSummary.income}
-                          format={formatAmount}
-                        />
-                        <Summary
-                          label={t("movement.expense")}
-                          value={annualSummary.expense}
-                          format={formatAmount}
-                        />
-                        <Summary
-                          label={t("dashboard.netChange")}
-                          value={
-                            annualSummary.income -
-                            annualSummary.expense +
-                            annualSummary.adjustment
+                    <View style={styles.card}>
+                      <Text style={styles.muted}>
+                        {t("dashboard.annualDescription")}
+                      </Text>
+                      <View style={styles.annualRow}>
+                        <View style={styles.annualInput}>
+                          <Text style={styles.label}>
+                            {t("dashboard.year")}
+                          </Text>
+                          <TextInput
+                            accessibilityLabel={t("dashboard.year")}
+                            keyboardType="number-pad"
+                            maxLength={4}
+                            onChangeText={(value) => {
+                              setAnnualYear(value);
+                              setAnnualSummary(null);
+                              setAnnualMonths([]);
+                              setAnnualSummaryBudgetId("");
+                              clearFieldError("annualYear");
+                            }}
+                            style={[
+                              styles.input,
+                              styles.yearInput,
+                              fieldErrors.annualYear && styles.inputInvalid,
+                            ]}
+                            value={annualYear}
+                          />
+                          <FieldError message={fieldErrors.annualYear} />
+                        </View>
+                        <ActionButton
+                          disabled={isLoadingAnnual}
+                          label={
+                            isLoadingAnnual
+                              ? t("common.loading")
+                              : t("dashboard.loadAnnual")
                           }
-                          format={formatAmount}
+                          onPress={handleLoadAnnualSummary}
                         />
                       </View>
-                    ) : null}
-                    <Text style={styles.sectionTitle}>
-                      {t("dashboard.annualChartTitle")}
-                    </Text>
-                    {isLoadingAnnual ? (
-                      <Text style={styles.muted}>{t("common.loading")}</Text>
-                    ) : annualHasActivity ? (
-                      <AnnualBarChart months={annualMonths} />
-                    ) : (
-                      <Text style={styles.muted}>
-                        {t("dashboard.noChartData")}
+                      {annualSummary &&
+                      annualSummaryBudgetId === selectedBudgetId ? (
+                        <View style={styles.monthSummaryRow}>
+                          <Summary
+                            label={t("movement.income")}
+                            value={annualSummary.income}
+                            format={formatAmount}
+                          />
+                          <Summary
+                            label={t("movement.expense")}
+                            value={annualSummary.expense}
+                            format={formatAmount}
+                          />
+                          <Summary
+                            label={t("dashboard.netChange")}
+                            value={
+                              annualSummary.income -
+                              annualSummary.expense +
+                              annualSummary.adjustment
+                            }
+                            format={formatAmount}
+                          />
+                        </View>
+                      ) : null}
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.annualChartTitle")}
                       </Text>
-                    )}
-                    {annualSummary &&
-                    annualSummaryBudgetId === selectedBudgetId ? (
-                      <Text style={styles.muted}>
-                        {t("movement.adjustment")}:{" "}
-                        {formatAmount.format(annualSummary.adjustment)}
-                      </Text>
-                    ) : null}
-                  </View>
-                </>
-              ) : null}
-            </>
-          ) : null}
-        </>
-      ) : isCreatingBudget ? (
-        <View style={styles.card}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setIsCreatingBudget(false);
-              setFieldErrors({});
-              setCategoryNameErrors([]);
-              setCategoryPercentageErrors([]);
-              setAllocationTotalError(false);
-            }}
-            style={styles.formBack}
-          >
-            <Text style={styles.link}>{t("common.cancel")}</Text>
-          </Pressable>
-          <Text style={styles.sectionTitle}>{t("budget.setupTitle")}</Text>
-          <Text style={styles.muted}>{t("budget.setupDescription")}</Text>
-          <Text style={styles.label}>{t("budget.name")}</Text>
-          <TextInput
-            accessibilityLabel={t("budget.name")}
-            onChangeText={(value) => {
-              setBudgetName(value);
-              clearFieldError("budgetName");
-            }}
-            maxLength={120}
-            placeholder={t("budget.namePlaceholder")}
-            style={[
-              styles.input,
-              fieldErrors.budgetName && styles.inputInvalid,
-            ]}
-            value={budgetName}
-          />
-          <FieldError message={fieldErrors.budgetName} />
-          <Text style={styles.label}>{t("budget.type")}</Text>
-          <View style={styles.rowWrap}>
-            <Choice
-              label={t("budget.personal")}
-              selected={budgetType === "PERSONAL"}
-              onPress={() => setBudgetType("PERSONAL")}
+                      {isLoadingAnnual ? (
+                        <Text style={styles.muted}>{t("common.loading")}</Text>
+                      ) : annualHasActivity ? (
+                        <AnnualBarChart months={annualMonths} />
+                      ) : (
+                        <Text style={styles.muted}>
+                          {t("dashboard.noChartData")}
+                        </Text>
+                      )}
+                      {annualSummary &&
+                      annualSummaryBudgetId === selectedBudgetId ? (
+                        <Text style={styles.muted}>
+                          {t("movement.adjustment")}:{" "}
+                          {formatAmount.format(annualSummary.adjustment)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        ) : isCreatingBudget ? (
+          <View style={styles.card}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setIsCreatingBudget(false);
+                setFieldErrors({});
+                setCategoryNameErrors([]);
+                setCategoryPercentageErrors([]);
+                setAllocationTotalError(false);
+              }}
+              style={styles.formBack}
+            >
+              <Text style={styles.link}>{t("common.cancel")}</Text>
+            </Pressable>
+            <Text style={styles.sectionTitle}>{t("budget.setupTitle")}</Text>
+            <Text style={styles.muted}>{t("budget.setupDescription")}</Text>
+            <Text style={styles.label}>{t("budget.name")}</Text>
+            <TextInput
+              accessibilityLabel={t("budget.name")}
+              onChangeText={(value) => {
+                setBudgetName(value);
+                clearFieldError("budgetName");
+              }}
+              maxLength={120}
+              placeholder={t("budget.namePlaceholder")}
+              style={[
+                styles.input,
+                fieldErrors.budgetName && styles.inputInvalid,
+              ]}
+              value={budgetName}
             />
-            <Choice
-              label={t("budget.shared")}
-              selected={budgetType === "SHARED"}
-              onPress={() => setBudgetType("SHARED")}
+            <FieldError message={fieldErrors.budgetName} />
+            <Text style={styles.label}>{t("budget.type")}</Text>
+            <View style={styles.rowWrap}>
+              <Choice
+                label={t("budget.personal")}
+                selected={budgetType === "PERSONAL"}
+                onPress={() => setBudgetType("PERSONAL")}
+              />
+              <Choice
+                label={t("budget.shared")}
+                selected={budgetType === "SHARED"}
+                onPress={() => setBudgetType("SHARED")}
+              />
+            </View>
+            <Text style={styles.label}>{t("budget.currency")}</Text>
+            <TextInput
+              accessibilityLabel={t("budget.currency")}
+              autoCapitalize="characters"
+              maxLength={3}
+              onChangeText={(value) => {
+                setCurrency(value);
+                clearFieldError("currency");
+              }}
+              style={[
+                styles.input,
+                fieldErrors.currency && styles.inputInvalid,
+              ]}
+              value={currency}
             />
-          </View>
-          <Text style={styles.label}>{t("budget.currency")}</Text>
-          <TextInput
-            accessibilityLabel={t("budget.currency")}
-            autoCapitalize="characters"
-            maxLength={3}
-            onChangeText={(value) => {
-              setCurrency(value);
-              clearFieldError("currency");
-            }}
-            style={[styles.input, fieldErrors.currency && styles.inputInvalid]}
-            value={currency}
-          />
-          <FieldError message={fieldErrors.currency} />
-          <Text style={styles.label}>{t("budget.period")}</Text>
-          <TextInput
-            accessibilityLabel={t("budget.startsOn")}
-            onChangeText={(value) => {
-              setStartsOn(value);
-              clearFieldError("startsOn");
-              clearFieldError("endsOn");
-            }}
-            placeholder={t("budget.startsOn")}
-            style={[styles.input, fieldErrors.startsOn && styles.inputInvalid]}
-            value={startsOn}
-          />
-          <FieldError message={fieldErrors.startsOn} />
-          <TextInput
-            accessibilityLabel={t("budget.endsOn")}
-            onChangeText={(value) => {
-              setEndsOn(value);
-              clearFieldError("endsOn");
-            }}
-            placeholder={t("budget.endsOn")}
-            style={[styles.input, fieldErrors.endsOn && styles.inputInvalid]}
-            value={endsOn}
-          />
-          <FieldError message={fieldErrors.endsOn} />
-          <Text style={styles.sectionTitle}>{t("budget.categories")}</Text>
-          {draftCategories.map((category, index) => (
-            <View key={index} style={styles.categoryItem}>
-              <View style={styles.categoryRow}>
-                <TextInput
-                  accessibilityLabel={t("budget.categoryName")}
-                  accessibilityHint={
-                    categoryNameErrors.includes(index)
-                      ? t("budget.categoryNameRequired")
-                      : undefined
-                  }
-                  onChangeText={(value) =>
-                    setCategoryField(index, "name", value)
-                  }
-                  maxLength={80}
-                  placeholder={t("budget.categoryPlaceholder")}
-                  style={[
-                    styles.input,
-                    styles.categoryName,
-                    categoryNameErrors.includes(index) && styles.inputInvalid,
-                  ]}
-                  value={category.name}
-                />
-                <TextInput
-                  accessibilityLabel={t("budget.percentage")}
-                  keyboardType="decimal-pad"
-                  onChangeText={(value) =>
-                    setCategoryField(index, "percentage", value)
-                  }
-                  style={[
-                    styles.input,
-                    styles.percentage,
-                    categoryPercentageErrors.includes(index) &&
-                      styles.inputInvalid,
-                  ]}
-                  value={category.percentage}
-                />
-                <Text style={styles.percent}>%</Text>
-                {draftCategories.length > 1 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("budget.removeCategory")}
-                    onPress={() => {
-                      setDraftCategories((current) =>
-                        current.filter((_, itemIndex) => itemIndex !== index),
-                      );
-                      setCategoryNameErrors((current) =>
-                        current
-                          .filter((item) => item !== index)
-                          .map((item) => (item > index ? item - 1 : item)),
-                      );
-                      setCategoryPercentageErrors((current) =>
-                        current
-                          .filter((item) => item !== index)
-                          .map((item) => (item > index ? item - 1 : item)),
-                      );
-                      setAllocationTotalError(false);
-                    }}
+            <FieldError message={fieldErrors.currency} />
+            <Text style={styles.label}>{t("budget.period")}</Text>
+            <TextInput
+              accessibilityLabel={t("budget.startsOn")}
+              onChangeText={(value) => {
+                setStartsOn(value);
+                clearFieldError("startsOn");
+                clearFieldError("endsOn");
+              }}
+              placeholder={t("budget.startsOn")}
+              style={[
+                styles.input,
+                fieldErrors.startsOn && styles.inputInvalid,
+              ]}
+              value={startsOn}
+            />
+            <FieldError message={fieldErrors.startsOn} />
+            <TextInput
+              accessibilityLabel={t("budget.endsOn")}
+              onChangeText={(value) => {
+                setEndsOn(value);
+                clearFieldError("endsOn");
+              }}
+              placeholder={t("budget.endsOn")}
+              style={[styles.input, fieldErrors.endsOn && styles.inputInvalid]}
+              value={endsOn}
+            />
+            <FieldError message={fieldErrors.endsOn} />
+            <Text style={styles.sectionTitle}>{t("budget.categories")}</Text>
+            {draftCategories.map((category, index) => (
+              <View key={index} style={styles.categoryItem}>
+                <View style={styles.categoryRow}>
+                  <TextInput
+                    accessibilityLabel={t("budget.categoryName")}
+                    accessibilityHint={
+                      categoryNameErrors.includes(index)
+                        ? t("budget.categoryNameRequired")
+                        : undefined
+                    }
+                    onChangeText={(value) =>
+                      setCategoryField(index, "name", value)
+                    }
+                    maxLength={80}
+                    placeholder={t("budget.categoryPlaceholder")}
+                    style={[
+                      styles.input,
+                      styles.categoryName,
+                      categoryNameErrors.includes(index) && styles.inputInvalid,
+                    ]}
+                    value={category.name}
+                  />
+                  <TextInput
+                    accessibilityLabel={t("budget.percentage")}
+                    keyboardType="decimal-pad"
+                    onChangeText={(value) =>
+                      setCategoryField(index, "percentage", value)
+                    }
+                    style={[
+                      styles.input,
+                      styles.percentage,
+                      categoryPercentageErrors.includes(index) &&
+                        styles.inputInvalid,
+                    ]}
+                    value={category.percentage}
+                  />
+                  <Text style={styles.percent}>%</Text>
+                  {draftCategories.length > 1 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("budget.removeCategory")}
+                      onPress={() => {
+                        setDraftCategories((current) =>
+                          current.filter((_, itemIndex) => itemIndex !== index),
+                        );
+                        setCategoryNameErrors((current) =>
+                          current
+                            .filter((item) => item !== index)
+                            .map((item) => (item > index ? item - 1 : item)),
+                        );
+                        setCategoryPercentageErrors((current) =>
+                          current
+                            .filter((item) => item !== index)
+                            .map((item) => (item > index ? item - 1 : item)),
+                        );
+                        setAllocationTotalError(false);
+                      }}
+                    >
+                      <Text style={styles.link}>×</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                {categoryNameErrors.includes(index) ? (
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    style={styles.fieldError}
                   >
-                    <Text style={styles.link}>×</Text>
-                  </Pressable>
+                    {t("budget.categoryNameRequired")}
+                  </Text>
+                ) : null}
+                {categoryPercentageErrors.includes(index) ? (
+                  <FieldError message={t("budget.percentageRequired")} />
                 ) : null}
               </View>
-              {categoryNameErrors.includes(index) ? (
-                <Text
-                  accessibilityLiveRegion="polite"
-                  style={styles.fieldError}
-                >
-                  {t("budget.categoryNameRequired")}
-                </Text>
-              ) : null}
-              {categoryPercentageErrors.includes(index) ? (
-                <FieldError message={t("budget.percentageRequired")} />
-              ) : null}
+            ))}
+            <Text
+              style={allocationTotalError ? styles.fieldError : styles.muted}
+              accessibilityLiveRegion={
+                allocationTotalError ? "polite" : undefined
+              }
+            >
+              {t("budget.total", { percentage: percentageTotal })}
+            </Text>
+            {allocationTotalError ? (
+              <FieldError message={t("budget.invalidTotal")} />
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setDraftCategories((current) => [
+                  ...current,
+                  { name: "", percentage: "0" },
+                ]);
+                setAllocationTotalError(false);
+              }}
+            >
+              <Text style={styles.link}>{t("budget.addCategory")}</Text>
+            </Pressable>
+            <ActionButton
+              disabled={isSaving}
+              label={isSaving ? t("common.saving") : t("budget.setup")}
+              onPress={createBudgetAndSetup}
+            />
+          </View>
+        ) : (
+          <View
+            style={[styles.emptyCard, isCompact && styles.emptyCardCompact]}
+          >
+            <View style={styles.emptyIcon}>
+              <Text style={styles.emptyIconText}>＋</Text>
             </View>
-          ))}
-          <Text
-            style={allocationTotalError ? styles.fieldError : styles.muted}
-            accessibilityLiveRegion={
-              allocationTotalError ? "polite" : undefined
+            <Text style={styles.emptyTitle}>{t("budget.emptyTitle")}</Text>
+            <Text style={styles.emptyDescription}>
+              {t("budget.emptyDescription")}
+            </Text>
+            <View style={styles.emptySteps}>
+              <Text style={styles.emptyStep}>{t("budget.emptyStepOne")}</Text>
+              <Text style={styles.emptyStep}>{t("budget.emptyStepTwo")}</Text>
+            </View>
+            <ActionButton
+              label={t("budget.createFirst")}
+              onPress={() => setIsCreatingBudget(true)}
+            />
+          </View>
+        )}
+      </ScrollView>
+      {isNative && !isCreatingBudget ? (
+        <MobileNavigation
+          current={workspaceView}
+          onSelect={(destination) => {
+            if (destination === "profile") {
+              setShowAccountSettings(true);
+              return;
             }
-          >
-            {t("budget.total", { percentage: percentageTotal })}
-          </Text>
-          {allocationTotalError ? (
-            <FieldError message={t("budget.invalidTotal")} />
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setDraftCategories((current) => [
-                ...current,
-                { name: "", percentage: "0" },
-              ]);
-              setAllocationTotalError(false);
-            }}
-          >
-            <Text style={styles.link}>{t("budget.addCategory")}</Text>
-          </Pressable>
-          <ActionButton
-            disabled={isSaving}
-            label={isSaving ? t("common.saving") : t("budget.setup")}
-            onPress={createBudgetAndSetup}
-          />
-        </View>
-      ) : (
-        <View style={[styles.emptyCard, isCompact && styles.emptyCardCompact]}>
-          <View style={styles.emptyIcon}>
-            <Text style={styles.emptyIconText}>＋</Text>
-          </View>
-          <Text style={styles.emptyTitle}>{t("budget.emptyTitle")}</Text>
-          <Text style={styles.emptyDescription}>
-            {t("budget.emptyDescription")}
-          </Text>
-          <View style={styles.emptySteps}>
-            <Text style={styles.emptyStep}>{t("budget.emptyStepOne")}</Text>
-            <Text style={styles.emptyStep}>{t("budget.emptyStepTwo")}</Text>
-          </View>
-          <ActionButton
-            label={t("budget.createFirst")}
-            onPress={() => setIsCreatingBudget(true)}
-          />
-        </View>
-      )}
-    </ScrollView>
+            setWorkspaceView(destination);
+          }}
+          t={t}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -2368,10 +2478,12 @@ function Choice({
 }
 
 function MobileTab({
+  icon,
   label,
   selected,
   onPress,
 }: {
+  icon: string;
   label: string;
   selected: boolean;
   onPress: () => void;
@@ -2379,16 +2491,83 @@ function MobileTab({
   return (
     <Pressable
       accessibilityRole="tab"
+      accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={[styles.mobileTab, selected && styles.mobileTabSelected]}
     >
       <Text
+        style={[styles.mobileTabIcon, selected && styles.mobileTabIconSelected]}
+      >
+        {icon}
+      </Text>
+      <Text
+        adjustsFontSizeToFit
+        numberOfLines={1}
         style={[styles.mobileTabText, selected && styles.mobileTabTextSelected]}
       >
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function MobileNavigation({
+  current,
+  onSelect,
+  t,
+}: {
+  current: MobileDestination;
+  onSelect: (destination: MobileDestination) => void;
+  t: TFunction;
+}) {
+  const destinations: {
+    key: MobileDestination;
+    label: string;
+    icon: string;
+  }[] = [
+    { key: "budgets", label: t("mobileNav.budgets"), icon: "▤" },
+    { key: "movement", label: t("mobileNav.movements"), icon: "↔" },
+    { key: "dashboard", label: t("mobileNav.home"), icon: "⌂" },
+    { key: "statistics", label: t("mobileNav.statistics"), icon: "▥" },
+    { key: "profile", label: t("mobileNav.profile"), icon: "◉" },
+  ];
+
+  return (
+    <View style={styles.mobileTabBar} accessibilityRole="tablist">
+      {destinations.map((destination) => (
+        <MobileTab
+          key={destination.key}
+          icon={destination.icon}
+          label={destination.label}
+          selected={current === destination.key}
+          onPress={() => onSelect(destination.key)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function MovementTypeSelector({
+  selected,
+  onSelect,
+  t,
+}: {
+  selected: MovementTab;
+  onSelect: (tab: MovementTab) => void;
+  t: TFunction;
+}) {
+  return (
+    <View style={styles.tabs}>
+      {(["income", "expense", "adjustment"] as const).map((item) => (
+        <Choice
+          key={item}
+          label={t(`movement.${item}`)}
+          selected={selected === item}
+          onPress={() => onSelect(item)}
+        />
+      ))}
+    </View>
   );
 }
 
@@ -2750,26 +2929,57 @@ function EntryList({
 }
 
 const styles = StyleSheet.create({
-  mobileTabBar: {
-    minHeight: 54,
-    flexDirection: "row",
-    alignItems: "stretch",
+  mobileWorkspaceShell: {
+    flex: 1,
     backgroundColor: "#f5f7f2",
-    borderBottomWidth: 1,
-    borderBottomColor: "#dce5dd",
+  },
+  mobileTabBar: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 4,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#dce5dd",
   },
   mobileTab: {
-    minHeight: 48,
+    minHeight: 52,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 4,
-    borderBottomWidth: 3,
-    borderBottomColor: "transparent",
+    minWidth: 0,
+    gap: 2,
+    borderRadius: 10,
   },
-  mobileTabSelected: { borderBottomColor: "#285c3c" },
-  mobileTabText: { color: "#627168", fontSize: 13, fontWeight: "600" },
+  mobileTabSelected: { backgroundColor: "#e6f0e7" },
+  mobileTabIcon: { color: "#627168", fontSize: 18, lineHeight: 20 },
+  mobileTabIconSelected: { color: "#285c3c" },
+  mobileTabText: {
+    width: "100%",
+    color: "#627168",
+    fontSize: 10,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   mobileTabTextSelected: { color: "#285c3c", fontWeight: "800" },
+  budgetHub: { gap: 12 },
+  budgetHubItem: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    borderColor: "#dce5dd",
+    borderWidth: 1,
+    borderRadius: 14,
+  },
+  budgetHubItemSelected: { borderColor: "#285c3c", backgroundColor: "#f7faf7" },
+  budgetHubArrow: { color: "#285c3c", fontSize: 28, lineHeight: 30 },
   page: {
     paddingHorizontal: 22,
     paddingTop: 24,
@@ -2781,6 +2991,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f7f2",
   },
   pageCompact: { paddingHorizontal: 16, paddingTop: 18 },
+  pageNative: { paddingBottom: 112 },
   centered: {
     flex: 1,
     alignItems: "center",
@@ -2801,15 +3012,6 @@ const styles = StyleSheet.create({
     flexWrap: "nowrap",
     gap: 4,
   },
-  headerIconButton: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: "#e6f0e7",
-  },
-  headerIcon: { color: "#285c3c", fontSize: 20, fontWeight: "700" },
   headerCreateButton: {
     minHeight: 40,
     justifyContent: "center",

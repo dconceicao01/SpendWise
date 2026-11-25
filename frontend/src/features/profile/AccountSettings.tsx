@@ -21,9 +21,15 @@ type Props = {
   accessToken: string;
   onBack: () => void;
   onSignOut: () => void | Promise<void>;
+  showBack?: boolean;
 };
 
-export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
+export function AccountSettings({
+  accessToken,
+  onBack,
+  onSignOut,
+  showBack = true,
+}: Props) {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [options, setOptions] = useState<AccountDeletionOption[]>([]);
@@ -145,7 +151,11 @@ export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.page}
+      style={styles.scrollView}
+      contentContainerStyle={[
+        styles.page,
+        !showBack && styles.pageWithBottomNavigation,
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.header}>
@@ -155,9 +165,11 @@ export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
         </View>
         <View style={styles.headerActions}>
           <LanguageSwitcher />
-          <Pressable accessibilityRole="button" onPress={onBack} hitSlop={8}>
-            <Text style={styles.link}>{t("account.back")}</Text>
-          </Pressable>
+          {showBack ? (
+            <Pressable accessibilityRole="button" onPress={onBack} hitSlop={8}>
+              <Text style={styles.link}>{t("account.back")}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -225,6 +237,13 @@ export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
             label={isSaving ? t("common.saving") : t("common.save")}
             onPress={saveProfile}
           />
+          <Pressable
+            accessibilityRole="button"
+            onPress={onSignOut}
+            style={styles.signOutButton}
+          >
+            <Text style={styles.signOutText}>{t("common.signOut")}</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -341,6 +360,8 @@ function FieldError({ message }: { message?: string }) {
 }
 
 const styles = StyleSheet.create({
+  scrollView: { flex: 1 },
+  pageWithBottomNavigation: { paddingBottom: 112 },
   page: {
     paddingHorizontal: 22,
     paddingTop: 24,
@@ -429,5 +450,17 @@ const styles = StyleSheet.create({
   },
   dangerAction: { backgroundColor: "#a33024" },
   actionText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  signOutButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderColor: "#bdcbbf",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: "#fff",
+  },
+  signOutText: { color: "#285c3c", fontSize: 15, fontWeight: "700" },
   disabled: { opacity: 0.5 },
 });
