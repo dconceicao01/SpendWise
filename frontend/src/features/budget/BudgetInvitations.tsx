@@ -27,6 +27,7 @@ export function BudgetInvitations({ accessToken, budgetId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState(false);
   const [role, setRole] = useState<BudgetInvitationRole>("CONTRIBUTOR");
   const [createdLink, setCreatedLink] = useState("");
   const [notice, setNotice] = useState("");
@@ -78,13 +79,18 @@ export function BudgetInvitations({ accessToken, budgetId }: Props) {
 
   async function createInvitation() {
     const normalizedEmail = email.trim();
-    if (!normalizedEmail || !normalizedEmail.includes("@")) {
-      setIsError(true);
-      setNotice(t("invitation.emailInvalid"));
+    if (
+      normalizedEmail.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+    ) {
+      setEmailError(true);
+      setIsError(false);
+      setNotice("");
       return;
     }
 
     setIsSaving(true);
+    setEmailError(false);
     setIsError(false);
     setNotice("");
     setCreatedLink("");
@@ -202,15 +208,27 @@ export function BudgetInvitations({ accessToken, budgetId }: Props) {
       <Text style={styles.label}>{t("invitation.email")}</Text>
       <TextInput
         accessibilityLabel={t("invitation.email")}
+        accessibilityHint={
+          emailError ? t("invitation.emailInvalid") : undefined
+        }
         autoCapitalize="none"
         autoComplete="email"
         autoCorrect={false}
+        maxLength={254}
         keyboardType="email-address"
-        onChangeText={setEmail}
+        onChangeText={(value) => {
+          setEmail(value);
+          setEmailError(false);
+        }}
         placeholder={t("invitation.emailPlaceholder")}
-        style={styles.input}
+        style={[styles.input, emailError && styles.inputInvalid]}
         value={email}
       />
+      {emailError ? (
+        <Text accessibilityLiveRegion="polite" style={styles.error}>
+          {t("invitation.emailInvalid")}
+        </Text>
+      ) : null}
       <Text style={styles.label}>{t("invitation.role")}</Text>
       <View style={styles.actions}>
         <RoleChoice
@@ -358,6 +376,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
+  inputInvalid: { borderColor: "#a33024" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   action: {
     minHeight: 44,
