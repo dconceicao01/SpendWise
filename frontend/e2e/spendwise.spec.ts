@@ -559,6 +559,9 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Income recorded.")).toBeVisible();
   await page.getByText("Correct income").click();
+  await expect(
+    page.getByText("This reason is saved in the income history."),
+  ).toBeVisible();
   await page.getByLabel("Correction amount").fill("100");
   await page.getByLabel("Correction date (YYYY-MM-DD)").fill(`${year}-06-05`);
   await page
@@ -583,6 +586,8 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByRole("button", { name: "View summary" }).click();
   await expect(page.getByText(/1,000\.00/).last()).toBeVisible();
   await expect(page.getByText(/200\.00/).last()).toBeVisible();
+  await expect(page.getByText("Monthly breakdown")).toBeVisible();
+  await expect(page.getByText("June", { exact: true })).toBeVisible();
   expect(state.budgets).toHaveLength(1);
   expect(state.periods).toHaveLength(1);
   expect(state.movements.incomes).toHaveLength(1);

@@ -149,7 +149,8 @@
     "select": "Select a budget",
     "removeCategory": "Remove category",
     "invalidSetup": "Check the details and make sure percentages add up to 100%.",
-    "setupError": "We couldn't configure the budget. Values remain only in SpendWise."
+    "setupError": "We couldn't configure the budget. Values remain only in SpendWise.",
+    "loadError": "We couldn't load this budget. Check your connection and try again."
   },
   "movement": {
     "overview": "Movements",
@@ -164,6 +165,7 @@
     "correctionDateDescription": "Choose a date within the selected period.",
     "correctionDateInvalid": "The correction date must be within the selected period.",
     "correctionDescription": "Correction description",
+    "correctionDescriptionHelp": "This reason is saved in the income history.",
     "correctionDescriptionPlaceholder": "Explain the correction",
     "correctionDescriptionRequired": "Enter a description for the correction.",
     "incomeCorrectionLabel": "Income correction",
@@ -254,6 +256,7 @@
     "previewTitle": "Monthly and annual statistics",
     "monthSummary": "{{month}} summary",
     "annualChartTitle": "Income and expenses by month",
+    "monthlyBreakdown": "Monthly breakdown",
     "incomeLegend": "Income",
     "expenseLegend": "Expenses",
     "noChartData": "There are no movements to show for this year yet.",

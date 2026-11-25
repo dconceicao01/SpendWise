@@ -149,7 +149,8 @@
     "select": "Seleciona um orçamento",
     "removeCategory": "Remover categoria",
     "invalidSetup": "Confirma os dados e garante que as percentagens totalizam 100%.",
-    "setupError": "Não foi possível configurar o orçamento. Os valores continuam apenas no SpendWise."
+    "setupError": "Não foi possível configurar o orçamento. Os valores continuam apenas no SpendWise.",
+    "loadError": "Não foi possível carregar este orçamento. Verifica a ligação e tenta novamente."
   },
   "movement": {
     "overview": "Movimentos",
@@ -164,6 +165,7 @@
     "correctionDateDescription": "Escolhe uma data dentro do período selecionado.",
     "correctionDateInvalid": "A data da correção tem de pertencer ao período selecionado.",
     "correctionDescription": "Descrição da correção",
+    "correctionDescriptionHelp": "A justificação fica guardada no histórico deste rendimento.",
     "correctionDescriptionPlaceholder": "Explica a correção",
     "correctionDescriptionRequired": "Indica a descrição da correção.",
     "incomeCorrectionLabel": "Correção ao rendimento",
@@ -254,6 +256,7 @@
     "previewTitle": "Estatísticas do mês e do ano",
     "monthSummary": "Resumo de {{month}}",
     "annualChartTitle": "Rendimentos e despesas por mês",
+    "monthlyBreakdown": "Detalhe por mês",
     "incomeLegend": "Rendimentos",
     "expenseLegend": "Despesas",
     "noChartData": "Ainda não há movimentos para apresentar neste ano.",
