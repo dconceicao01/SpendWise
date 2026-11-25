@@ -4,6 +4,8 @@
 
 Este runbook prepara a validação de um staging persistente, separado de produção e com dados sintéticos. O piloto pessoal aprovado na Vercel usa projetos web e API separados, com `frontend/` e `backend/` como diretórios raiz. A Vercel pode publicar ambos através da integração GitHub; este workflow não publica, não migra dados e não escreve na base de dados. Executa apenas verificações HTTP depois de o deploy estar concluído.
 
+O endereço canónico do web staging é `https://spendwise-web-staging.vercel.app`. Usar este domínio nos testes manuais; aliases automáticos de Preview por branch não fazem parte da allowlist CORS da API.
+
 Quando presentes na branch selecionada, usar os ficheiros `frontend/vercel.json` e `backend/vercel.json` para a configuração versionada. Nunca apontar previews, staging ou testes para o projeto Supabase de produção.
 
 ## Configuração externa necessária
@@ -12,7 +14,7 @@ Quando presentes na branch selecionada, usar os ficheiros `frontend/vercel.json`
 2. Criar um projeto Supabase de staging independente em Paris (`eu-west-3`), aplicar as migrações aprovadas e usar apenas contas/dados sintéticos.
 3. Configurar os valores de staging nos ambientes Preview dos projetos Vercel. O projeto web recebe `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `EXPO_PUBLIC_SPENDWISE_API_URL`. O projeto API recebe `PORT=8080`, `SUPABASE_ISSUER_URI`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SPENDWISE_CORS_ALLOWED_ORIGINS` com a origem HTTPS exata do web staging e `SPENDWISE_INVITATION_BASE_URL` no domínio web.
 4. Manter qualquer `SUPABASE_SERVICE_ROLE_KEY` apenas como variável secreta server-side do projeto API, e só se o fluxo Auth Admin de eliminação a exigir. Nunca a definir no projeto web, em variáveis `EXPO_PUBLIC_*`, ou nos previews com valores de produção.
-5. Em GitHub, criar/usar o Environment `staging` e definir as variáveis não secretas `STAGING_WEB_URL` e `STAGING_API_URL` com as origens HTTPS atribuídas aos deployments de staging. Não incluir caminho, credenciais, query string ou fragmento.
+5. Em GitHub, criar/usar o Environment `staging` e definir `STAGING_WEB_URL=https://spendwise-web-staging.vercel.app`; definir `STAGING_API_URL` com a origem HTTPS canónica da API de staging. Não incluir caminho, credenciais, query string ou fragmento.
 6. Configurar o SMTP Brevo, o remetente verificado, os callbacks e os templates no projeto Supabase de staging conforme o [runbook de email Auth](email-auth-brevo.md). Usa apenas destinatários de teste e não reutilizes a SMTP key de produção.
 
 Os passos de criação de projetos, configuração da integração Vercel e introdução de variáveis são ações nos dashboards dos fornecedores; não são efetuados por este repositório. Não ativar faturação nem exceder quotas do plano gratuito aprovado.
