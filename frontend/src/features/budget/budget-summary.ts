@@ -3,6 +3,7 @@ import type {
   BudgetCategory,
   BudgetPeriod,
   ExpenseEntry,
+  IncomeCorrection,
   IncomeEntry,
 } from "@/lib/spendwise-api";
 
@@ -30,12 +31,17 @@ export function calculateMonthlySummaries(
   incomes: IncomeEntry[],
   expenses: ExpenseEntry[],
   adjustments: BudgetAdjustment[],
+  incomeCorrections: IncomeCorrection[] = [],
 ): MonthlySummary[] {
   return Array.from({ length: 12 }, (_, index) => {
     const month = `${year}-${String(index + 1).padStart(2, "0")}`;
-    const income = incomes
-      .filter((item) => item.occurred_on.startsWith(month))
-      .reduce((total, item) => total + item.amount, 0);
+    const income =
+      incomes
+        .filter((item) => item.occurred_on.startsWith(month))
+        .reduce((total, item) => total + item.amount, 0) +
+      incomeCorrections
+        .filter((item) => item.occurred_on.startsWith(month))
+        .reduce((total, item) => total + item.amount_delta, 0);
     const expense = expenses
       .filter((item) => item.spent_on.startsWith(month))
       .reduce((total, item) => total + item.amount, 0);
@@ -58,6 +64,7 @@ export function calculatePeriodCategoryBalances(
   incomes: IncomeEntry[],
   expenses: ExpenseEntry[],
   adjustments: BudgetAdjustment[],
+  incomeCorrections: IncomeCorrection[] = [],
 ): CategoryBalance[] {
   return categories.map((category) => {
     const allocated = incomes.reduce(
@@ -74,13 +81,21 @@ export function calculatePeriodCategoryBalances(
     const adjusted = adjustments
       .filter((adjustment) => adjustment.category_id === category.id)
       .reduce((total, adjustment) => total + adjustment.amount_delta, 0);
+    const correctionAllocated = incomeCorrections.reduce(
+      (total, correction) =>
+        total +
+        correction.allocation_snapshot
+          .filter((allocation) => allocation.category_id === category.id)
+          .reduce((sum, allocation) => sum + allocation.allocated_amount, 0),
+      0,
+    );
 
     return {
       category,
-      allocated,
+      allocated: allocated + correctionAllocated,
       spent,
       adjusted,
-      balance: allocated - spent + adjusted,
+      balance: allocated + correctionAllocated - spent + adjusted,
     };
   });
 }
@@ -101,12 +116,17 @@ export function calculateAnnualSummary(
   incomes: IncomeEntry[],
   expenses: ExpenseEntry[],
   adjustments: BudgetAdjustment[],
+  incomeCorrections: IncomeCorrection[] = [],
 ): AnnualSummary {
   const yearPrefix = `${year}-`;
   return {
-    income: incomes
-      .filter((item) => item.occurred_on.startsWith(yearPrefix))
-      .reduce((total, item) => total + item.amount, 0),
+    income:
+      incomes
+        .filter((item) => item.occurred_on.startsWith(yearPrefix))
+        .reduce((total, item) => total + item.amount, 0) +
+      incomeCorrections
+        .filter((item) => item.occurred_on.startsWith(yearPrefix))
+        .reduce((total, item) => total + item.amount_delta, 0),
     expense: expenses
       .filter((item) => item.spent_on.startsWith(yearPrefix))
       .reduce((total, item) => total + item.amount, 0),

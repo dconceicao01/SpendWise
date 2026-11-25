@@ -17,6 +17,7 @@ public record BudgetDataExport(
         List<ExportIncome> incomes,
         List<ExportExpense> expenses,
         List<ExportAdjustment> adjustments,
+        List<ExportIncomeCorrection> incomeCorrections,
         List<ExportIncomeSchedule> incomeSchedules) {
 
     public BudgetDataExport {
@@ -26,6 +27,7 @@ public record BudgetDataExport(
         incomes = List.copyOf(incomes);
         expenses = List.copyOf(expenses);
         adjustments = List.copyOf(adjustments);
+        incomeCorrections = List.copyOf(incomeCorrections);
         incomeSchedules = List.copyOf(incomeSchedules);
     }
 }

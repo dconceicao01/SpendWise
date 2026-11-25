@@ -19,8 +19,11 @@ import pt.spendwise.api.budget.BudgetMovementRepository;
 import pt.spendwise.api.budget.CreateBudgetAdjustmentRequest;
 import pt.spendwise.api.budget.CreateExpenseRequest;
 import pt.spendwise.api.budget.CreateIncomeRequest;
+import pt.spendwise.api.budget.CreateIncomeCorrectionRequest;
 import pt.spendwise.api.budget.ExpenseEntryResponse;
 import pt.spendwise.api.budget.IncomeAllocationSnapshotResponse;
+import pt.spendwise.api.budget.IncomeCorrectionAllocationResponse;
+import pt.spendwise.api.budget.IncomeCorrectionResponse;
 import pt.spendwise.api.budget.IncomeEntryResponse;
 
 @Repository
@@ -34,6 +37,10 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
             "id,budget_id,period_id,category_id,recorded_by_member_id,amount,spent_on,description,created_at";
     private static final String SELECT_ADJUSTMENT =
             "id,budget_id,period_id,category_id,corrected_expense_entry_id,recorded_by_member_id,amount_delta,reason,occurred_on,created_at";
+    private static final String SELECT_INCOME_CORRECTION =
+            "id,budget_id,income_entry_id,period_id,allocation_set_id,recorded_by_member_id,amount_delta,reason,occurred_on,created_at";
+    private static final String SELECT_INCOME_CORRECTION_SNAPSHOT =
+            "income_correction_id,category_id,percentage_basis_points,allocated_amount";
 
     private static final ParameterizedTypeReference<List<IncomeRow>> INCOME_ROWS =
             new ParameterizedTypeReference<>() {};
@@ -42,6 +49,10 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
     private static final ParameterizedTypeReference<List<ExpenseEntryResponse>> EXPENSE_ROWS =
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<BudgetAdjustmentResponse>> ADJUSTMENT_ROWS =
+            new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<IncomeCorrectionRow>> INCOME_CORRECTION_ROWS =
+            new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<IncomeCorrectionSnapshotRow>> INCOME_CORRECTION_SNAPSHOT_ROWS =
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<UUID> UUID_RESULT =
             new ParameterizedTypeReference<>() {};
@@ -82,6 +93,32 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
         query.put("limit", "1");
         List<IncomeRow> rows = dataApiClient.request(HttpMethod.GET, "income_entries", query, null, INCOME_ROWS);
         return withSnapshots(budgetId, rows).stream().findFirst();
+    }
+
+    @Override
+    public List<IncomeCorrectionResponse> findIncomeCorrections(
+            UUID budgetId, UUID periodId, int limit, int offset) {
+        Map<String, String> query = movementQuery(
+                budgetId, periodId, SELECT_INCOME_CORRECTION,
+                "occurred_on.desc,created_at.desc", limit, offset);
+        List<IncomeCorrectionRow> rows = dataApiClient.request(
+                HttpMethod.GET, "income_corrections", query, null, INCOME_CORRECTION_ROWS);
+        return withCorrectionSnapshots(budgetId, rows);
+    }
+
+    @Override
+    public Optional<IncomeCorrectionResponse> recordIncomeCorrection(
+            UUID budgetId, UUID incomeEntryId, CreateIncomeCorrectionRequest request) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("p_budget_id", budgetId);
+        body.put("p_income_entry_id", incomeEntryId);
+        body.put("p_period_id", request.periodId());
+        body.put("p_amount_delta", request.amountDelta());
+        body.put("p_occurred_on", request.occurredOn().toString());
+        body.put("p_reason", request.reason().strip());
+        UUID correctionId = dataApiClient.callFunction(
+                "record_income_correction", body, UUID_RESULT);
+        return correctionId == null ? Optional.empty() : findIncomeCorrection(budgetId, correctionId);
     }
 
     @Override
@@ -155,6 +192,46 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
                 .toList();
     }
 
+    private List<IncomeCorrectionResponse> withCorrectionSnapshots(
+            UUID budgetId, List<IncomeCorrectionRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        String correctionIds = rows.stream()
+                .map(row -> row.id().toString())
+                .collect(Collectors.joining(","));
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("select", SELECT_INCOME_CORRECTION_SNAPSHOT);
+        query.put("budget_id", "eq." + budgetId);
+        query.put("income_correction_id", "in.(" + correctionIds + ")");
+        query.put("order", "category_id.asc");
+        List<IncomeCorrectionSnapshotRow> snapshots = dataApiClient.request(
+                HttpMethod.GET, "income_correction_allocation_snapshots", query, null,
+                INCOME_CORRECTION_SNAPSHOT_ROWS);
+        Map<UUID, List<IncomeCorrectionAllocationResponse>> byCorrection = new LinkedHashMap<>();
+        if (snapshots != null) {
+            for (IncomeCorrectionSnapshotRow snapshot : snapshots) {
+                byCorrection.computeIfAbsent(snapshot.incomeCorrectionId(), ignored -> new ArrayList<>())
+                        .add(new IncomeCorrectionAllocationResponse(
+                                snapshot.categoryId(), snapshot.percentageBasisPoints(), snapshot.allocatedAmount()));
+            }
+        }
+        return rows.stream()
+                .map(row -> row.toResponse(byCorrection.getOrDefault(row.id(), List.of())))
+                .toList();
+    }
+
+    private Optional<IncomeCorrectionResponse> findIncomeCorrection(UUID budgetId, UUID correctionId) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("select", SELECT_INCOME_CORRECTION);
+        query.put("budget_id", "eq." + budgetId);
+        query.put("id", "eq." + correctionId);
+        query.put("limit", "1");
+        List<IncomeCorrectionRow> rows = dataApiClient.request(
+                HttpMethod.GET, "income_corrections", query, null, INCOME_CORRECTION_ROWS);
+        return withCorrectionSnapshots(budgetId, rows).stream().findFirst();
+    }
+
     private Optional<ExpenseEntryResponse> findExpense(UUID budgetId, UUID expenseId) {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("select", SELECT_EXPENSE);
@@ -213,6 +290,32 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
 
     private record SnapshotRow(
             @JsonProperty("income_entry_id") UUID incomeEntryId,
+            @JsonProperty("category_id") UUID categoryId,
+            @JsonProperty("percentage_basis_points") int percentageBasisPoints,
+            @JsonProperty("allocated_amount") BigDecimal allocatedAmount) {
+    }
+
+    private record IncomeCorrectionRow(
+            UUID id,
+            @JsonProperty("budget_id") UUID budgetId,
+            @JsonProperty("income_entry_id") UUID incomeEntryId,
+            @JsonProperty("period_id") UUID periodId,
+            @JsonProperty("allocation_set_id") UUID allocationSetId,
+            @JsonProperty("recorded_by_member_id") UUID recordedByMemberId,
+            @JsonProperty("amount_delta") BigDecimal amountDelta,
+            String reason,
+            @JsonProperty("occurred_on") LocalDate occurredOn,
+            @JsonProperty("created_at") Instant createdAt) {
+
+        private IncomeCorrectionResponse toResponse(List<IncomeCorrectionAllocationResponse> snapshot) {
+            return new IncomeCorrectionResponse(
+                    id, budgetId, incomeEntryId, periodId, allocationSetId, recordedByMemberId,
+                    amountDelta, reason, occurredOn, createdAt, snapshot);
+        }
+    }
+
+    private record IncomeCorrectionSnapshotRow(
+            @JsonProperty("income_correction_id") UUID incomeCorrectionId,
             @JsonProperty("category_id") UUID categoryId,
             @JsonProperty("percentage_basis_points") int percentageBasisPoints,
             @JsonProperty("allocated_amount") BigDecimal allocatedAmount) {

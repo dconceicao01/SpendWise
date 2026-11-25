@@ -40,6 +40,26 @@ public class BudgetMovementService {
         }
     }
 
+    public List<IncomeCorrectionResponse> listIncomeCorrections(
+            UUID budgetId, UUID periodId, int limit, int offset) {
+        authorizationService.requireAllowed(budgetId, BudgetAction.READ);
+        return movementRepository.findIncomeCorrections(budgetId, periodId, pageSize(limit), pageOffset(offset));
+    }
+
+    public IncomeCorrectionResponse recordIncomeCorrection(
+            UUID budgetId, UUID incomeEntryId, CreateIncomeCorrectionRequest request) {
+        authorizationService.requireAllowed(budgetId, BudgetAction.RECORD_MOVEMENT);
+        if (request.amountDelta().signum() == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Correction amount must not be zero");
+        }
+        try {
+            return movementRepository.recordIncomeCorrection(budgetId, incomeEntryId, request)
+                    .orElseThrow(() -> new IllegalStateException("Recorded income correction is not visible to its owner"));
+        } catch (RestClientResponseException exception) {
+            throw translateMovementError(exception);
+        }
+    }
+
     public List<ExpenseEntryResponse> listExpenses(UUID budgetId, UUID periodId, int limit, int offset) {
         authorizationService.requireAllowed(budgetId, BudgetAction.READ);
         return movementRepository.findExpenses(budgetId, periodId, pageSize(limit), pageOffset(offset));

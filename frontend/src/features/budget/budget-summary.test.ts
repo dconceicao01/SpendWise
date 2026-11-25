@@ -8,6 +8,7 @@ import type {
   BudgetCategory,
   BudgetPeriod,
   ExpenseEntry,
+  IncomeCorrection,
   IncomeEntry,
 } from "@/lib/spendwise-api";
 
@@ -85,6 +86,56 @@ describe("budget dashboard summaries", () => {
         balance: 0,
       },
     ]);
+  });
+
+  it("applies income corrections to the original category and income total", () => {
+    const incomes: IncomeEntry[] = [
+      {
+        id: "income-1",
+        period_id: "period-1",
+        amount: 900,
+        occurred_on: "2026-01-01",
+        allocation_snapshot: [
+          {
+            category_id: "general",
+            percentage_basis_points: 5000,
+            allocated_amount: 450,
+          },
+        ],
+      },
+    ];
+    const corrections: IncomeCorrection[] = [
+      {
+        id: "income-correction-1",
+        income_entry_id: "income-1",
+        period_id: "period-1",
+        amount_delta: -100,
+        reason: "Rendimento registado em excesso",
+        occurred_on: "2026-01-01",
+        allocation_snapshot: [
+          {
+            category_id: "general",
+            percentage_basis_points: 5000,
+            allocated_amount: -50,
+          },
+        ],
+      },
+    ];
+
+    expect(
+      calculatePeriodCategoryBalances(
+        [category],
+        incomes,
+        [],
+        [],
+        corrections,
+      )[0],
+    ).toMatchObject({ allocated: 400, balance: 400 });
+    expect(calculateAnnualSummary(2026, incomes, [], [], corrections)).toEqual({
+      income: 800,
+      expense: 0,
+      adjustment: 0,
+    });
   });
 
   it("selects periods that overlap a year even when they start in the prior year", () => {

@@ -13,6 +13,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import pt.spendwise.api.budget.CreateExpenseRequest;
 import pt.spendwise.api.budget.CreateIncomeRequest;
+import pt.spendwise.api.budget.CreateIncomeCorrectionRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -117,6 +118,51 @@ class SupabaseBudgetMovementRepositoryTest {
         assertThat(income.orElseThrow().allocationSnapshot()).hasSize(1);
         assertThat(income.orElseThrow().allocationSnapshot().getFirst().allocatedAmount())
                 .isEqualByComparingTo("900.00");
+        mockServer.verify();
+    }
+
+    @Test
+    void recordsIncomeCorrectionUsingTheSelectedPeriodAndActiveAllocationSnapshot() {
+        UUID correctionId = UUID.fromString("c1d8ea22-1919-47d5-b161-b101b0dba548");
+        UUID recorderId = UUID.fromString("5988f040-a1f5-492f-a2ab-4e7b6d93c8c3");
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/rpc/record_income_correction"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
+                .andExpect(content().json("{\"p_budget_id\":\"" + BUDGET_ID
+                        + "\",\"p_income_entry_id\":\"" + ENTRY_ID
+                        + "\",\"p_period_id\":\"" + PERIOD_ID
+                        + "\",\"p_amount_delta\":-25.00,\"p_occurred_on\":\"2026-11-22\","
+                        + "\"p_reason\":\"Rendimento registado em excesso\"}"))
+                .andRespond(withSuccess("\"" + correctionId + "\"", MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_corrections?select=id,budget_id,income_entry_id,period_id,allocation_set_id,recorded_by_member_id,amount_delta,reason,occurred_on,created_at&budget_id=eq."
+                        + BUDGET_ID + "&id=eq." + correctionId + "&limit=1"))
+                .andRespond(withSuccess("[{\"id\":\"" + correctionId + "\",\"budget_id\":\"" + BUDGET_ID
+                        + "\",\"income_entry_id\":\"" + ENTRY_ID + "\",\"period_id\":\"" + PERIOD_ID
+                        + "\",\"allocation_set_id\":\"" + ALLOCATION_ID + "\",\"recorded_by_member_id\":\""
+                        + recorderId + "\",\"amount_delta\":-25.00,\"reason\":\"Rendimento registado em excesso\","
+                        + "\"occurred_on\":\"2026-11-22\",\"created_at\":\"2026-11-22T17:00:00Z\"}]",
+                        MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_correction_allocation_snapshots?select=income_correction_id,category_id,percentage_basis_points,allocated_amount&budget_id=eq."
+                        + BUDGET_ID + "&income_correction_id=in.(" + correctionId + ")&order=category_id.asc"))
+                .andRespond(withSuccess("[{\"income_correction_id\":\"" + correctionId
+                        + "\",\"category_id\":\"" + CATEGORY_ID
+                        + "\",\"percentage_basis_points\":10000,\"allocated_amount\":-25.00}]",
+                        MediaType.APPLICATION_JSON));
+
+        var correction = movementRepository.recordIncomeCorrection(
+                BUDGET_ID,
+                ENTRY_ID,
+                new CreateIncomeCorrectionRequest(
+                        PERIOD_ID,
+                        new BigDecimal("-25.00"),
+                        LocalDate.of(2026, 11, 22),
+                        "Rendimento registado em excesso"));
+
+        assertThat(correction).isPresent();
+        assertThat(correction.orElseThrow().periodId()).isEqualTo(PERIOD_ID);
+        assertThat(correction.orElseThrow().allocationSnapshot()).hasSize(1);
+        assertThat(correction.orElseThrow().allocationSnapshot().getFirst().allocatedAmount())
+                .isEqualByComparingTo("-25.00");
         mockServer.verify();
     }
 }
