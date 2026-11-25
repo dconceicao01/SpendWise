@@ -565,7 +565,7 @@ async function mockBudgetApi(page: Page) {
 async function signIn(page: Page) {
   await page.getByLabel("Email").fill("pilot@example.test");
   await page.getByLabel("Password").fill("Spendwise-test-Password-1!");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
     page.getByText("Start by creating your first budget"),
   ).toBeVisible();

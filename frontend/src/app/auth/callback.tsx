@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { useTranslation } from "react-i18next";
+import { exchangeAuthCode } from "@/auth/social-auth";
 
 const emailOtpTypes = [
   "signup",
@@ -47,8 +48,7 @@ export default function AuthCallbackScreen() {
       let callbackType: string | undefined;
       try {
         if (typeof code === "string" && code) {
-          const result = await supabase.auth.exchangeCodeForSession(code);
-          hasError = Boolean(result.error);
+          await exchangeAuthCode(code);
         } else if (
           typeof tokenHash === "string" &&
           tokenHash &&
@@ -73,7 +73,9 @@ export default function AuthCallbackScreen() {
           ? "/?authError=1"
           : flow === "recovery" || callbackType === "recovery"
             ? "/auth/reset-password"
-            : "/?confirmed=1",
+            : flow === "oauth"
+              ? "/"
+              : "/?confirmed=1",
       );
     }
 
@@ -81,7 +83,7 @@ export default function AuthCallbackScreen() {
     return () => {
       isMounted = false;
     };
-  }, [code, flow]);
+  }, [code, flow, tokenHash, type]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
