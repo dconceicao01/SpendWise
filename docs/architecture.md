@@ -29,7 +29,7 @@ flowchart LR
 
 JWT é identidade autenticada, não autorização suficiente: os papéis e a pertença a orçamentos são confirmados no servidor/base de dados. Nunca usar `user_metadata` editável pelo utilizador para decidir permissões; não confiar em IDs fornecidos pelo browser. O JWT deve ser validado por biblioteca de confiança e chaves rotativas via JWKS. A publishable key pode estar no frontend/servidor; nunca enviar secret/service-role keys ao browser.
 
-O redirect de confirmação e recuperação usa `spendwise://auth/callback` em aplicações móveis e o URL HTTPS do ambiente web. O callback troca o código PKCE por uma sessão e substitui imediatamente a rota, retirando o código de uso único do URL visível/histórico. Cada URL de redirect permitido deve ser configurado explicitamente no Supabase Auth; não usar curingas para produção.
+O redirect de confirmação e recuperação usa `spendwise://auth/callback` em aplicações móveis e o URL HTTPS do ambiente web. O callback troca o código PKCE por uma sessão e também aceita `token_hash` de templates de email personalizados, limitando os tipos aos fluxos de email suportados. Recuperação leva ao ecrã para definir uma palavra-passe. O callback substitui a rota após a troca, retirando o código/token de uso único do URL visível/histórico. Cada URL de redirect permitido deve ser configurado explicitamente no Supabase Auth; não usar curingas para produção. Em projetos alojados, o Supabase Auth entrega mensagens por SMTP transacional Brevo; a configuração e o teste estão no [runbook de email](email-auth-brevo.md). Localmente continua a usar-se Mailpit.
 
 ### Matriz RLS e grants
 

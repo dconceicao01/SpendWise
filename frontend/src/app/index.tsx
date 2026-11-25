@@ -41,6 +41,7 @@ export default function HomeScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const routeNotice =
     confirmed === "1"
       ? t("auth.confirmed")
@@ -67,6 +68,20 @@ export default function HomeScreen() {
   async function submitAuth() {
     setNotice("");
     setIsError(false);
+    const errors: Record<string, string> = {};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = t("auth.emailInvalid");
+    }
+    if (mode === "signUp" && !fullName.trim()) {
+      errors.fullName = t("auth.fullNameRequired");
+    }
+    if (mode !== "recover" && !password) {
+      errors.password = t("auth.passwordRequired");
+    } else if (mode === "signUp" && password.length < 8) {
+      errors.password = t("auth.passwordTooShort");
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) return;
     setIsSubmitting(true);
 
     try {
@@ -195,12 +210,26 @@ export default function HomeScreen() {
                     accessibilityLabel={t("auth.fullName")}
                     autoComplete="name"
                     maxLength={120}
-                    onChangeText={setFullName}
+                    onChangeText={(value) => {
+                      setFullName(value);
+                      setFieldErrors((current) => ({
+                        ...current,
+                        fullName: "",
+                      }));
+                    }}
                     placeholder={t("auth.fullNamePlaceholder")}
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      fieldErrors.fullName && styles.inputInvalid,
+                    ]}
                     textContentType="name"
                     value={fullName}
                   />
+                  {fieldErrors.fullName ? (
+                    <Text accessibilityLiveRegion="polite" style={styles.error}>
+                      {fieldErrors.fullName}
+                    </Text>
+                  ) : null}
                 </>
               )}
               <Text style={styles.label}>{t("auth.email")}</Text>
@@ -210,13 +239,21 @@ export default function HomeScreen() {
                 autoComplete="email"
                 autoCorrect={false}
                 keyboardType="email-address"
-                onChangeText={setEmail}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setFieldErrors((current) => ({ ...current, email: "" }));
+                }}
                 placeholder={t("auth.emailPlaceholder")}
                 returnKeyType={mode === "recover" ? "done" : "next"}
-                style={styles.input}
+                style={[styles.input, fieldErrors.email && styles.inputInvalid]}
                 textContentType="emailAddress"
                 value={email}
               />
+              {fieldErrors.email ? (
+                <Text accessibilityLiveRegion="polite" style={styles.error}>
+                  {fieldErrors.email}
+                </Text>
+              ) : null}
 
               {mode !== "recover" && (
                 <>
@@ -227,17 +264,31 @@ export default function HomeScreen() {
                     autoComplete={
                       mode === "signUp" ? "new-password" : "current-password"
                     }
-                    onChangeText={setPassword}
+                    onChangeText={(value) => {
+                      setPassword(value);
+                      setFieldErrors((current) => ({
+                        ...current,
+                        password: "",
+                      }));
+                    }}
                     onSubmitEditing={submitAuth}
                     placeholder={t("auth.passwordPlaceholder")}
                     returnKeyType="go"
                     secureTextEntry
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      fieldErrors.password && styles.inputInvalid,
+                    ]}
                     textContentType={
                       mode === "signUp" ? "newPassword" : "password"
                     }
                     value={password}
                   />
+                  {fieldErrors.password ? (
+                    <Text accessibilityLiveRegion="polite" style={styles.error}>
+                      {fieldErrors.password}
+                    </Text>
+                  ) : null}
                 </>
               )}
 
@@ -251,13 +302,7 @@ export default function HomeScreen() {
               ) : null}
 
               <PrimaryButton
-                disabled={
-                  isSubmitting ||
-                  !email.trim() ||
-                  (mode === "signUp" && !fullName.trim()) ||
-                  (mode !== "recover" && !password) ||
-                  (mode === "signUp" && password.length < 8)
-                }
+                disabled={isSubmitting}
                 label={isSubmitting ? t("common.loading") : submitLabel}
                 onPress={submitAuth}
               />
@@ -293,6 +338,7 @@ export default function HomeScreen() {
     setMode(nextMode);
     setNotice("");
     setIsError(false);
+    setFieldErrors({});
   }
 }
 
@@ -401,6 +447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
+  inputInvalid: { borderColor: "#a33024" },
   primaryButton: {
     minHeight: 48,
     alignItems: "center",

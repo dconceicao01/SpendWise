@@ -497,6 +497,7 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByRole("button", { name: "Save budget" }).click();
 
   await expect(page.getByText("Budget configured.")).toBeVisible();
+  await page.getByText("Income this month").click();
   await expect(page.getByLabel("Amount")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Household pilot" }),
@@ -520,8 +521,10 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await expect(page.getByText("Expense recorded.")).toBeVisible();
   await expect(page.getByText(/General · Groceries/)).toBeVisible();
 
+  await page.getByRole("button", { name: "Back to dashboard" }).click();
+  await page.getByRole("button", { name: "View all statistics" }).click();
+  await expect(page.getByText("Statistics")).toBeVisible();
   await page.getByRole("button", { name: "View summary" }).click();
-  await expect(page.getByText("Annual summary")).toBeVisible();
   await expect(page.getByText(/900\.00/).last()).toBeVisible();
   await expect(page.getByText(/200\.00/).last()).toBeVisible();
   expect(state.budgets).toHaveLength(1);

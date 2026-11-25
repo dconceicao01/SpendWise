@@ -39,6 +39,7 @@ export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -70,14 +71,28 @@ export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
   }, [accessToken, t]);
 
   async function saveProfile() {
-    setIsSaving(true);
     setNotice("");
     setIsError(false);
+    const errors: Record<string, string> = {};
+    const normalizedCurrency = currency.trim().toUpperCase();
+    const normalizedPhone = phone.trim();
+    if (!fullName.trim() || fullName.trim().length > 120) {
+      errors.fullName = t("account.fullNameInvalid");
+    }
+    if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
+      errors.currency = t("account.currencyInvalid");
+    }
+    if (normalizedPhone && !/^\+[1-9][0-9]{7,14}$/.test(normalizedPhone)) {
+      errors.phone = t("account.phoneInvalid");
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) return;
+    setIsSaving(true);
     try {
       const updated = await spendwiseApi.updateProfile(accessToken, {
         fullName: fullName.trim(),
-        phoneE164: phone.trim() || null,
-        defaultCurrency: currency.trim().toUpperCase(),
+        phoneE164: normalizedPhone || null,
+        defaultCurrency: normalizedCurrency,
       });
       setProfile(updated);
       setNotice(t("account.profileSaved"));
@@ -170,33 +185,43 @@ export function AccountSettings({ accessToken, onBack, onSignOut }: Props) {
             accessibilityLabel={t("account.fullName")}
             autoComplete="name"
             maxLength={120}
-            onChangeText={setFullName}
-            style={styles.input}
+            onChangeText={(value) => {
+              setFullName(value);
+              setFieldErrors((current) => ({ ...current, fullName: "" }));
+            }}
+            style={[styles.input, fieldErrors.fullName && styles.inputInvalid]}
             value={fullName}
           />
+          <FieldError message={fieldErrors.fullName} />
           <Text style={styles.label}>{t("account.phone")}</Text>
           <TextInput
             accessibilityLabel={t("account.phone")}
             autoComplete="tel"
             keyboardType="phone-pad"
-            onChangeText={setPhone}
+            onChangeText={(value) => {
+              setPhone(value);
+              setFieldErrors((current) => ({ ...current, phone: "" }));
+            }}
             placeholder={t("account.phonePlaceholder")}
-            style={styles.input}
+            style={[styles.input, fieldErrors.phone && styles.inputInvalid]}
             value={phone}
           />
+          <FieldError message={fieldErrors.phone} />
           <Text style={styles.label}>{t("account.currency")}</Text>
           <TextInput
             accessibilityLabel={t("account.currency")}
             autoCapitalize="characters"
             maxLength={3}
-            onChangeText={setCurrency}
-            style={styles.input}
+            onChangeText={(value) => {
+              setCurrency(value);
+              setFieldErrors((current) => ({ ...current, currency: "" }));
+            }}
+            style={[styles.input, fieldErrors.currency && styles.inputInvalid]}
             value={currency}
           />
+          <FieldError message={fieldErrors.currency} />
           <ActionButton
-            disabled={
-              isSaving || !fullName.trim() || currency.trim().length !== 3
-            }
+            disabled={isSaving}
             label={isSaving ? t("common.saving") : t("common.save")}
             onPress={saveProfile}
           />
@@ -306,6 +331,15 @@ function ActionButton({
   );
 }
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <Text accessibilityLiveRegion="polite" style={styles.error}>
+      {message}
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   page: {
     paddingHorizontal: 22,
@@ -362,6 +396,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
+  inputInvalid: { borderColor: "#a33024" },
   link: { color: "#285c3c", fontSize: 14, fontWeight: "700" },
   notice: { color: "#285c3c", fontSize: 14, lineHeight: 20 },
   error: { color: "#a33024", fontSize: 14, lineHeight: 20 },

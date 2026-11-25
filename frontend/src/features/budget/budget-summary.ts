@@ -20,6 +20,39 @@ export type AnnualSummary = {
   adjustment: number;
 };
 
+export type MonthlySummary = AnnualSummary & {
+  month: string;
+  remaining: number;
+};
+
+export function calculateMonthlySummaries(
+  year: number,
+  incomes: IncomeEntry[],
+  expenses: ExpenseEntry[],
+  adjustments: BudgetAdjustment[],
+): MonthlySummary[] {
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = `${year}-${String(index + 1).padStart(2, "0")}`;
+    const income = incomes
+      .filter((item) => item.occurred_on.startsWith(month))
+      .reduce((total, item) => total + item.amount, 0);
+    const expense = expenses
+      .filter((item) => item.spent_on.startsWith(month))
+      .reduce((total, item) => total + item.amount, 0);
+    const adjustment = adjustments
+      .filter((item) => item.occurred_on.startsWith(month))
+      .reduce((total, item) => total + item.amount_delta, 0);
+
+    return {
+      month,
+      income,
+      expense,
+      adjustment,
+      remaining: income - expense + adjustment,
+    };
+  });
+}
+
 export function calculatePeriodCategoryBalances(
   categories: BudgetCategory[],
   incomes: IncomeEntry[],
