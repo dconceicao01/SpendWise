@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collections;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Repository;
@@ -73,6 +74,21 @@ public class SupabaseBudgetRepository implements BudgetRepository {
                 "budgets",
                 query,
                 Map.of("archived_at", java.time.Instant.now().toString()),
+                BUDGET_ROWS);
+        return findFirst(rows);
+    }
+
+    @Override
+    public Optional<BudgetResponse> restore(UUID budgetId) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("select", SELECT_BUDGET);
+        query.put("id", "eq." + budgetId);
+        query.put("archived_at", "not.is.null");
+        List<BudgetResponse> rows = dataApiClient.requestReturningRepresentation(
+                HttpMethod.PATCH,
+                "budgets",
+                query,
+                Collections.singletonMap("archived_at", null),
                 BUDGET_ROWS);
         return findFirst(rows);
     }

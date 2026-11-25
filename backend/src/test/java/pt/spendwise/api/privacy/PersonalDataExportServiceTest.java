@@ -52,7 +52,7 @@ class PersonalDataExportServiceTest {
 
     @Test
     void exportsOwnProfileAndAllReadableBudgetSections() {
-        BudgetResponse budget = new BudgetResponse(BUDGET_ID, "Home", BudgetType.PERSONAL, "EUR", null, null);
+        BudgetResponse budget = new BudgetResponse(BUDGET_ID, "Home", BudgetType.PERSONAL, "EUR", null, null, null);
         ExportProfile profile = new ExportProfile(UUID.randomUUID(), "duarte@example.test", "Duarte", null, "EUR", null, null);
         when(exportRepository.findCurrentUserProfile()).thenReturn(Optional.of(profile));
         when(budgetService.listForCurrentUser()).thenReturn(List.of(budget));

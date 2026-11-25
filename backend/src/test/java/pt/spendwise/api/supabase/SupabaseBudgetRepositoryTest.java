@@ -112,4 +112,24 @@ class SupabaseBudgetRepositoryTest {
         assertThat(period.orElseThrow().startsOn()).isEqualTo(LocalDate.parse("2026-11-02"));
         mockServer.verify();
     }
+
+    @Test
+    void restoresOnlyAnArchivedBudgetAndClearsItsArchiveTimestamp() {
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budgets?select=id,name,budget_type,currency_code,created_at,archived_at&id=eq."
+                        + BUDGET_ID + "&archived_at=not.is.null"))
+                .andExpect(method(org.springframework.http.HttpMethod.PATCH))
+                .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
+                .andExpect(header("Prefer", "return=representation"))
+                .andExpect(content().json("{\"archived_at\":null}"))
+                .andRespond(withSuccess("[{\"id\":\"" + BUDGET_ID
+                        + "\",\"name\":\"Travel\",\"budget_type\":\"PERSONAL\","
+                        + "\"currency_code\":\"EUR\",\"created_at\":\"2026-11-22T17:00:00Z\",\"archived_at\":null}]",
+                        MediaType.APPLICATION_JSON));
+
+        var restored = budgetRepository.restore(BUDGET_ID);
+
+        assertThat(restored).isPresent();
+        assertThat(restored.orElseThrow().archivedAt()).isNull();
+        mockServer.verify();
+    }
 }

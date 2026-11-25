@@ -53,6 +53,26 @@ public class SupabaseBudgetMembershipRepository implements BudgetMembershipRepos
         return Optional.of(rows.getFirst().role());
     }
 
+    @Override
+    public Map<UUID, BudgetRole> findCurrentUserActiveRoles() {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("select", "budget_id,role");
+        query.put("user_id", "eq." + currentUserId());
+        query.put("removed_at", "is.null");
+        List<MembershipRow> rows = dataApiClient.request(
+                HttpMethod.GET, "budget_members", query, null, MEMBERSHIP_ROWS);
+        if (rows == null || rows.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, BudgetRole> roles = new LinkedHashMap<>();
+        for (MembershipRow row : rows) {
+            if (row.budgetId() == null || row.role() == null || roles.putIfAbsent(row.budgetId(), row.role()) != null) {
+                throw new AccessDeniedException("Budget access denied");
+            }
+        }
+        return Map.copyOf(roles);
+    }
+
     private UUID currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwtAuthenticationToken)
@@ -66,6 +86,6 @@ public class SupabaseBudgetMembershipRepository implements BudgetMembershipRepos
         }
     }
 
-    private record MembershipRow(BudgetRole role) {
+    private record MembershipRow(@com.fasterxml.jackson.annotation.JsonProperty("budget_id") UUID budgetId, BudgetRole role) {
     }
 }

@@ -51,4 +51,9 @@ public class BudgetController {
     public ResponseEntity<BudgetResponse> archive(@PathVariable UUID budgetId) {
         return ResponseEntity.status(HttpStatus.OK).body(budgetService.archive(budgetId));
     }
+
+    @PostMapping("/{budgetId}/restore")
+    public BudgetResponse restore(@PathVariable UUID budgetId) {
+        return budgetService.restore(budgetId);
+    }
 }

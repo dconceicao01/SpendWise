@@ -14,5 +14,7 @@ public interface BudgetRepository {
 
     Optional<BudgetResponse> archive(UUID budgetId);
 
+    Optional<BudgetResponse> restore(UUID budgetId);
+
     BudgetResponse create(String name, BudgetType budgetType, String currencyCode);
 }

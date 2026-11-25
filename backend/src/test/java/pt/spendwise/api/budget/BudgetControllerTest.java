@@ -23,6 +23,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -88,6 +89,44 @@ class BudgetControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(budgetService, never()).create(any(CreateBudgetRequest.class));
+    }
+
+    @Test
+    void renamesBudgetThroughTheBudgetScopedRoute() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        when(budgetService.rename(BUDGET_ID, new UpdateBudgetRequest("Renamed"))).thenReturn(budget());
+
+        mockMvc.perform(patch("/api/v1/budgets/" + BUDGET_ID)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed\"}"))
+                .andExpect(status().isOk());
+
+        verify(budgetService).rename(BUDGET_ID, new UpdateBudgetRequest("Renamed"));
+    }
+
+    @Test
+    void archivesBudgetThroughTheBudgetScopedRoute() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        when(budgetService.archive(BUDGET_ID)).thenReturn(budget());
+
+        mockMvc.perform(post("/api/v1/budgets/" + BUDGET_ID + "/archive")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token"))
+                .andExpect(status().isOk());
+
+        verify(budgetService).archive(BUDGET_ID);
+    }
+
+    @Test
+    void restoresBudgetThroughTheBudgetScopedRoute() throws Exception {
+        when(jwtDecoder.decode("valid-token")).thenReturn(validJwt());
+        when(budgetService.restore(BUDGET_ID)).thenReturn(budget());
+
+        mockMvc.perform(post("/api/v1/budgets/" + BUDGET_ID + "/restore")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token"))
+                .andExpect(status().isOk());
+
+        verify(budgetService).restore(BUDGET_ID);
     }
 
     @Test
@@ -185,6 +224,6 @@ class BudgetControllerTest {
 
     private BudgetResponse budget() {
         return new BudgetResponse(BUDGET_ID, "Travel", BudgetType.PERSONAL, "EUR",
-                Instant.parse("2026-11-22T17:00:00Z"), null);
+                Instant.parse("2026-11-22T17:00:00Z"), null, null);
     }
 }
