@@ -29,6 +29,7 @@ import {
   type BudgetCategory,
   type BudgetPeriod,
   type ExpenseEntry,
+  type IncomeCorrection,
   type IncomeEntry,
   type IncomeSchedule,
   type IncomeScheduleFrequency,
@@ -90,6 +91,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [incomes, setIncomes] = useState<IncomeEntry[]>([]);
+  const [incomeCorrections, setIncomeCorrections] = useState<
+    IncomeCorrection[]
+  >([]);
   const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [adjustments, setAdjustments] = useState<BudgetAdjustment[]>([]);
@@ -103,6 +107,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [annualMonths, setAnnualMonths] = useState<MonthlySummary[]>([]);
   const [annualRefreshKey, setAnnualRefreshKey] = useState(0);
   const [isLoadingMovements, setIsLoadingMovements] = useState(false);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
+  const [workspaceLoadFailed, setWorkspaceLoadFailed] = useState(false);
   const [workspaceView, setWorkspaceView] =
     useState<WorkspaceView>("dashboard");
   const [isLoadingAnnual, setIsLoadingAnnual] = useState(false);
@@ -143,6 +149,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [description, setDescription] = useState("");
   const [adjustmentSign, setAdjustmentSign] = useState<1 | -1>(1);
   const [reason, setReason] = useState("");
+  const [correctionEntryId, setCorrectionEntryId] = useState<string | null>(
+    null,
+  );
+  const [correctionAmount, setCorrectionAmount] = useState("");
+  const [correctionSign, setCorrectionSign] = useState<1 | -1>(1);
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [correctionDate, setCorrectionDate] = useState(today());
 
   const selectedBudget = budgets.find(
     (budget) => budget.id === selectedBudgetId,
@@ -161,6 +174,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     incomes,
     expenses,
     adjustments,
+    incomeCorrections,
   );
   const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   const currentMonthIncomes = incomes
@@ -169,10 +183,11 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const currentMonthExpenses = expenses
     .filter((item) => item.spent_on.startsWith(currentMonthKey))
     .sort((left, right) => right.spent_on.localeCompare(left.spent_on));
-  const currentMonthIncomeTotal = currentMonthIncomes.reduce(
-    (total, item) => total + item.amount,
-    0,
-  );
+  const currentMonthIncomeTotal =
+    currentMonthIncomes.reduce((total, item) => total + item.amount, 0) +
+    incomeCorrections
+      .filter((item) => item.occurred_on.startsWith(currentMonthKey))
+      .reduce((total, item) => total + item.amount_delta, 0);
   const currentMonthExpenseTotal = currentMonthExpenses.reduce(
     (total, item) => total + item.amount,
     0,
@@ -212,21 +227,30 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const loadWorkspace = useCallback(
     async (budgetId = selectedBudgetId) => {
       if (!budgetId) return;
-      const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
-        spendwiseApi.listPeriods(accessToken, budgetId),
-        spendwiseApi.listCategories(accessToken, budgetId),
-        allPages((offset) =>
-          spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
-        ),
-      ]);
-      setPeriods(nextPeriods);
-      setCategories(nextCategories);
-      setIncomeSchedules(nextSchedules);
-      setSelectedPeriodId((current) =>
-        nextPeriods.some((period) => period.id === current)
-          ? current
-          : (nextPeriods[0]?.id ?? ""),
-      );
+      setIsLoadingWorkspace(true);
+      setWorkspaceLoadFailed(false);
+      try {
+        const [nextPeriods, nextCategories, nextSchedules] = await Promise.all([
+          spendwiseApi.listPeriods(accessToken, budgetId),
+          spendwiseApi.listCategories(accessToken, budgetId),
+          allPages((offset) =>
+            spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
+          ),
+        ]);
+        setPeriods(nextPeriods);
+        setCategories(nextCategories);
+        setIncomeSchedules(nextSchedules);
+        setSelectedPeriodId((current) =>
+          nextPeriods.some((period) => period.id === current)
+            ? current
+            : (nextPeriods[0]?.id ?? ""),
+        );
+      } catch (error) {
+        setWorkspaceLoadFailed(true);
+        throw error;
+      } finally {
+        setIsLoadingWorkspace(false);
+      }
     },
     [accessToken, selectedBudgetId],
   );
@@ -235,7 +259,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     if (!selectedBudgetId || !selectedPeriodId) return;
     setIsLoadingMovements(true);
     try {
-      const [nextIncomes, nextExpenses, nextAdjustments] = await Promise.all([
+      const [
+        nextIncomes,
+        nextExpenses,
+        nextAdjustments,
+        nextIncomeCorrections,
+      ] = await Promise.all([
         allPages((offset) =>
           spendwiseApi.listIncomes(
             accessToken,
@@ -260,10 +289,19 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             offset,
           ),
         ),
+        allPages((offset) =>
+          spendwiseApi.listIncomeCorrections(
+            accessToken,
+            selectedBudgetId,
+            selectedPeriodId,
+            offset,
+          ),
+        ),
       ]);
       setIncomes(nextIncomes);
       setExpenses(nextExpenses);
       setAdjustments(nextAdjustments);
+      setIncomeCorrections(nextIncomeCorrections);
     } finally {
       setIsLoadingMovements(false);
     }
@@ -457,6 +495,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       return;
     }
     setIsSaving(true);
+    let movementSaved = false;
     try {
       if (tab === "income") {
         if (incomeRecurring) {
@@ -471,6 +510,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               endDate: scheduleEndDate || null,
             },
           );
+          movementSaved = true;
           setNotice(t("schedule.created"));
           setScheduleEndDate("");
           await loadWorkspace();
@@ -480,6 +520,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             amount: parsedAmount,
             occurred_on: movementDate,
           });
+          movementSaved = true;
           setNotice(t("movement.incomeSaved"));
         }
       } else if (tab === "expense") {
@@ -490,6 +531,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           spent_on: movementDate,
           description: description.trim() || null,
         });
+        movementSaved = true;
         setNotice(t("movement.expenseSaved"));
       } else {
         await spendwiseApi.createAdjustment(accessToken, selectedBudgetId, {
@@ -500,6 +542,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           occurred_on: movementDate,
           corrected_expense_entry_id: null,
         });
+        movementSaved = true;
         setNotice(t("movement.adjustmentSaved"));
       }
       setAmount("");
@@ -509,7 +552,74 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       setAnnualRefreshKey((current) => current + 1);
     } catch {
       setIsError(true);
-      setNotice(t("movement.saveError"));
+      setNotice(
+        movementSaved
+          ? t("movement.savedRefreshError")
+          : t("movement.saveError"),
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function submitIncomeCorrection(income: IncomeEntry) {
+    if (!selectedBudgetId) return;
+    setNotice("");
+    setIsError(false);
+    const parsedAmount = numberValue(correctionAmount);
+    const nextFieldErrors: Record<string, string> = {};
+    const selectedPeriod = periods.find(
+      (period) => period.id === selectedPeriodId,
+    );
+    if (!parsedAmount) {
+      nextFieldErrors.incomeCorrectionAmount = t("movement.amountInvalid");
+    }
+    if (
+      !selectedPeriod ||
+      !isValidDate(correctionDate) ||
+      correctionDate < selectedPeriod.starts_on ||
+      correctionDate > selectedPeriod.ends_on
+    ) {
+      nextFieldErrors.incomeCorrectionDate = t(
+        "movement.correctionDateInvalid",
+      );
+    }
+    if (!correctionReason.trim()) {
+      nextFieldErrors.incomeCorrectionReason = t(
+        "movement.correctionDescriptionRequired",
+      );
+    }
+    setFieldErrors(nextFieldErrors);
+    if (Object.keys(nextFieldErrors).length || !parsedAmount) return;
+
+    setIsSaving(true);
+    let correctionSaved = false;
+    try {
+      await spendwiseApi.createIncomeCorrection(
+        accessToken,
+        selectedBudgetId,
+        income.id,
+        {
+          period_id: selectedPeriodId,
+          amount_delta: parsedAmount * correctionSign,
+          occurred_on: correctionDate,
+          reason: correctionReason.trim(),
+        },
+      );
+      correctionSaved = true;
+      setCorrectionAmount("");
+      setCorrectionReason("");
+      setCorrectionEntryId(null);
+      setNotice(t("movement.incomeCorrectionSaved"));
+      await loadMovements();
+      setAnnualRefreshKey((current) => current + 1);
+    } catch {
+      setIsError(true);
+      setNotice(
+        correctionSaved
+          ? t("movement.savedRefreshError")
+          : t("movement.incomeCorrectionError"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -597,37 +707,51 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       const annualIncomes: IncomeEntry[] = [];
       const annualExpenses: ExpenseEntry[] = [];
       const annualAdjustments: BudgetAdjustment[] = [];
+      const annualIncomeCorrections: IncomeCorrection[] = [];
       for (const period of relevantPeriods) {
-        const [periodIncomes, periodExpenses, periodAdjustments] =
-          await Promise.all([
-            allPages((offset) =>
-              spendwiseApi.listIncomes(
-                accessToken,
-                selectedBudgetId,
-                period.id,
-                offset,
-              ),
+        const [
+          periodIncomes,
+          periodExpenses,
+          periodAdjustments,
+          periodIncomeCorrections,
+        ] = await Promise.all([
+          allPages((offset) =>
+            spendwiseApi.listIncomes(
+              accessToken,
+              selectedBudgetId,
+              period.id,
+              offset,
             ),
-            allPages((offset) =>
-              spendwiseApi.listExpenses(
-                accessToken,
-                selectedBudgetId,
-                period.id,
-                offset,
-              ),
+          ),
+          allPages((offset) =>
+            spendwiseApi.listExpenses(
+              accessToken,
+              selectedBudgetId,
+              period.id,
+              offset,
             ),
-            allPages((offset) =>
-              spendwiseApi.listAdjustments(
-                accessToken,
-                selectedBudgetId,
-                period.id,
-                offset,
-              ),
+          ),
+          allPages((offset) =>
+            spendwiseApi.listAdjustments(
+              accessToken,
+              selectedBudgetId,
+              period.id,
+              offset,
             ),
-          ]);
+          ),
+          allPages((offset) =>
+            spendwiseApi.listIncomeCorrections(
+              accessToken,
+              selectedBudgetId,
+              period.id,
+              offset,
+            ),
+          ),
+        ]);
         annualIncomes.push(...periodIncomes);
         annualExpenses.push(...periodExpenses);
         annualAdjustments.push(...periodAdjustments);
+        annualIncomeCorrections.push(...periodIncomeCorrections);
       }
       setAnnualSummary(
         calculateAnnualSummary(
@@ -635,6 +759,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           annualIncomes,
           annualExpenses,
           annualAdjustments,
+          annualIncomeCorrections,
         ),
       );
       setAnnualMonths(
@@ -643,6 +768,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           annualIncomes,
           annualExpenses,
           annualAdjustments,
+          annualIncomeCorrections,
         ),
       );
       setAnnualSummaryBudgetId(selectedBudgetId);
@@ -724,12 +850,16 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   function selectBudget(budgetId: string) {
     setSelectedBudgetId(budgetId);
+    setIsLoadingWorkspace(true);
+    setWorkspaceLoadFailed(false);
     setSelectedPeriodId("");
     setPeriods([]);
     setCategories([]);
     setIncomes([]);
+    setIncomeCorrections([]);
     setExpenses([]);
     setAdjustments([]);
+    setCorrectionEntryId(null);
     setAnnualSummary(null);
     setAnnualSummaryBudgetId("");
     setAnnualMonths([]);
@@ -739,8 +869,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   function selectPeriod(periodId: string) {
     setSelectedPeriodId(periodId);
     setIncomes([]);
+    setIncomeCorrections([]);
     setExpenses([]);
     setAdjustments([]);
+    setCorrectionEntryId(null);
     setIsLoadingMovements(true);
   }
 
@@ -835,13 +967,38 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               · {selectedBudget.currency_code}
             </Text>
           ) : null}
+          {workspaceView !== "dashboard" ? (
+            <View style={styles.detailHeader}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setWorkspaceView("dashboard")}
+                style={styles.formBack}
+              >
+                <Text style={styles.link}>
+                  {t("dashboard.backToDashboard")}
+                </Text>
+              </Pressable>
+              <Text style={styles.sectionTitle}>
+                {workspaceView === "statistics"
+                  ? t("dashboard.statisticsTitle")
+                  : t(`movement.${tab}`)}
+              </Text>
+              <Text style={styles.muted}>
+                {t("dashboard.detailDescription")}
+              </Text>
+            </View>
+          ) : null}
           {selectedBudget?.budget_type === "SHARED" ? (
             <BudgetInvitations
               accessToken={accessToken}
               budgetId={selectedBudget.id}
             />
           ) : null}
-          {periods.length ? (
+          {isLoadingWorkspace ? (
+            <View style={styles.card}>
+              <Text style={styles.muted}>{t("common.loading")}</Text>
+            </View>
+          ) : workspaceLoadFailed ? null : periods.length ? (
             <>
               <Text style={styles.sectionTitle}>{t("budget.period")}</Text>
               <View style={styles.rowWrap}>
@@ -850,6 +1007,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                     key={period.id}
                     label={`${period.starts_on} – ${period.ends_on}`}
                     selected={period.id === selectedPeriodId}
+                    disabled={workspaceView === "dashboard"}
                     onPress={() => selectPeriod(period.id)}
                   />
                 ))}
@@ -899,27 +1057,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ) : null}
           {canRecordMovements ? (
             <>
-              {workspaceView !== "dashboard" ? (
-                <View style={styles.detailHeader}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setWorkspaceView("dashboard")}
-                    style={styles.formBack}
-                  >
-                    <Text style={styles.link}>
-                      {t("dashboard.backToDashboard")}
-                    </Text>
-                  </Pressable>
-                  <Text style={styles.sectionTitle}>
-                    {workspaceView === "statistics"
-                      ? t("dashboard.statisticsTitle")
-                      : t(`movement.${tab}`)}
-                  </Text>
-                  <Text style={styles.muted}>
-                    {t("dashboard.detailDescription")}
-                  </Text>
-                </View>
-              ) : null}
               {workspaceView === "dashboard" ? (
                 <>
                   <View
@@ -1020,7 +1157,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                               {t("dashboard.allocated")}:{" "}
                               {formatAmount.format(item.allocated)} ·{" "}
                               {t("dashboard.spent")}:{" "}
-                              {formatAmount.format(item.spent)}
+                              {formatAmount.format(item.spent)} ·{" "}
+                              {t("dashboard.adjusted")}:{" "}
+                              {formatAmount.format(item.adjusted)}
                             </Text>
                           </View>
                           <View style={styles.balanceValue}>
@@ -1446,16 +1585,181 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   <Text style={styles.sectionTitle}>
                     {t("movement.recent")}
                   </Text>
-                  <EntryList
-                    empty={t(`movement.${tab}Empty`)}
-                    items={
-                      tab === "income"
-                        ? incomes.map((item) => ({
-                            label: t("movement.income"),
-                            date: item.occurred_on,
-                            amount: item.amount,
-                          }))
-                        : tab === "expense"
+                  {tab === "income" ? (
+                    incomes.length ? (
+                      <View style={styles.list}>
+                        {incomes.map((income) => {
+                          const corrections = incomeCorrections.filter(
+                            (item) => item.income_entry_id === income.id,
+                          );
+                          return (
+                            <View key={income.id} style={styles.incomeRecord}>
+                              <View style={styles.entry}>
+                                <View style={styles.entryText}>
+                                  <Text style={styles.entryTitle}>
+                                    {t("movement.income")}
+                                  </Text>
+                                  <Text style={styles.muted}>
+                                    {income.occurred_on}
+                                  </Text>
+                                </View>
+                                <Text style={styles.entryAmount}>
+                                  {formatAmount.format(income.amount)}
+                                </Text>
+                              </View>
+                              {corrections.map((correction) => (
+                                <View
+                                  key={correction.id}
+                                  style={styles.incomeCorrectionEntry}
+                                >
+                                  <Text style={styles.muted}>
+                                    {t("movement.incomeCorrectionLabel")}:{" "}
+                                    {formatAmount.format(
+                                      correction.amount_delta,
+                                    )}
+                                  </Text>
+                                  <Text style={styles.muted}>
+                                    {correction.reason}
+                                  </Text>
+                                </View>
+                              ))}
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => {
+                                  setCorrectionEntryId(income.id);
+                                  setCorrectionAmount("");
+                                  setCorrectionReason("");
+                                  setCorrectionSign(1);
+                                  setCorrectionDate(today());
+                                  setFieldErrors({});
+                                }}
+                              >
+                                <Text style={styles.link}>
+                                  {t("movement.correctIncome")}
+                                </Text>
+                              </Pressable>
+                              {correctionEntryId === income.id ? (
+                                <View style={styles.correctionForm}>
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    onPress={() => setCorrectionEntryId(null)}
+                                  >
+                                    <Text style={styles.link}>
+                                      {t("common.cancel")}
+                                    </Text>
+                                  </Pressable>
+                                  <View style={styles.rowWrap}>
+                                    <Choice
+                                      label={t("movement.addToIncome")}
+                                      selected={correctionSign === 1}
+                                      onPress={() => setCorrectionSign(1)}
+                                    />
+                                    <Choice
+                                      label={t("movement.removeFromIncome")}
+                                      selected={correctionSign === -1}
+                                      onPress={() => setCorrectionSign(-1)}
+                                    />
+                                  </View>
+                                  <Text style={styles.label}>
+                                    {t("movement.correctionAmount")}
+                                  </Text>
+                                  <TextInput
+                                    accessibilityLabel={t(
+                                      "movement.correctionAmount",
+                                    )}
+                                    keyboardType="decimal-pad"
+                                    onChangeText={(value) => {
+                                      setCorrectionAmount(value);
+                                      clearFieldError("incomeCorrectionAmount");
+                                    }}
+                                    placeholder="0,00"
+                                    style={[
+                                      styles.input,
+                                      fieldErrors.incomeCorrectionAmount &&
+                                        styles.inputInvalid,
+                                    ]}
+                                    value={correctionAmount}
+                                  />
+                                  <FieldError
+                                    message={fieldErrors.incomeCorrectionAmount}
+                                  />
+                                  <Text style={styles.label}>
+                                    {t("movement.correctionDate")}
+                                  </Text>
+                                  <Text style={styles.muted}>
+                                    {t("movement.correctionDateDescription")}
+                                  </Text>
+                                  <TextInput
+                                    accessibilityLabel={t(
+                                      "movement.correctionDate",
+                                    )}
+                                    onChangeText={(value) => {
+                                      setCorrectionDate(value);
+                                      clearFieldError("incomeCorrectionDate");
+                                    }}
+                                    placeholder="AAAA-MM-DD"
+                                    style={[
+                                      styles.input,
+                                      fieldErrors.incomeCorrectionDate &&
+                                        styles.inputInvalid,
+                                    ]}
+                                    value={correctionDate}
+                                  />
+                                  <FieldError
+                                    message={fieldErrors.incomeCorrectionDate}
+                                  />
+                                  <Text style={styles.label}>
+                                    {t("movement.correctionDescription")}
+                                  </Text>
+                                  <TextInput
+                                    accessibilityLabel={t(
+                                      "movement.correctionDescription",
+                                    )}
+                                    maxLength={500}
+                                    onChangeText={(value) => {
+                                      setCorrectionReason(value);
+                                      clearFieldError("incomeCorrectionReason");
+                                    }}
+                                    placeholder={t(
+                                      "movement.correctionDescriptionPlaceholder",
+                                    )}
+                                    style={[
+                                      styles.input,
+                                      fieldErrors.incomeCorrectionReason &&
+                                        styles.inputInvalid,
+                                    ]}
+                                    value={correctionReason}
+                                  />
+                                  <FieldError
+                                    message={fieldErrors.incomeCorrectionReason}
+                                  />
+                                  <ActionButton
+                                    disabled={isSaving}
+                                    label={
+                                      isSaving
+                                        ? t("common.saving")
+                                        : t("movement.saveIncomeCorrection")
+                                    }
+                                    onPress={() =>
+                                      void submitIncomeCorrection(income)
+                                    }
+                                  />
+                                </View>
+                              ) : null}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <Text style={styles.muted}>
+                        {t("movement.incomeEmpty")}
+                      </Text>
+                    )
+                  ) : (
+                    <EntryList
+                      empty={t(`movement.${tab}Empty`)}
+                      items={
+                        tab === "expense"
                           ? expenses.map((item) => ({
                               label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.expense")} · ${item.description ?? ""}`,
                               date: item.spent_on,
@@ -1466,9 +1770,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                               date: item.occurred_on,
                               amount: item.amount_delta,
                             }))
-                    }
-                    format={formatAmount}
-                  />
+                      }
+                      format={formatAmount}
+                    />
+                  )}
                 </>
               ) : null}
               {workspaceView === "statistics" ? (
@@ -1771,18 +2076,25 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 function Choice({
   label,
   selected,
+  disabled,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={[styles.choice, selected && styles.choiceSelected]}
+      style={[
+        styles.choice,
+        selected && styles.choiceSelected,
+        disabled && styles.choiceDisabled,
+      ]}
     >
       <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>
         {label}
@@ -2107,8 +2419,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   choiceSelected: { backgroundColor: "#e6f0e7", borderColor: "#43805a" },
+  choiceDisabled: { opacity: 0.78 },
   choiceText: { color: "#34473b", fontSize: 14 },
   choiceTextSelected: { color: "#234b34", fontWeight: "700" },
+  incomeRecord: {
+    gap: 9,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e3e9e4",
+  },
+  incomeCorrectionEntry: {
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: "#43805a",
+    gap: 3,
+  },
+  correctionForm: {
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#f4f7f4",
+  },
   categoryRow: {
     flexDirection: "row",
     alignItems: "center",

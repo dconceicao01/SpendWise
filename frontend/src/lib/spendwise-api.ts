@@ -44,6 +44,20 @@ export type IncomeEntry = {
   }[];
 };
 
+export type IncomeCorrection = {
+  id: string;
+  income_entry_id: string;
+  period_id: string;
+  amount_delta: number;
+  reason: string;
+  occurred_on: string;
+  allocation_snapshot: {
+    category_id: string;
+    percentage_basis_points: number;
+    allocated_amount: number;
+  }[];
+};
+
 export type ExpenseEntry = {
   id: string;
   period_id: string;
@@ -254,6 +268,32 @@ export const spendwiseApi = {
     request<IncomeEntry>(
       token,
       `/budgets/${budgetId}/incomes`,
+      jsonBody(input),
+    ),
+  listIncomeCorrections: (
+    token: string,
+    budgetId: string,
+    periodId: string,
+    offset = 0,
+  ) =>
+    request<IncomeCorrection[]>(
+      token,
+      `/budgets/${budgetId}/income-corrections${movementQuery(periodId, offset)}`,
+    ),
+  createIncomeCorrection: (
+    token: string,
+    budgetId: string,
+    incomeEntryId: string,
+    input: {
+      period_id: string;
+      amount_delta: number;
+      occurred_on: string;
+      reason: string;
+    },
+  ) =>
+    request<IncomeCorrection>(
+      token,
+      `/budgets/${budgetId}/incomes/${incomeEntryId}/corrections`,
       jsonBody(input),
     ),
   listIncomeSchedules: (token: string, budgetId: string, offset = 0) =>

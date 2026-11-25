@@ -39,6 +39,25 @@ public class BudgetMovementController {
         return ResponseEntity.status(HttpStatus.CREATED).body(income);
     }
 
+    @GetMapping("/income-corrections")
+    public List<IncomeCorrectionResponse> listIncomeCorrections(
+            @PathVariable UUID budgetId,
+            @RequestParam(required = false) UUID periodId,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        return movementService.listIncomeCorrections(budgetId, periodId, limit, offset);
+    }
+
+    @PostMapping("/incomes/{incomeEntryId}/corrections")
+    public ResponseEntity<IncomeCorrectionResponse> recordIncomeCorrection(
+            @PathVariable UUID budgetId,
+            @PathVariable UUID incomeEntryId,
+            @Valid @RequestBody CreateIncomeCorrectionRequest request) {
+        IncomeCorrectionResponse correction = movementService.recordIncomeCorrection(
+                budgetId, incomeEntryId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(correction);
+    }
+
     @GetMapping("/expenses")
     public List<ExpenseEntryResponse> listExpenses(
             @PathVariable UUID budgetId,

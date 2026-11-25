@@ -10,6 +10,11 @@ public interface BudgetMovementRepository {
 
     Optional<IncomeEntryResponse> recordIncome(UUID budgetId, CreateIncomeRequest request);
 
+    List<IncomeCorrectionResponse> findIncomeCorrections(UUID budgetId, UUID periodId, int limit, int offset);
+
+    Optional<IncomeCorrectionResponse> recordIncomeCorrection(
+            UUID budgetId, UUID incomeEntryId, CreateIncomeCorrectionRequest request);
+
     List<ExpenseEntryResponse> findExpenses(UUID budgetId, UUID periodId, int limit, int offset);
 
     Optional<ExpenseEntryResponse> recordExpense(UUID budgetId, CreateExpenseRequest request);

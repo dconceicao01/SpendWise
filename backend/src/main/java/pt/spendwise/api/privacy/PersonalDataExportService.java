@@ -73,6 +73,11 @@ public class PersonalDataExportService {
                                 row.correctedExpenseEntryId(), row.amountDelta(), row.reason(), row.occurredOn(),
                                 row.createdAt()))
                         .toList(),
+                allPages(offset -> movementService.listIncomeCorrections(budgetId, null, PAGE_SIZE, offset)).stream()
+                        .map(row -> new ExportIncomeCorrection(row.id(), row.incomeEntryId(), row.periodId(),
+                                row.allocationSetId(), row.amountDelta(), row.reason(), row.occurredOn(), row.createdAt(),
+                                row.allocationSnapshot()))
+                        .toList(),
                 allPages(offset -> scheduleService.list(budgetId, PAGE_SIZE, offset)).stream()
                         .map(this::exportSchedule)
                         .toList());

@@ -28,7 +28,7 @@ select ok((select proconfig @> array['search_path=pg_catalog'] from pg_proc
             where oid = 'private.enforce_authenticated_write_limit()'::regprocedure),
     'Trigger wrapper pins its search path');
 select is((select count(*)::integer from pg_trigger
-            where not tgisinternal and tgname like '%_write_rate_limit'), 14,
+            where not tgisinternal and tgname like '%_write_rate_limit'), 16,
     'All authenticated write tables have a rate-limit trigger');
 select is((select count(*)::integer from cron.job
             where jobname = 'spendwise-write-rate-limit-retention'), 1,

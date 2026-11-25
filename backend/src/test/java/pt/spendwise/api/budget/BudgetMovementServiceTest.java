@@ -76,6 +76,32 @@ class BudgetMovementServiceTest {
                 .hasMessageContaining("negative");
     }
 
+    @Test
+    void recordsIncomeCorrectionsAfterMovementAuthorization() {
+        UUID incomeId = UUID.fromString("223d59c3-82e5-48c9-8f4f-981cc3be6a85");
+        CreateIncomeCorrectionRequest request = new CreateIncomeCorrectionRequest(
+                PERIOD_ID, new BigDecimal("-25.00"), LocalDate.of(2026, 11, 1),
+                "Rendimento registado em excesso");
+        IncomeCorrectionResponse correction = new IncomeCorrectionResponse(
+                UUID.fromString("03be3477-d72e-4cb6-8bd1-4575278b02ee"),
+                BUDGET_ID,
+                incomeId,
+                PERIOD_ID,
+                UUID.fromString("da5e407d-e5bb-432a-b035-80f7234ca6a2"),
+                UUID.fromString("5988f040-a1f5-492f-a2ab-4e7b6d93c8c3"),
+                request.amountDelta(),
+                request.reason(),
+                LocalDate.of(2026, 11, 1),
+                Instant.parse("2026-11-22T10:02:00Z"),
+                List.of());
+        when(repository.recordIncomeCorrection(BUDGET_ID, incomeId, request))
+                .thenReturn(Optional.of(correction));
+
+        assertThat(service.recordIncomeCorrection(BUDGET_ID, incomeId, request)).isEqualTo(correction);
+        verify(authorization).requireAllowed(BUDGET_ID, BudgetAction.RECORD_MOVEMENT);
+        verify(repository).recordIncomeCorrection(BUDGET_ID, incomeId, request);
+    }
+
     private IncomeEntryResponse income() {
         return new IncomeEntryResponse(
                 UUID.fromString("223d59c3-82e5-48c9-8f4f-981cc3be6a85"),
