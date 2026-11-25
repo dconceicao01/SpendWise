@@ -17,13 +17,17 @@ type EmailOtpType = (typeof emailOtpTypes)[number];
 
 function isEmailOtpType(value: unknown): value is EmailOtpType {
   return (
-    typeof value === "string" &&
-    emailOtpTypes.includes(value as EmailOtpType)
+    typeof value === "string" && emailOtpTypes.includes(value as EmailOtpType)
   );
 }
 
 export default function AuthCallbackScreen() {
-  const { code, flow, token_hash: tokenHash, type } = useLocalSearchParams<{
+  const {
+    code,
+    flow,
+    token_hash: tokenHash,
+    type,
+  } = useLocalSearchParams<{
     code?: string;
     flow?: string;
     token_hash?: string;
@@ -84,9 +88,7 @@ export default function AuthCallbackScreen() {
       <View style={styles.content}>
         <Text style={styles.brand}>SpendWise</Text>
         <ActivityIndicator color="#35684b" style={styles.indicator} />
-        <Text style={styles.description}>
-          {t("auth.callbackLoading")}
-        </Text>
+        <Text style={styles.description}>{t("auth.callbackLoading")}</Text>
       </View>
     </SafeAreaView>
   );
