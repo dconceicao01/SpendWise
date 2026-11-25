@@ -139,17 +139,24 @@ async function request<T>(
   path: string,
   init?: RequestInit,
 ) {
-  const response = await fetch(`${requireApiUrl()}/api/v1${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
-  });
-  if (!response.ok) throw new SpendWiseApiError(response.status);
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(`${requireApiUrl()}/api/v1${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers,
+      },
+    });
+    if (!response.ok) throw new SpendWiseApiError(response.status);
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function jsonBody(value: unknown): Pick<RequestInit, "method" | "body"> {

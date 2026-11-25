@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -156,6 +156,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [correctionSign, setCorrectionSign] = useState<1 | -1>(1);
   const [correctionReason, setCorrectionReason] = useState("");
   const [correctionDate, setCorrectionDate] = useState(today());
+  const workspaceRequestId = useRef(0);
 
   const selectedBudget = budgets.find(
     (budget) => budget.id === selectedBudgetId,
@@ -227,6 +228,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const loadWorkspace = useCallback(
     async (budgetId = selectedBudgetId) => {
       if (!budgetId) return;
+      const requestId = ++workspaceRequestId.current;
       setIsLoadingWorkspace(true);
       setWorkspaceLoadFailed(false);
       try {
@@ -237,6 +239,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             spendwiseApi.listIncomeSchedules(accessToken, budgetId, offset),
           ),
         ]);
+        if (requestId !== workspaceRequestId.current) return;
         setPeriods(nextPeriods);
         setCategories(nextCategories);
         setIncomeSchedules(nextSchedules);
@@ -246,10 +249,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             : (nextPeriods[0]?.id ?? ""),
         );
       } catch (error) {
+        if (requestId !== workspaceRequestId.current) return;
         setWorkspaceLoadFailed(true);
         throw error;
       } finally {
-        setIsLoadingWorkspace(false);
+        if (requestId === workspaceRequestId.current) {
+          setIsLoadingWorkspace(false);
+        }
       }
     },
     [accessToken, selectedBudgetId],
@@ -342,7 +348,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     const timer = setTimeout(() => {
       void loadWorkspace().catch(() => {
         setIsError(true);
-        setNotice(t("budget.setupError"));
+        setNotice(t("budget.loadError"));
       });
     }, 0);
     return () => clearTimeout(timer);
@@ -849,6 +855,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   };
 
   function selectBudget(budgetId: string) {
+    if (budgetId === selectedBudgetId) return;
+    workspaceRequestId.current += 1;
     setSelectedBudgetId(budgetId);
     setIsLoadingWorkspace(true);
     setWorkspaceLoadFailed(false);
@@ -998,7 +1006,15 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             <View style={styles.card}>
               <Text style={styles.muted}>{t("common.loading")}</Text>
             </View>
-          ) : workspaceLoadFailed ? null : periods.length ? (
+          ) : workspaceLoadFailed ? (
+            <View style={styles.card}>
+              <Text style={styles.error}>{t("budget.loadError")}</Text>
+              <ActionButton
+                label={t("common.retry")}
+                onPress={() => void loadWorkspace().catch(() => undefined)}
+              />
+            </View>
+          ) : periods.length ? (
             <>
               <Text style={styles.sectionTitle}>{t("budget.period")}</Text>
               <View style={styles.rowWrap}>
@@ -1711,6 +1727,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                   <Text style={styles.label}>
                                     {t("movement.correctionDescription")}
                                   </Text>
+                                  <Text style={styles.muted}>
+                                    {t("movement.correctionDescriptionHelp")}
+                                  </Text>
                                   <TextInput
                                     accessibilityLabel={t(
                                       "movement.correctionDescription",
@@ -1783,6 +1802,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   </Text>
                   <View style={styles.annualRow}>
                     <View style={styles.annualInput}>
+                      <Text style={styles.label}>{t("dashboard.year")}</Text>
                       <TextInput
                         accessibilityLabel={t("dashboard.year")}
                         keyboardType="number-pad"
@@ -1803,7 +1823,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       />
                       <FieldError message={fieldErrors.annualYear} />
                     </View>
-                    <Text style={styles.muted}>{t("dashboard.year")}</Text>
                     <ActionButton
                       disabled={isLoadingAnnual}
                       label={
@@ -1836,6 +1855,44 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                         }
                         format={formatAmount}
                       />
+                    </View>
+                  ) : null}
+                  {annualMonths.some(
+                    (month) =>
+                      month.income !== 0 ||
+                      month.expense !== 0 ||
+                      month.adjustment !== 0,
+                  ) ? (
+                    <View style={styles.annualBreakdown}>
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.monthlyBreakdown")}
+                      </Text>
+                      {annualMonths
+                        .filter(
+                          (month) =>
+                            month.income !== 0 ||
+                            month.expense !== 0 ||
+                            month.adjustment !== 0,
+                        )
+                        .map((month) => (
+                          <View key={month.month} style={styles.annualMonthRow}>
+                            <Text style={styles.entryTitle}>
+                              {new Intl.DateTimeFormat(i18n.language, {
+                                month: "long",
+                              }).format(new Date(`${month.month}-01T12:00:00`))}
+                            </Text>
+                            <Text style={styles.muted}>
+                              {t("dashboard.incomeLegend")}:{" "}
+                              {formatAmount.format(month.income)}
+                              {" · "}
+                              {t("dashboard.expenseLegend")}:{" "}
+                              {formatAmount.format(month.expense)}
+                              {" · "}
+                              {t("dashboard.remainingTitle")}:{" "}
+                              {formatAmount.format(month.remaining)}
+                            </Text>
+                          </View>
+                        ))}
                     </View>
                   ) : null}
                   <Text style={styles.sectionTitle}>
@@ -2545,9 +2602,21 @@ const styles = StyleSheet.create({
   chartMonth: { color: "#627168", fontSize: 10, textTransform: "capitalize" },
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   balanceValue: { alignItems: "flex-end", gap: 2 },
-  annualRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  annualInput: { gap: 4 },
+  annualRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: 10,
+  },
+  annualInput: { gap: 4, width: 140 },
   yearInput: { width: 100 },
+  annualBreakdown: { gap: 8 },
+  annualMonthRow: {
+    gap: 3,
+    paddingVertical: 9,
+    borderBottomColor: "#edf1ed",
+    borderBottomWidth: 1,
+  },
   list: { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 14 },
   scheduleList: { marginTop: 8, borderTopColor: "#edf1ed", borderTopWidth: 1 },
   scheduleItem: {
