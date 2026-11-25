@@ -63,17 +63,21 @@ select b.id, 'General', m.id
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11000000-0000-0000-0000-000000000001', true);
+select public.create_expense_label(
+    (select id from public.budgets where name = 'MVP-13 archived test'),
+    (select id from public.budget_categories where name = 'General'), 'General');
 select lives_ok(
     $$update public.budgets set archived_at = now() where name = 'MVP-13 archived test'$$,
     'Owner can archive a budget'
 );
 select set_config('request.jwt.claim.sub', '11000000-0000-0000-0000-000000000002', true);
 select lives_ok(
-    $$insert into public.expense_entries (budget_id, period_id, category_id, recorded_by_member_id, amount, spent_on)
-      select b.id, p.id, c.id, m.id, 5, current_date
+    $$insert into public.expense_entries (budget_id, period_id, category_id, label_id, recorded_by_member_id, amount, spent_on)
+      select b.id, p.id, c.id, l.id, m.id, 5, current_date
         from public.budgets b
         join public.budget_periods p on p.budget_id = b.id
         join public.budget_categories c on c.budget_id = b.id
+        join public.expense_labels l on l.budget_id = b.id and l.category_id = c.id and l.name = 'General'
         join public.budget_members m on m.budget_id = b.id and m.user_id = auth.uid() and m.removed_at is null
        where b.name = 'MVP-13 archived test'$$,
     'Active contributor can still record a movement after archive'

@@ -1,6 +1,7 @@
 import {
   calculateAnnualSummary,
   calculateExpenseCategoryShares,
+  calculateExpenseLabelShares,
   calculatePeriodCategoryBalances,
   periodsOverlappingYear,
 } from "@/features/budget/budget-summary";
@@ -27,6 +28,38 @@ const travelCategory: BudgetCategory = {
 };
 
 describe("budget dashboard summaries", () => {
+  it("breaks expenses down by label inside each budget category", () => {
+    const result = calculateExpenseLabelShares(
+      [category, travelCategory],
+      [
+        {
+          id: "expense-culture",
+          period_id: "period-1",
+          category_id: "general",
+          label_id: "culture",
+          label: { name: "Cultura", is_system: false },
+          amount: 20,
+          spent_on: "2026-01-01",
+          description: null,
+        },
+        {
+          id: "expense-sport",
+          period_id: "period-1",
+          category_id: "general",
+          label_id: "sport",
+          label: { name: "Desporto", is_system: false },
+          amount: 30,
+          spent_on: "2026-01-02",
+          description: null,
+        },
+      ],
+    );
+
+    expect(result).toEqual([
+      { category, label: "Desporto", amount: 30, percentage: 60 },
+      { category, label: "Cultura", amount: 20, percentage: 40 },
+    ]);
+  });
   it("calculates a period balance from allocations, expenses and signed adjustments", () => {
     const incomes: IncomeEntry[] = [
       {
@@ -49,6 +82,8 @@ describe("budget dashboard summaries", () => {
         id: "expense-1",
         period_id: "period-1",
         category_id: "general",
+        label_id: "food",
+        label: { name: "Alimentação", is_system: false },
         amount: 500,
         spent_on: "2026-01-02",
         description: null,
@@ -226,6 +261,8 @@ describe("budget dashboard summaries", () => {
         id: "expense-2026",
         period_id: "cross-year",
         category_id: "general",
+        label_id: "culture",
+        label: { name: "Cultura", is_system: false },
         amount: 60,
         spent_on: "2026-12-31",
         description: null,
@@ -234,6 +271,8 @@ describe("budget dashboard summaries", () => {
         id: "expense-2027",
         period_id: "cross-year",
         category_id: "general",
+        label_id: "culture",
+        label: { name: "Cultura", is_system: false },
         amount: 30,
         spent_on: "2027-01-01",
         description: null,

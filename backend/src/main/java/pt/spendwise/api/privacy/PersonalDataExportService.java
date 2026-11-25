@@ -14,6 +14,7 @@ import pt.spendwise.api.budget.BudgetResponse;
 import pt.spendwise.api.budget.BudgetService;
 import pt.spendwise.api.budget.IncomeScheduleResponse;
 import pt.spendwise.api.budget.IncomeScheduleService;
+import pt.spendwise.api.budget.ExpenseLabelService;
 
 @Service
 public class PersonalDataExportService {
@@ -27,6 +28,7 @@ public class PersonalDataExportService {
     private final AllocationSetService allocationService;
     private final BudgetMovementService movementService;
     private final IncomeScheduleService scheduleService;
+    private final ExpenseLabelService expenseLabelService;
 
     public PersonalDataExportService(
             PrivacyExportRepository exportRepository,
@@ -35,7 +37,8 @@ public class PersonalDataExportService {
             BudgetCategoryService categoryService,
             AllocationSetService allocationService,
             BudgetMovementService movementService,
-            IncomeScheduleService scheduleService) {
+            IncomeScheduleService scheduleService,
+            ExpenseLabelService expenseLabelService) {
         this.exportRepository = exportRepository;
         this.budgetService = budgetService;
         this.periodService = periodService;
@@ -43,6 +46,7 @@ public class PersonalDataExportService {
         this.allocationService = allocationService;
         this.movementService = movementService;
         this.scheduleService = scheduleService;
+        this.expenseLabelService = expenseLabelService;
     }
 
     public PersonalDataExport exportForCurrentUser() {
@@ -55,17 +59,22 @@ public class PersonalDataExportService {
 
     private BudgetDataExport exportBudget(BudgetResponse budget) {
         UUID budgetId = budget.id();
+        var categories = categoryService.list(budgetId);
         return new BudgetDataExport(
                 budget,
                 periodService.list(budgetId),
-                categoryService.list(budgetId),
+                categories,
+                categories.stream()
+                        .flatMap(category -> expenseLabelService.list(budgetId, category.id()).stream())
+                        .toList(),
                 allocationService.list(budgetId),
                 allPages(offset -> movementService.listIncomes(budgetId, null, PAGE_SIZE, offset)).stream()
                         .map(row -> new ExportIncome(row.id(), row.periodId(), row.amount(), row.occurredOn(),
                                 row.createdAt(), row.allocationSnapshot()))
                         .toList(),
                 allPages(offset -> movementService.listExpenses(budgetId, null, PAGE_SIZE, offset)).stream()
-                        .map(row -> new ExportExpense(row.id(), row.periodId(), row.categoryId(), row.amount(),
+                        .map(row -> new ExportExpense(row.id(), row.periodId(), row.categoryId(), row.labelId(),
+                                row.label() == null ? null : row.label().name(), row.amount(),
                                 row.spentOn(), row.description(), row.createdAt()))
                         .toList(),
                 allPages(offset -> movementService.listAdjustments(budgetId, null, PAGE_SIZE, offset)).stream()

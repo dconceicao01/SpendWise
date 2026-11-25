@@ -75,6 +75,16 @@ public class BudgetMovementService {
         }
     }
 
+    public ExpenseEntryResponse updateExpenseLabel(UUID budgetId, UUID expenseId, UUID labelId) {
+        authorizationService.requireAllowed(budgetId, BudgetAction.RECORD_MOVEMENT);
+        try {
+            return movementRepository.updateExpenseLabel(budgetId, expenseId, labelId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expense not found"));
+        } catch (RestClientResponseException exception) {
+            throw translateMovementError(exception);
+        }
+    }
+
     public List<BudgetAdjustmentResponse> listAdjustments(UUID budgetId, UUID periodId, int limit, int offset) {
         authorizationService.requireAllowed(budgetId, BudgetAction.READ);
         return movementRepository.findAdjustments(budgetId, periodId, pageSize(limit), pageOffset(offset));

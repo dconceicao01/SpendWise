@@ -64,21 +64,23 @@ class SupabaseBudgetMovementRepositoryTest {
                 .andExpect(content().json("{\"p_budget_id\":\"" + BUDGET_ID
                         + "\",\"p_period_id\":\"" + PERIOD_ID
                         + "\",\"p_category_id\":\"" + CATEGORY_ID
+                        + "\",\"p_label_id\":\"eea3f961-1f03-4608-a248-a0fd9fd321f0"
                         + "\",\"p_amount\":12.50,\"p_spent_on\":\"2026-11-22\",\"p_description\":\"Lunch\"}"))
                 .andRespond(withSuccess("\"" + ENTRY_ID + "\"", MediaType.APPLICATION_JSON));
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/expense_entries?select=id,budget_id,period_id,category_id,recorded_by_member_id,amount,spent_on,description,created_at&budget_id=eq."
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/expense_entries?select=id,budget_id,period_id,category_id,label_id,recorded_by_member_id,amount,spent_on,description,created_at,label:expense_labels(name,is_system)&budget_id=eq."
                         + BUDGET_ID + "&id=eq." + ENTRY_ID + "&limit=1"))
                 .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
                 .andRespond(withSuccess("[{\"id\":\"" + ENTRY_ID + "\",\"budget_id\":\"" + BUDGET_ID
                         + "\",\"period_id\":\"" + PERIOD_ID + "\",\"category_id\":\"" + CATEGORY_ID
-                        + "\",\"recorded_by_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
+                        + "\",\"label_id\":\"eea3f961-1f03-4608-a248-a0fd9fd321f0\",\"label\":{\"name\":\"Lunch\",\"is_system\":false},"
+                        + "\"recorded_by_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
                         + "\"amount\":12.50,\"spent_on\":\"2026-11-22\",\"description\":\"Lunch\","
                         + "\"created_at\":\"2026-11-22T17:00:00Z\"}]", MediaType.APPLICATION_JSON));
 
         var expense = movementRepository.recordExpense(
                 BUDGET_ID,
-                new CreateExpenseRequest(PERIOD_ID, CATEGORY_ID, new BigDecimal("12.50"),
-                        LocalDate.of(2026, 11, 22), "Lunch"));
+                new CreateExpenseRequest(PERIOD_ID, CATEGORY_ID, UUID.fromString("eea3f961-1f03-4608-a248-a0fd9fd321f0"),
+                        new BigDecimal("12.50"), LocalDate.of(2026, 11, 22), "Lunch"));
 
         assertThat(expense).isPresent();
         assertThat(expense.orElseThrow().id()).isEqualTo(ENTRY_ID);

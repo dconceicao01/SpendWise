@@ -4,6 +4,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const budgetId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const periodId = "pppppppp-pppp-4ppp-8ppp-pppppppppppp";
 const categoryId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const groceryLabelId = "llll1111-1111-4111-8111-111111111111";
 const allocationSetId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const accountId = "11111111-1111-4111-8111-111111111111";
 
@@ -37,6 +38,8 @@ type MovementState = {
     id: string;
     period_id: string;
     category_id: string;
+    label_id: string;
+    label: { name: string; is_system: boolean };
     amount: number;
     spent_on: string;
     description: string | null;
@@ -273,6 +276,41 @@ async function mockBudgetApi(page: Page) {
       return respond(budget, 201);
     }
 
+    const labelPath = path.match(
+      /^\/budgets\/[^/]+\/categories\/([^/]+)\/expense-labels$/,
+    );
+    if (labelPath) {
+      const [, labelCategoryId] = labelPath;
+      const labels =
+        labelCategoryId === categoryId
+          ? [
+              {
+                id: groceryLabelId,
+                budget_id: budgetId,
+                category_id: categoryId,
+                name: "Groceries",
+                is_system: false,
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ]
+          : [];
+      if (method === "GET") return respond(labels);
+      if (method === "POST") {
+        const input = request.postDataJSON() as { name: string };
+        return respond(
+          {
+            id: "llll2222-2222-4222-8222-222222222222",
+            budget_id: budgetId,
+            category_id: labelCategoryId,
+            name: input.name,
+            is_system: false,
+            created_at: "2026-01-01T00:00:00Z",
+          },
+          201,
+        );
+      }
+    }
+
     const resource = path.match(
       /^\/budgets\/[^/]+\/(periods|categories|allocation-sets|income-schedules|incomes|income-corrections|expenses|adjustments|invitations)(?:\/(.*))?$/,
     );
@@ -492,11 +530,16 @@ async function mockBudgetApi(page: Page) {
       const input = request.postDataJSON() as {
         period_id: string;
         category_id: string;
+        label_id: string;
         amount: number;
         spent_on: string;
         description: string | null;
       };
-      const expense = { id: "ffffffff-ffff-4fff-8fff-ffffffffffff", ...input };
+      const expense = {
+        id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        ...input,
+        label: { name: "Groceries", is_system: false },
+      };
       state.movements.expenses = [...state.movements.expenses, expense];
       return respond(expense, 201);
     }
@@ -627,6 +670,11 @@ test("creates a budget, records virtual movements and reviews annual totals", as
 
   await page.getByRole("button", { name: "Expenses" }).click();
   await page.getByRole("button", { name: "General" }).click();
+  await page.getByRole("button", { name: "+ Add type" }).click();
+  await page.getByLabel("New expense type").fill("Travel");
+  await page.getByRole("button", { name: "Save type" }).click();
+  await expect(page.getByRole("button", { name: "Travel" })).toBeVisible();
+  await page.getByRole("button", { name: "Groceries" }).click();
   await page.getByLabel("Amount").fill("200");
   await page.getByLabel("Date (YYYY-MM-DD)").fill(`${year}-06-10`);
   await page.getByLabel("Description (optional)").fill("Groceries");
@@ -641,6 +689,9 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await expect(page.getByText(/1,000\.00/).last()).toBeVisible();
   await expect(page.getByText(/200\.00/).last()).toBeVisible();
   await expect(page.getByText("Expenses by category")).toBeVisible();
+  await expect(
+    page.getByText("Expenses by type within each category"),
+  ).toBeVisible();
   await expect(
     page.getByText("Allocation and balance by category"),
   ).toBeVisible();

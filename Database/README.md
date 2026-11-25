@@ -2,6 +2,8 @@
 
 Configuração e migrações Supabase/PostgreSQL do SpendWise. A CLI fica fixada em `3.2.0` como dependência de desenvolvimento neste pacote; o diretório de trabalho personalizado permite manter tudo sob `Database/`.
 
+Despesas usam uma label obrigatória, separada da descrição livre, com unicidade de nome por categoria e integridade para impedir associação cruzada entre categorias/orçamentos. OWNER e CONTRIBUTOR podem criar labels; membros ativos consultam-nas. Despesas anteriores recebem a label reservada `Por classificar`, que não pode ser usada em novos registos, e podem ser reclassificadas. As estatísticas por label são gratuitas e agregadas por categoria e período. A migration mantém RLS ativo e restringe RPCs de escrita a `authenticated`.
+
 ## Preparação local
 
 Requisitos: Node.js 24 LTS, pnpm 12 e Docker Desktop em execução.
