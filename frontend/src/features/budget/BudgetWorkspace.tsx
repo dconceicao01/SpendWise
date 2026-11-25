@@ -664,7 +664,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       Number(annualYear) < 1
     )
       return;
-    void loadAnnualSummary();
+    void Promise.resolve().then(loadAnnualSummary);
   }, [
     annualRefreshKey,
     annualYear,
