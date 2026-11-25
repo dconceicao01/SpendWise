@@ -12,6 +12,8 @@
     "error": "We couldn't complete this action. Please try again."
   },
   "mobileNav": {
+    "budgets": "Budgets",
+    "profile": "Profile",
     "home": "Home",
     "movements": "Activity",
     "statistics": "Statistics"

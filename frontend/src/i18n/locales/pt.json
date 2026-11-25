@@ -12,6 +12,8 @@
     "error": "Não foi possível concluir esta operação. Tenta novamente."
   },
   "mobileNav": {
+    "budgets": "Orçamentos",
+    "profile": "Perfil",
     "home": "Início",
     "movements": "Movimentos",
     "statistics": "Estatísticas"
