@@ -17,7 +17,7 @@ import pt.spendwise.api.budget.IncomeScheduleStatus;
 public class SupabaseIncomeScheduleRepository implements IncomeScheduleRepository {
 
     private static final String SELECT_SCHEDULE =
-            "id,budget_id,income_member_id,created_by_member_id,amount,frequency,monthly_short_month_behavior,start_date,end_date,next_occurrence_on,status,created_at,updated_at";
+            "id,budget_id,income_member_id,created_by_member_id,amount,description,frequency,monthly_short_month_behavior,start_date,end_date,next_occurrence_on,status,created_at,updated_at";
     private static final ParameterizedTypeReference<List<IncomeScheduleResponse>> SCHEDULE_ROWS =
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<UUID> UUID_RESULT =
@@ -51,7 +51,8 @@ public class SupabaseIncomeScheduleRepository implements IncomeScheduleRepositor
         body.put("p_start_date", request.startDate().toString());
         body.put("p_end_date", request.endDate() == null ? null : request.endDate().toString());
         body.put("p_monthly_short_month_behavior", request.monthlyShortMonthBehavior().name());
-        UUID id = dataApiClient.callFunction("create_income_schedule", body, UUID_RESULT);
+        body.put("p_description", request.description());
+        UUID id = dataApiClient.callFunction("create_income_schedule_with_description", body, UUID_RESULT);
         return id == null ? Optional.empty() : findById(budgetId, id);
     }
 

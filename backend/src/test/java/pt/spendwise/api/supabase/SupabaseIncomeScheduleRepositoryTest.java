@@ -52,21 +52,21 @@ class SupabaseIncomeScheduleRepositoryTest {
 
     @Test
     void createsScheduleThroughAuthenticatedRpcAndReadsItBack() {
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/rpc/create_income_schedule"))
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/rpc/create_income_schedule_with_description"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
                 .andExpect(content().json("{\"p_budget_id\":\"" + BUDGET_ID
                         + "\",\"p_amount\":900.00,\"p_frequency\":\"MONTHLY\","
                         + "\"p_start_date\":\"2026-11-23\",\"p_end_date\":null,"
-                        + "\"p_monthly_short_month_behavior\":\"SKIP\"}"))
+                        + "\"p_monthly_short_month_behavior\":\"SKIP\",\"p_description\":\"Rendimento mensal\"}"))
                 .andRespond(withSuccess("\"" + SCHEDULE_ID + "\"", MediaType.APPLICATION_JSON));
 
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_schedules?select=id,budget_id,income_member_id,created_by_member_id,amount,frequency,monthly_short_month_behavior,start_date,end_date,next_occurrence_on,status,created_at,updated_at&budget_id=eq."
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_schedules?select=id,budget_id,income_member_id,created_by_member_id,amount,description,frequency,monthly_short_month_behavior,start_date,end_date,next_occurrence_on,status,created_at,updated_at&budget_id=eq."
                         + BUDGET_ID + "&id=eq." + SCHEDULE_ID + "&limit=1"))
                 .andRespond(withSuccess("[{\"id\":\"" + SCHEDULE_ID + "\",\"budget_id\":\"" + BUDGET_ID
                         + "\",\"income_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
                         + "\"created_by_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
-                        + "\"amount\":900.00,\"frequency\":\"MONTHLY\",\"monthly_short_month_behavior\":\"SKIP\",\"start_date\":\"2026-11-23\","
+                        + "\"amount\":900.00,\"description\":\"Rendimento mensal\",\"frequency\":\"MONTHLY\",\"monthly_short_month_behavior\":\"SKIP\",\"start_date\":\"2026-11-23\","
                         + "\"end_date\":null,\"next_occurrence_on\":\"2026-11-23\",\"status\":\"ACTIVE\","
                         + "\"created_at\":\"2026-11-23T08:00:00Z\",\"updated_at\":\"2026-11-23T08:00:00Z\"}]",
                         MediaType.APPLICATION_JSON));
@@ -75,11 +75,12 @@ class SupabaseIncomeScheduleRepositoryTest {
                 BUDGET_ID,
                 new CreateIncomeScheduleRequest(
                         new BigDecimal("900.00"), IncomeScheduleFrequency.MONTHLY,
-                        LocalDate.of(2026, 11, 23), null, MonthlyShortMonthBehavior.SKIP));
+                        LocalDate.of(2026, 11, 23), null, MonthlyShortMonthBehavior.SKIP, "Rendimento mensal"));
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().id()).isEqualTo(SCHEDULE_ID);
         assertThat(result.orElseThrow().amount()).isEqualByComparingTo("900.00");
+        assertThat(result.orElseThrow().description()).isEqualTo("Rendimento mensal");
         assertThat(result.orElseThrow().frequency()).isEqualTo(IncomeScheduleFrequency.MONTHLY);
         assertThat(result.orElseThrow().monthlyShortMonthBehavior()).isEqualTo(MonthlyShortMonthBehavior.SKIP);
         mockServer.verify();

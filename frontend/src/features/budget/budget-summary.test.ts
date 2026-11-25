@@ -1,5 +1,6 @@
 import {
   calculateAnnualSummary,
+  calculateExpenseCategoryShares,
   calculatePeriodCategoryBalances,
   periodsOverlappingYear,
 } from "@/features/budget/budget-summary";
@@ -18,6 +19,12 @@ const category: BudgetCategory = {
   name: "Geral",
   archived_at: null,
 };
+const travelCategory: BudgetCategory = {
+  id: "travel",
+  budget_id: "budget-1",
+  name: "Viagens",
+  archived_at: null,
+};
 
 describe("budget dashboard summaries", () => {
   it("calculates a period balance from allocations, expenses and signed adjustments", () => {
@@ -27,6 +34,7 @@ describe("budget dashboard summaries", () => {
         period_id: "period-1",
         amount: 900,
         occurred_on: "2026-01-01",
+        description: null,
         allocation_snapshot: [
           {
             category_id: "general",
@@ -88,6 +96,34 @@ describe("budget dashboard summaries", () => {
     ]);
   });
 
+  it("calculates the share of spending by category for the period chart", () => {
+    expect(
+      calculateExpenseCategoryShares([
+        {
+          category,
+          allocated: 500,
+          spent: 300,
+          adjusted: 0,
+          balance: 200,
+        },
+        {
+          category: travelCategory,
+          allocated: 200,
+          spent: 100,
+          adjusted: 0,
+          balance: 100,
+        },
+      ]),
+    ).toEqual([
+      { category, amount: 300, percentage: 75 },
+      { category: travelCategory, amount: 100, percentage: 25 },
+    ]);
+  });
+
+  it("returns no expense slices when a period has no expenses", () => {
+    expect(calculateExpenseCategoryShares([])).toEqual([]);
+  });
+
   it("applies income corrections to the original category and income total", () => {
     const incomes: IncomeEntry[] = [
       {
@@ -95,6 +131,7 @@ describe("budget dashboard summaries", () => {
         period_id: "period-1",
         amount: 900,
         occurred_on: "2026-01-01",
+        description: null,
         allocation_snapshot: [
           {
             category_id: "general",
@@ -172,6 +209,7 @@ describe("budget dashboard summaries", () => {
         period_id: "cross-year",
         amount: 100,
         occurred_on: "2025-12-31",
+        description: null,
         allocation_snapshot: [],
       },
       {
@@ -179,6 +217,7 @@ describe("budget dashboard summaries", () => {
         period_id: "cross-year",
         amount: 200,
         occurred_on: "2026-01-01",
+        description: null,
         allocation_snapshot: [],
       },
     ];

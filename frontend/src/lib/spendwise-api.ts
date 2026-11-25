@@ -37,6 +37,7 @@ export type IncomeEntry = {
   period_id: string;
   amount: number;
   occurred_on: string;
+  description: string | null;
   allocation_snapshot: {
     category_id: string;
     percentage_basis_points: number;
@@ -114,6 +115,7 @@ export type IncomeSchedule = {
   id: string;
   budget_id: string;
   amount: number;
+  description: string | null;
   frequency: IncomeScheduleFrequency;
   monthly_short_month_behavior: MonthlyShortMonthBehavior;
   start_date: string;
@@ -270,7 +272,12 @@ export const spendwiseApi = {
   createIncome: (
     token: string,
     budgetId: string,
-    input: { period_id: string; amount: number; occurred_on: string },
+    input: {
+      period_id: string;
+      amount: number;
+      occurred_on: string;
+      description: string | null;
+    },
   ) =>
     request<IncomeEntry>(
       token,
@@ -317,6 +324,7 @@ export const spendwiseApi = {
       monthlyShortMonthBehavior: MonthlyShortMonthBehavior;
       startDate: string;
       endDate: string | null;
+      description: string | null;
     },
   ) =>
     request<IncomeSchedule>(

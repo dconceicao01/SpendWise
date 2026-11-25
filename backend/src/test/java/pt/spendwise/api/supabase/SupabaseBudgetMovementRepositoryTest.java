@@ -88,14 +88,14 @@ class SupabaseBudgetMovementRepositoryTest {
 
     @Test
     void recordsIncomeAtomicallyAndReturnsItsAllocationSnapshot() {
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/rpc/record_income"))
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/rpc/record_income_with_description"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(content().json("{\"p_budget_id\":\"" + BUDGET_ID
                         + "\",\"p_period_id\":\"" + PERIOD_ID
                         + "\",\"p_amount\":900.00,\"p_occurred_on\":\"2026-11-22\","
-                        + "\"p_schedule_id\":null,\"p_scheduled_for\":null,\"p_recorder_member_id\":null}"))
+                        + "\"p_description\":\"Salário\",\"p_schedule_id\":null,\"p_scheduled_for\":null,\"p_recorder_member_id\":null}"))
                 .andRespond(withSuccess("\"" + ENTRY_ID + "\"", MediaType.APPLICATION_JSON));
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_entries?select=id,budget_id,period_id,income_member_id,recorded_by_member_id,allocation_set_id,schedule_id,scheduled_for,amount,occurred_on,created_at&budget_id=eq."
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_entries?select=id,budget_id,period_id,income_member_id,recorded_by_member_id,allocation_set_id,schedule_id,scheduled_for,amount,occurred_on,description,created_at&budget_id=eq."
                         + BUDGET_ID + "&id=eq." + ENTRY_ID + "&limit=1"))
                 .andRespond(withSuccess("[{\"id\":\"" + ENTRY_ID + "\",\"budget_id\":\"" + BUDGET_ID
                         + "\",\"period_id\":\"" + PERIOD_ID + "\","
@@ -103,7 +103,7 @@ class SupabaseBudgetMovementRepositoryTest {
                         + "\"recorded_by_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
                         + "\"allocation_set_id\":\"" + ALLOCATION_ID
                         + "\",\"schedule_id\":null,\"scheduled_for\":null,\"amount\":900.00,"
-                        + "\"occurred_on\":\"2026-11-22\",\"created_at\":\"2026-11-22T17:00:00Z\"}]",
+                        + "\"occurred_on\":\"2026-11-22\",\"description\":\"Salário\",\"created_at\":\"2026-11-22T17:00:00Z\"}]",
                         MediaType.APPLICATION_JSON));
         mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/income_allocation_snapshots?select=income_entry_id,category_id,percentage_basis_points,allocated_amount&budget_id=eq."
                         + BUDGET_ID + "&income_entry_id=in.(" + ENTRY_ID + ")&order=category_id.asc"))
@@ -112,9 +112,10 @@ class SupabaseBudgetMovementRepositoryTest {
                         MediaType.APPLICATION_JSON));
 
         var income = movementRepository.recordIncome(
-                BUDGET_ID, new CreateIncomeRequest(PERIOD_ID, new BigDecimal("900.00"), LocalDate.of(2026, 11, 22)));
+                BUDGET_ID, new CreateIncomeRequest(PERIOD_ID, new BigDecimal("900.00"), LocalDate.of(2026, 11, 22), "Salário"));
 
         assertThat(income).isPresent();
+        assertThat(income.orElseThrow().description()).isEqualTo("Salário");
         assertThat(income.orElseThrow().allocationSnapshot()).hasSize(1);
         assertThat(income.orElseThrow().allocationSnapshot().getFirst().allocatedAmount())
                 .isEqualByComparingTo("900.00");

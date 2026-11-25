@@ -59,7 +59,8 @@ class IncomeScheduleServiceTest {
                 IncomeScheduleFrequency.MONTHLY,
                 LocalDate.of(2026, 11, 10),
                 LocalDate.of(2026, 11, 9),
-                MonthlyShortMonthBehavior.LAST_DAY);
+                MonthlyShortMonthBehavior.LAST_DAY,
+                null);
 
         assertThatThrownBy(() -> service.create(BUDGET_ID, request))
                 .isInstanceOf(ResponseStatusException.class)
@@ -82,7 +83,8 @@ class IncomeScheduleServiceTest {
                 IncomeScheduleFrequency.MONTHLY,
                 LocalDate.of(2026, 11, 23),
                 null,
-                MonthlyShortMonthBehavior.LAST_DAY);
+                MonthlyShortMonthBehavior.LAST_DAY,
+                null);
     }
 
     private IncomeScheduleResponse schedule() {
@@ -92,6 +94,7 @@ class IncomeScheduleServiceTest {
                 UUID.fromString("5988f040-a1f5-492f-a2ab-4e7b6d93c8c3"),
                 UUID.fromString("5988f040-a1f5-492f-a2ab-4e7b6d93c8c3"),
                 new BigDecimal("900.00"),
+                null,
                 IncomeScheduleFrequency.MONTHLY,
                 MonthlyShortMonthBehavior.LAST_DAY,
                 LocalDate.of(2026, 11, 23),

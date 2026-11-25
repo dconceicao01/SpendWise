@@ -3,6 +3,7 @@ package pt.spendwise.api.budget;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -11,5 +12,6 @@ public record CreateIncomeScheduleRequest(
         @NotNull IncomeScheduleFrequency frequency,
         @NotNull LocalDate startDate,
         LocalDate endDate,
-        @NotNull MonthlyShortMonthBehavior monthlyShortMonthBehavior) {
+        @NotNull MonthlyShortMonthBehavior monthlyShortMonthBehavior,
+        @Size(max = 500) String description) {
 }
