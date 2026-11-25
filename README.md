@@ -73,6 +73,7 @@ Esta documentação é uma base de engenharia, não um parecer jurídico nem uma
 - [Desenvolvimento, revisão, testes e CI/CD](docs/workflow.md)
 - [Configuração do piloto Vercel](docs/vercel-pilot.md)
 - [Verificações de staging](docs/staging-smoke.md)
+- [Builds móveis e suporte Android ARM64](docs/mobile-builds.md)
 - [Cópias de segurança e recuperação](docs/disaster-recovery.md)
 - [Princípios de desenvolvimento, dependências e testes](docs/development-principles.md)
 - [Decisões de arquitetura](docs/adr/0001-stack-e-arquitetura.md)
