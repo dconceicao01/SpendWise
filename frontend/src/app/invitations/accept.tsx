@@ -12,6 +12,7 @@ import * as Linking from "expo-linking";
 import { useAuth } from "@/auth/auth-context";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { getRuntimeConfig } from "@/lib/runtime-config";
 
 type AcceptanceResult = {
   accepted: boolean;
@@ -40,7 +41,7 @@ export default function AcceptInvitationScreen() {
 
   async function acceptInvitation() {
     if (!token || !session) return;
-    const apiUrl = process.env.EXPO_PUBLIC_SPENDWISE_API_URL;
+    const apiUrl = getRuntimeConfig().apiUrl;
     if (!apiUrl) {
       setIsError(true);
       setNotice(t("invitation.invalid"));

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -89,6 +90,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const { t, i18n } = useTranslation();
   const { width } = useWindowDimensions();
   const isCompact = width < 600;
+  const isNative = Platform.OS !== "web";
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
   const [periods, setPeriods] = useState<BudgetPeriod[]>([]);
@@ -126,6 +128,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [isLoadingAnnual, setIsLoadingAnnual] = useState(false);
   const [tab, setTab] = useState<MovementTab>("income");
   const [isLoading, setIsLoading] = useState(true);
+  const [budgetLoadFailed, setBudgetLoadFailed] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [isCreatingBudget, setIsCreatingBudget] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -340,11 +343,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       })
       .catch((error: unknown) => {
         if (active) {
+          setBudgetLoadFailed(true);
           setIsError(true);
           setNotice(
             error instanceof SpendWiseApiError && error.status === 401
               ? t("budget.sessionError")
-              : t("budget.setupError"),
+              : error instanceof SpendWiseApiError && error.status === 0
+                ? t("budget.apiUnavailable")
+                : t("budget.apiError"),
           );
         }
       })
@@ -357,9 +363,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   useEffect(() => {
     if (!selectedBudgetId) return;
     const timer = setTimeout(() => {
-      void loadWorkspace().catch(() => {
+      void loadWorkspace().catch((error: unknown) => {
         setIsError(true);
-        setNotice(t("budget.loadError"));
+        setNotice(
+          error instanceof SpendWiseApiError && error.status === 401
+            ? t("budget.sessionError")
+            : error instanceof SpendWiseApiError && error.status === 0
+              ? t("budget.apiUnavailable")
+              : error instanceof SpendWiseApiError
+                ? t("budget.apiOperationError")
+                : t("budget.loadError"),
+        );
       });
     }, 0);
     return () => clearTimeout(timer);
@@ -367,9 +381,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadMovements().catch(() => {
+      void loadMovements().catch((error: unknown) => {
         setIsError(true);
-        setNotice(t("movement.loadError"));
+        setNotice(
+          error instanceof SpendWiseApiError && error.status === 401
+            ? t("budget.sessionError")
+            : error instanceof SpendWiseApiError && error.status === 0
+              ? t("budget.apiUnavailable")
+              : error instanceof SpendWiseApiError
+                ? t("budget.apiOperationError")
+                : t("movement.loadError"),
+        );
       });
     }, 0);
     return () => clearTimeout(timer);
@@ -384,6 +406,34 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       }),
     [currency, i18n.language, selectedBudget?.currency_code],
   );
+
+  async function retryBudgetLoad() {
+    setIsLoading(true);
+    setBudgetLoadFailed(false);
+    setNotice("");
+    try {
+      const nextBudgets = await spendwiseApi.listBudgets(accessToken);
+      const visible = nextBudgets.filter((budget) => !budget.archived_at);
+      setBudgets(visible);
+      setSelectedBudgetId((current) =>
+        visible.some((budget) => budget.id === current)
+          ? current
+          : (visible[0]?.id ?? ""),
+      );
+    } catch (error) {
+      setBudgetLoadFailed(true);
+      setIsError(true);
+      setNotice(
+        error instanceof SpendWiseApiError && error.status === 401
+          ? t("budget.sessionError")
+          : error instanceof SpendWiseApiError && error.status === 0
+            ? t("budget.apiUnavailable")
+            : t("budget.apiError"),
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   async function createBudgetAndSetup() {
     setNotice("");
@@ -939,11 +989,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     <ScrollView
       contentContainerStyle={[styles.page, isCompact && styles.pageCompact]}
       keyboardShouldPersistTaps="handled"
+      stickyHeaderIndices={
+        isNative && budgets.length > 0 && !isCreatingBudget ? [1] : undefined
+      }
+      showsVerticalScrollIndicator={!isNative}
     >
       <View style={[styles.header, isCompact && styles.headerCompact]}>
         <View>
-          <Text style={styles.eyebrow}>SPENDWISE</Text>
-          <Text style={styles.brand}>{t("budget.title")}</Text>
+          {!isNative ? <Text style={styles.eyebrow}>SPENDWISE</Text> : null}
+          <Text style={[styles.brand, isCompact && styles.brandCompact]}>
+            {t("budget.title")}
+          </Text>
         </View>
         <View
           style={[
@@ -952,7 +1008,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ]}
         >
           <LanguageSwitcher />
-          {budgets.length > 0 ? (
+          {!isNative && budgets.length > 0 ? (
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsCreatingBudget(true)}
@@ -963,21 +1019,53 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ) : null}
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={t("account.openSettings")}
             onPress={() => setShowAccountSettings(true)}
+            style={isNative && styles.headerIconButton}
           >
-            <Text style={styles.link}>{t("account.openSettings")}</Text>
+            <Text style={isNative ? styles.headerIcon : styles.link}>
+              {isNative ? "⚙" : t("account.openSettings")}
+            </Text>
           </Pressable>
-          <Pressable onPress={onSignOut} accessibilityRole="button">
-            <Text style={styles.link}>{t("common.signOut")}</Text>
+          <Pressable
+            onPress={onSignOut}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.signOut")}
+            style={isNative && styles.headerIconButton}
+          >
+            <Text style={isNative ? styles.headerIcon : styles.link}>
+              {isNative ? "↪" : t("common.signOut")}
+            </Text>
           </Pressable>
         </View>
       </View>
-      {userEmail ? <Text style={styles.muted}>{userEmail}</Text> : null}
-      <View style={styles.disclaimer}>
+      {isNative && budgets.length > 0 && !isCreatingBudget ? (
+        <View style={styles.mobileTabBar} accessibilityRole="tablist">
+          <MobileTab
+            label={t("mobileNav.home")}
+            selected={workspaceView === "dashboard"}
+            onPress={() => setWorkspaceView("dashboard")}
+          />
+          <MobileTab
+            label={t("mobileNav.movements")}
+            selected={workspaceView === "movement"}
+            onPress={() => setWorkspaceView("movement")}
+          />
+          <MobileTab
+            label={t("mobileNav.statistics")}
+            selected={workspaceView === "statistics"}
+            onPress={() => setWorkspaceView("statistics")}
+          />
+        </View>
+      ) : null}
+      {userEmail && !isNative ? (
+        <Text style={styles.muted}>{userEmail}</Text>
+      ) : null}
+      <View style={[styles.disclaimer, isNative && styles.disclaimerCompact]}>
         <Text style={styles.disclaimerTitle}>{t("budget.virtualTitle")}</Text>
         <Text style={styles.disclaimerText}>{t("budget.virtualNotice")}</Text>
       </View>
-      {notice ? (
+      {notice && !budgetLoadFailed ? (
         <Text
           accessibilityLiveRegion="polite"
           style={isError ? styles.error : styles.notice}
@@ -986,19 +1074,52 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         </Text>
       ) : null}
 
-      {budgets.length > 0 && !isCreatingBudget ? (
+      {budgetLoadFailed ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>{t("budget.apiErrorTitle")}</Text>
+          <Text style={styles.emptyDescription}>{notice}</Text>
+          <ActionButton
+            disabled={isLoading}
+            label={t("common.retry")}
+            onPress={() => void retryBudgetLoad()}
+          />
+        </View>
+      ) : budgets.length > 0 && !isCreatingBudget ? (
         <>
           <Text style={styles.sectionTitle}>{t("budget.select")}</Text>
-          <View style={styles.rowWrap}>
-            {budgets.map((budget) => (
-              <Choice
-                key={budget.id}
-                label={budget.name}
-                selected={budget.id === selectedBudgetId}
-                onPress={() => selectBudget(budget.id)}
-              />
-            ))}
-          </View>
+          {isNative ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.rowWrap}>
+                {budgets.map((budget) => (
+                  <Choice
+                    key={budget.id}
+                    label={budget.name}
+                    selected={budget.id === selectedBudgetId}
+                    onPress={() => selectBudget(budget.id)}
+                  />
+                ))}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("budget.new")}
+                  onPress={() => setIsCreatingBudget(true)}
+                  style={[styles.choice, styles.newBudgetChoice]}
+                >
+                  <Text style={styles.choiceText}>＋</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.rowWrap}>
+              {budgets.map((budget) => (
+                <Choice
+                  key={budget.id}
+                  label={budget.name}
+                  selected={budget.id === selectedBudgetId}
+                  onPress={() => selectBudget(budget.id)}
+                />
+              ))}
+            </View>
+          )}
           {selectedBudget ? (
             <Text style={styles.muted}>
               {selectedBudget.budget_type === "SHARED"
@@ -1009,15 +1130,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ) : null}
           {workspaceView !== "dashboard" ? (
             <View style={styles.detailHeader}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setWorkspaceView("dashboard")}
-                style={styles.formBack}
-              >
-                <Text style={styles.link}>
-                  {t("dashboard.backToDashboard")}
-                </Text>
-              </Pressable>
+              {!isNative ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setWorkspaceView("dashboard")}
+                  style={styles.formBack}
+                >
+                  <Text style={styles.link}>
+                    {t("dashboard.backToDashboard")}
+                  </Text>
+                </Pressable>
+              ) : null}
               <Text style={styles.sectionTitle}>
                 {workspaceView === "statistics"
                   ? t("dashboard.statisticsTitle")
@@ -1129,6 +1252,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       }))}
                       empty={t("dashboard.recentIncomeEmpty")}
                       format={formatAmount}
+                      compact={isCompact}
                       onPress={() => {
                         setTab("income");
                         setWorkspaceView("movement");
@@ -1150,6 +1274,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       }))}
                       empty={t("dashboard.recentExpenseEmpty")}
                       format={formatAmount}
+                      compact={isCompact}
                       onPress={() => {
                         setTab("expense");
                         setWorkspaceView("movement");
@@ -1158,7 +1283,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => setWorkspaceView("statistics")}
-                      style={styles.summaryItem}
+                      style={[
+                        styles.summaryItem,
+                        isCompact && styles.summaryItemWideCompact,
+                      ]}
                     >
                       <Text style={styles.muted}>
                         {t("dashboard.remainingTitle")}
@@ -2239,6 +2367,31 @@ function Choice({
   );
 }
 
+function MobileTab({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.mobileTab, selected && styles.mobileTabSelected]}
+    >
+      <Text
+        style={[styles.mobileTabText, selected && styles.mobileTabTextSelected]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
@@ -2291,6 +2444,7 @@ function DashboardCard({
   recent,
   empty,
   format,
+  compact = false,
   onPress,
 }: {
   label: string;
@@ -2298,6 +2452,7 @@ function DashboardCard({
   recent: { label: string; date: string; amount: number }[];
   empty: string;
   format: Intl.NumberFormat;
+  compact?: boolean;
   onPress: () => void;
 }) {
   const { t } = useTranslation();
@@ -2305,7 +2460,7 @@ function DashboardCard({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={styles.summaryItem}
+      style={[styles.summaryItem, compact && styles.summaryItemCompact]}
     >
       <Text style={styles.muted}>{label}</Text>
       <Text style={styles.summaryValue}>{value}</Text>
@@ -2595,6 +2750,26 @@ function EntryList({
 }
 
 const styles = StyleSheet.create({
+  mobileTabBar: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "stretch",
+    backgroundColor: "#f5f7f2",
+    borderBottomWidth: 1,
+    borderBottomColor: "#dce5dd",
+  },
+  mobileTab: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 4,
+    borderBottomWidth: 3,
+    borderBottomColor: "transparent",
+  },
+  mobileTabSelected: { borderBottomColor: "#285c3c" },
+  mobileTabText: { color: "#627168", fontSize: 13, fontWeight: "600" },
+  mobileTabTextSelected: { color: "#285c3c", fontWeight: "800" },
   page: {
     paddingHorizontal: 22,
     paddingTop: 24,
@@ -2620,12 +2795,21 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
-  headerCompact: { alignItems: "flex-start", flexDirection: "column" },
+  headerCompact: { alignItems: "center", flexDirection: "row", gap: 8 },
   headerActionsCompact: {
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-    rowGap: 10,
+    alignItems: "center",
+    flexWrap: "nowrap",
+    gap: 4,
   },
+  headerIconButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#e6f0e7",
+  },
+  headerIcon: { color: "#285c3c", fontSize: 20, fontWeight: "700" },
   headerCreateButton: {
     minHeight: 40,
     justifyContent: "center",
@@ -2638,6 +2822,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
   },
   brand: { color: "#18291f", fontSize: 28, fontWeight: "700", marginTop: 4 },
+  brandCompact: { fontSize: 21, marginTop: 2 },
+  newBudgetChoice: { width: 44, paddingHorizontal: 0, alignItems: "center" },
   disclaimer: {
     padding: 16,
     borderRadius: 12,
@@ -2646,6 +2832,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 4,
   },
+  disclaimerCompact: { padding: 12, gap: 2 },
   disclaimerTitle: { color: "#234b34", fontWeight: "700", fontSize: 15 },
   disclaimerText: { color: "#365643", fontSize: 14, lineHeight: 21 },
   sectionTitle: {
@@ -2769,7 +2956,7 @@ const styles = StyleSheet.create({
   error: { color: "#a33024", fontSize: 14, lineHeight: 20 },
   summary: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   summaryCards: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  summaryCardsCompact: { flexDirection: "column" },
+  summaryCardsCompact: { flexDirection: "row" },
   summaryItem: {
     flex: 1,
     minWidth: 210,
@@ -2780,6 +2967,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
   },
+  summaryItemCompact: { flexBasis: "46%", minWidth: 0, padding: 12 },
+  summaryItemWideCompact: { flexBasis: "100%", minWidth: 0, padding: 14 },
   summaryValue: { color: "#18291f", fontSize: 18, fontWeight: "700" },
   cardHint: { color: "#627168", fontSize: 13, lineHeight: 19 },
   cardRecentList: { gap: 5, marginTop: 4 },
