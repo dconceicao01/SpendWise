@@ -13,6 +13,7 @@ type MovementState = {
     period_id: string;
     amount: number;
     occurred_on: string;
+    description: string | null;
     allocation_snapshot: {
       category_id: string;
       percentage_basis_points: number;
@@ -61,6 +62,19 @@ type InvitationState = {
   revoked_at: string | null;
   created_at: string;
   invitation_link?: string | null;
+};
+
+type IncomeScheduleState = {
+  id: string;
+  budget_id: string;
+  amount: number;
+  description: string | null;
+  frequency: "WEEKLY" | "FORTNIGHTLY" | "MONTHLY";
+  monthly_short_month_behavior: "LAST_DAY" | "SKIP";
+  start_date: string;
+  end_date: string | null;
+  next_occurrence_on: string;
+  status: "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED";
 };
 
 async function enableEnglish(page: Page) {
@@ -154,6 +168,7 @@ async function mockBudgetApi(page: Page) {
     }[];
     movements: MovementState;
     invitations: InvitationState[];
+    incomeSchedules: IncomeScheduleState[];
     profile: {
       user_id: string;
       email: string;
@@ -174,6 +189,7 @@ async function mockBudgetApi(page: Page) {
       adjustments: [],
     },
     invitations: [],
+    incomeSchedules: [],
     profile: {
       user_id: accountId,
       email: "pilot@example.test",
@@ -392,7 +408,32 @@ async function mockBudgetApi(page: Page) {
         201,
       );
     }
-    if (name === "income-schedules" && method === "GET") return respond([]);
+    if (name === "income-schedules" && method === "GET")
+      return respond(state.incomeSchedules);
+    if (name === "income-schedules" && method === "POST") {
+      const input = request.postDataJSON() as {
+        amount: number;
+        description: string | null;
+        frequency: IncomeScheduleState["frequency"];
+        monthlyShortMonthBehavior: IncomeScheduleState["monthly_short_month_behavior"];
+        startDate: string;
+        endDate: string | null;
+      };
+      const schedule: IncomeScheduleState = {
+        id: "ssssssss-ssss-4sss-8sss-ssssssssssss",
+        budget_id: budgetId,
+        amount: input.amount,
+        description: input.description,
+        frequency: input.frequency,
+        monthly_short_month_behavior: input.monthlyShortMonthBehavior,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        next_occurrence_on: input.startDate,
+        status: "ACTIVE",
+      };
+      state.incomeSchedules = [...state.incomeSchedules, schedule];
+      return respond(schedule, 201);
+    }
     if (name === "income-corrections" && method === "GET")
       return respond(state.movements.incomeCorrections);
     if (name === "incomes" && method === "GET")
@@ -429,6 +470,7 @@ async function mockBudgetApi(page: Page) {
         period_id: string;
         amount: number;
         occurred_on: string;
+        description: string | null;
       };
       const income = {
         id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
@@ -556,8 +598,10 @@ test("creates a budget, records virtual movements and reviews annual totals", as
 
   await page.getByLabel("Amount").fill("900");
   await page.getByLabel("Date (YYYY-MM-DD)").fill(`${year}-06-01`);
+  await page.getByLabel("Income description (optional)").fill("June salary");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Income recorded.")).toBeVisible();
+  await expect(page.getByText("June salary")).toBeVisible();
   await page.getByText("Correct income").click();
   await expect(
     page.getByText("This reason is saved in the income history."),
@@ -570,6 +614,16 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByRole("button", { name: "Save correction" }).click();
   await expect(page.getByText("Income correction recorded.")).toBeVisible();
   await expect(page.getByText("June income adjustment")).toBeVisible();
+
+  await page.getByRole("button", { name: "Recurring" }).click();
+  await page.getByLabel("Amount").fill("900");
+  await page.getByLabel("First entry date (YYYY-MM-DD)").fill(`${year}-07-01`);
+  await page
+    .getByLabel("Income description (optional)")
+    .fill("Recurring salary");
+  await page.getByRole("button", { name: "Create recurring income" }).click();
+  await expect(page.getByText("Recurring income created.")).toBeVisible();
+  await expect(page.getByText("Recurring salary")).toBeVisible();
 
   await page.getByRole("button", { name: "Expenses" }).click();
   await page.getByRole("button", { name: "General" }).click();
@@ -586,11 +640,19 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByRole("button", { name: "View summary" }).click();
   await expect(page.getByText(/1,000\.00/).last()).toBeVisible();
   await expect(page.getByText(/200\.00/).last()).toBeVisible();
-  await expect(page.getByText("Monthly breakdown")).toBeVisible();
-  await expect(page.getByText("June", { exact: true })).toBeVisible();
+  await expect(page.getByText("Expenses by category")).toBeVisible();
+  await expect(
+    page.getByText("Allocation and balance by category"),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Expense distribution by category"),
+  ).toBeVisible();
+  await expect(page.getByText("Monthly breakdown")).toHaveCount(0);
   expect(state.budgets).toHaveLength(1);
   expect(state.periods).toHaveLength(1);
   expect(state.movements.incomes).toHaveLength(1);
+  expect(state.movements.incomes[0]?.description).toBe("June salary");
+  expect(state.incomeSchedules[0]?.description).toBe("Recurring salary");
   expect(state.movements.incomeCorrections).toHaveLength(1);
   expect(state.movements.expenses).toHaveLength(1);
 

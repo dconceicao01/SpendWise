@@ -47,7 +47,7 @@ class BudgetMovementServiceTest {
 
     @Test
     void recordsIncomeAndExpenseOnlyAfterMovementAuthorization() {
-        CreateIncomeRequest incomeRequest = new CreateIncomeRequest(PERIOD_ID, new BigDecimal("900.00"), LocalDate.of(2026, 11, 1));
+        CreateIncomeRequest incomeRequest = new CreateIncomeRequest(PERIOD_ID, new BigDecimal("900.00"), LocalDate.of(2026, 11, 1), null);
         CreateExpenseRequest expenseRequest = new CreateExpenseRequest(
                 PERIOD_ID, CATEGORY_ID, new BigDecimal("12.50"), LocalDate.of(2026, 11, 2), "Lunch");
         when(repository.recordIncome(BUDGET_ID, incomeRequest)).thenReturn(Optional.of(income()));
@@ -114,6 +114,7 @@ class BudgetMovementServiceTest {
                 null,
                 new BigDecimal("900.00"),
                 LocalDate.of(2026, 11, 1),
+                null,
                 Instant.parse("2026-11-22T10:00:00Z"),
                 List.of());
     }

@@ -12,6 +12,7 @@ public record IncomeScheduleResponse(
         @JsonProperty("income_member_id") UUID incomeMemberId,
         @JsonProperty("created_by_member_id") UUID createdByMemberId,
         BigDecimal amount,
+        String description,
         IncomeScheduleFrequency frequency,
         @JsonProperty("monthly_short_month_behavior") MonthlyShortMonthBehavior monthlyShortMonthBehavior,
         @JsonProperty("start_date") LocalDate startDate,

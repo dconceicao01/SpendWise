@@ -18,6 +18,7 @@ public record IncomeEntryResponse(
         @JsonProperty("scheduled_for") LocalDate scheduledFor,
         BigDecimal amount,
         @JsonProperty("occurred_on") LocalDate occurredOn,
+        String description,
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("allocation_snapshot") List<IncomeAllocationSnapshotResponse> allocationSnapshot) {
 }

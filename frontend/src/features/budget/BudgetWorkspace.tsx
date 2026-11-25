@@ -11,12 +11,16 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { Circle, default as Svg } from "react-native-svg";
 import {
   calculateAnnualSummary,
   calculateMonthlySummaries,
+  calculateExpenseCategoryShares,
   calculatePeriodCategoryBalances,
   periodsOverlappingYear,
   type AnnualSummary,
+  type CategoryBalance,
+  type ExpenseCategoryShare,
   type MonthlySummary,
 } from "@/features/budget/budget-summary";
 import { AccountSettings } from "@/features/profile/AccountSettings";
@@ -105,8 +109,16 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   );
   const [annualSummaryBudgetId, setAnnualSummaryBudgetId] = useState("");
   const [annualMonths, setAnnualMonths] = useState<MonthlySummary[]>([]);
+  const [dashboardMonthSummary, setDashboardMonthSummary] =
+    useState<MonthlySummary | null>(null);
+  const [dashboardMonthBudgetId, setDashboardMonthBudgetId] = useState("");
+  const [dashboardMonthIncomes, setDashboardMonthIncomes] = useState<
+    IncomeEntry[]
+  >([]);
+  const [dashboardMonthExpenses, setDashboardMonthExpenses] = useState<
+    ExpenseEntry[]
+  >([]);
   const [annualRefreshKey, setAnnualRefreshKey] = useState(0);
-  const [isLoadingMovements, setIsLoadingMovements] = useState(false);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
   const [workspaceLoadFailed, setWorkspaceLoadFailed] = useState(false);
   const [workspaceView, setWorkspaceView] =
@@ -145,6 +157,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     useState<MonthlyShortMonthBehavior>("LAST_DAY");
   const [scheduleEndDate, setScheduleEndDate] = useState("");
   const [incomeRecurring, setIncomeRecurring] = useState(false);
+  const [incomeDescription, setIncomeDescription] = useState("");
   const [movementCategoryId, setMovementCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [adjustmentSign, setAdjustmentSign] = useState<1 | -1>(1);
@@ -157,6 +170,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [correctionReason, setCorrectionReason] = useState("");
   const [correctionDate, setCorrectionDate] = useState(today());
   const workspaceRequestId = useRef(0);
+  const movementRequestId = useRef(0);
+  const annualRequestId = useRef(0);
 
   const selectedBudget = budgets.find(
     (budget) => budget.id === selectedBudgetId,
@@ -171,41 +186,35 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   );
 
   const categoryBalances = calculatePeriodCategoryBalances(
-    activeCategories,
+    categories,
     incomes,
     expenses,
     adjustments,
     incomeCorrections,
   );
-  const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-  const currentMonthIncomes = incomes
-    .filter((item) => item.occurred_on.startsWith(currentMonthKey))
-    .sort((left, right) => right.occurred_on.localeCompare(left.occurred_on));
-  const currentMonthExpenses = expenses
-    .filter((item) => item.spent_on.startsWith(currentMonthKey))
-    .sort((left, right) => right.spent_on.localeCompare(left.spent_on));
-  const currentMonthIncomeTotal =
-    currentMonthIncomes.reduce((total, item) => total + item.amount, 0) +
-    incomeCorrections
-      .filter((item) => item.occurred_on.startsWith(currentMonthKey))
-      .reduce((total, item) => total + item.amount_delta, 0);
-  const currentMonthExpenseTotal = currentMonthExpenses.reduce(
+  const expenseCategoryShares =
+    calculateExpenseCategoryShares(categoryBalances);
+  const periodIncomeTotal =
+    incomes.reduce((total, item) => total + item.amount, 0) +
+    incomeCorrections.reduce((total, item) => total + item.amount_delta, 0);
+  const periodExpenseTotal = expenses.reduce(
     (total, item) => total + item.amount,
     0,
   );
-  const currentMonthAdjustmentTotal = adjustments
+  const periodAdjustmentTotal = adjustments.reduce(
+    (total, item) => total + item.amount_delta,
+    0,
+  );
+  const periodRemaining =
+    periodIncomeTotal - periodExpenseTotal + periodAdjustmentTotal;
+  const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const currentMonthIncomes = dashboardMonthIncomes
     .filter((item) => item.occurred_on.startsWith(currentMonthKey))
-    .reduce((total, item) => total + item.amount_delta, 0);
-  const currentMonthSummary: MonthlySummary = {
-    month: currentMonthKey,
-    income: currentMonthIncomeTotal,
-    expense: currentMonthExpenseTotal,
-    adjustment: currentMonthAdjustmentTotal,
-    remaining:
-      currentMonthIncomeTotal -
-      currentMonthExpenseTotal +
-      currentMonthAdjustmentTotal,
-  };
+    .sort((left, right) => right.occurred_on.localeCompare(left.occurred_on));
+  const currentMonthExpenses = dashboardMonthExpenses
+    .filter((item) => item.spent_on.startsWith(currentMonthKey))
+    .sort((left, right) => right.spent_on.localeCompare(left.spent_on));
+  const currentMonthSummary = dashboardMonthSummary;
   const currentMonthLabel = new Intl.DateTimeFormat(i18n.language, {
     month: "long",
     year: "numeric",
@@ -213,7 +222,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const annualHasActivity = annualMonths.some(
     (item) => item.income !== 0 || item.expense !== 0 || item.adjustment !== 0,
   );
-  const dashboardStatsReady = !isLoadingMovements && Boolean(selectedPeriodId);
+  const dashboardStatsReady = dashboardMonthBudgetId === selectedBudgetId;
 
   const loadBudgets = useCallback(async () => {
     const nextBudgets = await spendwiseApi.listBudgets(accessToken);
@@ -263,7 +272,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   const loadMovements = useCallback(async () => {
     if (!selectedBudgetId || !selectedPeriodId) return;
-    setIsLoadingMovements(true);
+    const requestId = ++movementRequestId.current;
     try {
       const [
         nextIncomes,
@@ -304,12 +313,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ),
         ),
       ]);
+      if (requestId !== movementRequestId.current) return;
       setIncomes(nextIncomes);
       setExpenses(nextExpenses);
       setAdjustments(nextAdjustments);
       setIncomeCorrections(nextIncomeCorrections);
-    } finally {
-      setIsLoadingMovements(false);
+    } catch (error) {
+      if (requestId !== movementRequestId.current) return;
+      throw error;
     }
   }, [accessToken, selectedBudgetId, selectedPeriodId]);
 
@@ -514,17 +525,20 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               monthlyShortMonthBehavior: shortMonthBehavior,
               startDate: movementDate,
               endDate: scheduleEndDate || null,
+              description: incomeDescription.trim() || null,
             },
           );
           movementSaved = true;
           setNotice(t("schedule.created"));
           setScheduleEndDate("");
           await loadWorkspace();
+          setIncomeDescription("");
         } else {
           await spendwiseApi.createIncome(accessToken, selectedBudgetId, {
             period_id: selectedPeriodId,
             amount: parsedAmount,
             occurred_on: movementDate,
+            description: incomeDescription.trim() || null,
           });
           movementSaved = true;
           setNotice(t("movement.incomeSaved"));
@@ -553,6 +567,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       }
       setAmount("");
       setDescription("");
+      setIncomeDescription("");
       setReason("");
       await loadMovements();
       setAnnualRefreshKey((current) => current + 1);
@@ -703,6 +718,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     )
       return;
 
+    const requestId = ++annualRequestId.current;
     // Defer state updates to the async continuation when this loader is
     // triggered by the dashboard effect.
     await Promise.resolve();
@@ -759,32 +775,41 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         annualAdjustments.push(...periodAdjustments);
         annualIncomeCorrections.push(...periodIncomeCorrections);
       }
-      setAnnualSummary(
-        calculateAnnualSummary(
-          year,
-          annualIncomes,
-          annualExpenses,
-          annualAdjustments,
-          annualIncomeCorrections,
-        ),
+      if (requestId !== annualRequestId.current) return;
+      const nextAnnualSummary = calculateAnnualSummary(
+        year,
+        annualIncomes,
+        annualExpenses,
+        annualAdjustments,
+        annualIncomeCorrections,
       );
-      setAnnualMonths(
-        calculateMonthlySummaries(
-          year,
-          annualIncomes,
-          annualExpenses,
-          annualAdjustments,
-          annualIncomeCorrections,
-        ),
+      const nextAnnualMonths = calculateMonthlySummaries(
+        year,
+        annualIncomes,
+        annualExpenses,
+        annualAdjustments,
+        annualIncomeCorrections,
       );
+      setAnnualSummary(nextAnnualSummary);
+      setAnnualMonths(nextAnnualMonths);
       setAnnualSummaryBudgetId(selectedBudgetId);
+      if (year === new Date().getFullYear()) {
+        const currentMonth = nextAnnualMonths.find(
+          (month) => month.month === currentMonthKey,
+        );
+        setDashboardMonthSummary(currentMonth ?? null);
+        setDashboardMonthBudgetId(selectedBudgetId);
+        setDashboardMonthIncomes(annualIncomes);
+        setDashboardMonthExpenses(annualExpenses);
+      }
     } catch {
+      if (requestId !== annualRequestId.current) return;
       setIsError(true);
       setNotice(t("dashboard.loadError"));
     } finally {
-      setIsLoadingAnnual(false);
+      if (requestId === annualRequestId.current) setIsLoadingAnnual(false);
     }
-  }, [accessToken, annualYear, periods, selectedBudgetId, t]);
+  }, [accessToken, annualYear, currentMonthKey, periods, selectedBudgetId, t]);
 
   useEffect(() => {
     if (
@@ -857,8 +882,11 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   function selectBudget(budgetId: string) {
     if (budgetId === selectedBudgetId) return;
     workspaceRequestId.current += 1;
+    movementRequestId.current += 1;
+    annualRequestId.current += 1;
     setSelectedBudgetId(budgetId);
     setIsLoadingWorkspace(true);
+    setIsLoadingAnnual(false);
     setWorkspaceLoadFailed(false);
     setSelectedPeriodId("");
     setPeriods([]);
@@ -871,17 +899,21 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     setAnnualSummary(null);
     setAnnualSummaryBudgetId("");
     setAnnualMonths([]);
+    setDashboardMonthSummary(null);
+    setDashboardMonthBudgetId("");
+    setDashboardMonthIncomes([]);
+    setDashboardMonthExpenses([]);
     setWorkspaceView("dashboard");
   }
 
   function selectPeriod(periodId: string) {
+    movementRequestId.current += 1;
     setSelectedPeriodId(periodId);
     setIncomes([]);
     setIncomeCorrections([]);
     setExpenses([]);
     setAdjustments([]);
     setCorrectionEntryId(null);
-    setIsLoadingMovements(true);
   }
 
   if (isLoading) {
@@ -1292,6 +1324,11 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                       · {t("schedule.nextDate")}:{" "}
                                       {schedule.next_occurrence_on}
                                     </Text>
+                                    {schedule.description ? (
+                                      <Text style={styles.muted}>
+                                        {schedule.description}
+                                      </Text>
+                                    ) : null}
                                     {schedule.frequency === "MONTHLY" ? (
                                       <Text style={styles.muted}>
                                         {t("schedule.shortMonths")}:{" "}
@@ -1474,6 +1511,23 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       value={movementDate}
                     />
                     <FieldError message={fieldErrors.movementDate} />
+                    {tab === "income" ? (
+                      <>
+                        <Text style={styles.label}>
+                          {t("movement.incomeDescription")}
+                        </Text>
+                        <TextInput
+                          accessibilityLabel={t("movement.incomeDescription")}
+                          maxLength={500}
+                          onChangeText={setIncomeDescription}
+                          placeholder={t(
+                            "movement.incomeDescriptionPlaceholder",
+                          )}
+                          style={styles.input}
+                          value={incomeDescription}
+                        />
+                      </>
+                    ) : null}
                     {tab === "income" && incomeRecurring ? (
                       <>
                         <Text style={styles.label}>
@@ -1618,6 +1672,11 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                   <Text style={styles.muted}>
                                     {income.occurred_on}
                                   </Text>
+                                  {income.description ? (
+                                    <Text style={styles.muted}>
+                                      {income.description}
+                                    </Text>
+                                  ) : null}
                                 </View>
                                 <Text style={styles.entryAmount}>
                                   {formatAmount.format(income.amount)}
@@ -1796,125 +1855,145 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 </>
               ) : null}
               {workspaceView === "statistics" ? (
-                <View style={styles.card}>
-                  <Text style={styles.muted}>
-                    {t("dashboard.annualDescription")}
-                  </Text>
-                  <View style={styles.annualRow}>
-                    <View style={styles.annualInput}>
-                      <Text style={styles.label}>{t("dashboard.year")}</Text>
-                      <TextInput
-                        accessibilityLabel={t("dashboard.year")}
-                        keyboardType="number-pad"
-                        maxLength={4}
-                        onChangeText={(value) => {
-                          setAnnualYear(value);
-                          setAnnualSummary(null);
-                          setAnnualMonths([]);
-                          setAnnualSummaryBudgetId("");
-                          clearFieldError("annualYear");
-                        }}
-                        style={[
-                          styles.input,
-                          styles.yearInput,
-                          fieldErrors.annualYear && styles.inputInvalid,
-                        ]}
-                        value={annualYear}
+                <>
+                  <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>
+                      {t("dashboard.periodStatistics")}
+                    </Text>
+                    <Text style={styles.muted}>
+                      {t("dashboard.periodLabel", {
+                        start:
+                          periods.find(
+                            (period) => period.id === selectedPeriodId,
+                          )?.starts_on ?? "",
+                        end:
+                          periods.find(
+                            (period) => period.id === selectedPeriodId,
+                          )?.ends_on ?? "",
+                      })}
+                    </Text>
+                    <View style={styles.statisticsMetrics}>
+                      <StatisticsMetric
+                        label={t("movement.income")}
+                        value={formatAmount.format(periodIncomeTotal)}
                       />
-                      <FieldError message={fieldErrors.annualYear} />
+                      <StatisticsMetric
+                        label={t("movement.expense")}
+                        value={formatAmount.format(periodExpenseTotal)}
+                      />
+                      <StatisticsMetric
+                        label={t("dashboard.remainingTitle")}
+                        value={formatAmount.format(periodRemaining)}
+                      />
+                      <StatisticsMetric
+                        label={t("movement.adjustment")}
+                        value={formatAmount.format(periodAdjustmentTotal)}
+                      />
                     </View>
-                    <ActionButton
-                      disabled={isLoadingAnnual}
-                      label={
-                        isLoadingAnnual
-                          ? t("common.loading")
-                          : t("dashboard.loadAnnual")
-                      }
-                      onPress={handleLoadAnnualSummary}
+                    <Text style={styles.sectionTitle}>
+                      {t("dashboard.expenseByCategory")}
+                    </Text>
+                    {expenseCategoryShares.length ? (
+                      <ExpenseCategoryDonut
+                        items={expenseCategoryShares}
+                        total={periodExpenseTotal}
+                        format={formatAmount}
+                      />
+                    ) : (
+                      <Text style={styles.muted}>
+                        {t("dashboard.noCategoryExpenses")}
+                      </Text>
+                    )}
+                    <Text style={styles.sectionTitle}>
+                      {t("dashboard.categoryProgress")}
+                    </Text>
+                    <CategoryProgressList
+                      balances={categoryBalances}
+                      format={formatAmount}
                     />
                   </View>
-                  {annualSummary &&
-                  annualSummaryBudgetId === selectedBudgetId ? (
-                    <View style={styles.monthSummaryRow}>
-                      <Summary
-                        label={t("movement.income")}
-                        value={annualSummary.income}
-                        format={formatAmount}
-                      />
-                      <Summary
-                        label={t("movement.expense")}
-                        value={annualSummary.expense}
-                        format={formatAmount}
-                      />
-                      <Summary
-                        label={t("dashboard.netChange")}
-                        value={
-                          annualSummary.income -
-                          annualSummary.expense +
-                          annualSummary.adjustment
+                  <View style={styles.card}>
+                    <Text style={styles.muted}>
+                      {t("dashboard.annualDescription")}
+                    </Text>
+                    <View style={styles.annualRow}>
+                      <View style={styles.annualInput}>
+                        <Text style={styles.label}>{t("dashboard.year")}</Text>
+                        <TextInput
+                          accessibilityLabel={t("dashboard.year")}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                          onChangeText={(value) => {
+                            setAnnualYear(value);
+                            setAnnualSummary(null);
+                            setAnnualMonths([]);
+                            setAnnualSummaryBudgetId("");
+                            clearFieldError("annualYear");
+                          }}
+                          style={[
+                            styles.input,
+                            styles.yearInput,
+                            fieldErrors.annualYear && styles.inputInvalid,
+                          ]}
+                          value={annualYear}
+                        />
+                        <FieldError message={fieldErrors.annualYear} />
+                      </View>
+                      <ActionButton
+                        disabled={isLoadingAnnual}
+                        label={
+                          isLoadingAnnual
+                            ? t("common.loading")
+                            : t("dashboard.loadAnnual")
                         }
-                        format={formatAmount}
+                        onPress={handleLoadAnnualSummary}
                       />
                     </View>
-                  ) : null}
-                  {annualMonths.some(
-                    (month) =>
-                      month.income !== 0 ||
-                      month.expense !== 0 ||
-                      month.adjustment !== 0,
-                  ) ? (
-                    <View style={styles.annualBreakdown}>
-                      <Text style={styles.sectionTitle}>
-                        {t("dashboard.monthlyBreakdown")}
+                    {annualSummary &&
+                    annualSummaryBudgetId === selectedBudgetId ? (
+                      <View style={styles.monthSummaryRow}>
+                        <Summary
+                          label={t("movement.income")}
+                          value={annualSummary.income}
+                          format={formatAmount}
+                        />
+                        <Summary
+                          label={t("movement.expense")}
+                          value={annualSummary.expense}
+                          format={formatAmount}
+                        />
+                        <Summary
+                          label={t("dashboard.netChange")}
+                          value={
+                            annualSummary.income -
+                            annualSummary.expense +
+                            annualSummary.adjustment
+                          }
+                          format={formatAmount}
+                        />
+                      </View>
+                    ) : null}
+                    <Text style={styles.sectionTitle}>
+                      {t("dashboard.annualChartTitle")}
+                    </Text>
+                    {isLoadingAnnual ? (
+                      <Text style={styles.muted}>{t("common.loading")}</Text>
+                    ) : annualHasActivity ? (
+                      <AnnualBarChart months={annualMonths} />
+                    ) : (
+                      <Text style={styles.muted}>
+                        {t("dashboard.noChartData")}
                       </Text>
-                      {annualMonths
-                        .filter(
-                          (month) =>
-                            month.income !== 0 ||
-                            month.expense !== 0 ||
-                            month.adjustment !== 0,
-                        )
-                        .map((month) => (
-                          <View key={month.month} style={styles.annualMonthRow}>
-                            <Text style={styles.entryTitle}>
-                              {new Intl.DateTimeFormat(i18n.language, {
-                                month: "long",
-                              }).format(new Date(`${month.month}-01T12:00:00`))}
-                            </Text>
-                            <Text style={styles.muted}>
-                              {t("dashboard.incomeLegend")}:{" "}
-                              {formatAmount.format(month.income)}
-                              {" · "}
-                              {t("dashboard.expenseLegend")}:{" "}
-                              {formatAmount.format(month.expense)}
-                              {" · "}
-                              {t("dashboard.remainingTitle")}:{" "}
-                              {formatAmount.format(month.remaining)}
-                            </Text>
-                          </View>
-                        ))}
-                    </View>
-                  ) : null}
-                  <Text style={styles.sectionTitle}>
-                    {t("dashboard.annualChartTitle")}
-                  </Text>
-                  {isLoadingAnnual ? (
-                    <Text style={styles.muted}>{t("common.loading")}</Text>
-                  ) : annualHasActivity ? (
-                    <AnnualBarChart months={annualMonths} />
-                  ) : (
-                    <Text style={styles.muted}>
-                      {t("dashboard.noChartData")}
-                    </Text>
-                  )}
-                  {annualSummary &&
-                  annualSummaryBudgetId === selectedBudgetId ? (
-                    <Text style={styles.muted}>
-                      {t("movement.adjustment")}:{" "}
-                      {formatAmount.format(annualSummary.adjustment)}
-                    </Text>
-                  ) : null}
-                </View>
+                    )}
+                    {annualSummary &&
+                    annualSummaryBudgetId === selectedBudgetId ? (
+                      <Text style={styles.muted}>
+                        {t("movement.adjustment")}:{" "}
+                        {formatAmount.format(annualSummary.adjustment)}
+                      </Text>
+                    ) : null}
+                  </View>
+                </>
               ) : null}
             </>
           ) : null}
@@ -2254,6 +2333,174 @@ function DashboardCard({
   );
 }
 
+function StatisticsMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statisticsMetric}>
+      <Text style={styles.muted}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
+
+function ExpenseCategoryDonut({
+  items,
+  total,
+  format,
+}: {
+  items: ExpenseCategoryShare[];
+  total: number;
+  format: Intl.NumberFormat;
+}) {
+  const { t, i18n } = useTranslation();
+  const radius = 58;
+  const circumference = 2 * Math.PI * radius;
+  const colors = [
+    "#285c3c",
+    "#d27b4b",
+    "#3d7891",
+    "#9873a5",
+    "#c55353",
+    "#9d8a37",
+  ];
+  return (
+    <View style={styles.donutLayout}>
+      <View style={styles.donutGraphic}>
+        <Svg
+          accessible
+          accessibilityLabel={t("dashboard.categoryChartAccessible")}
+          height={168}
+          viewBox="0 0 168 168"
+          width={168}
+        >
+          <Circle
+            cx={84}
+            cy={84}
+            fill="none"
+            r={radius}
+            stroke="#e7eee8"
+            strokeWidth={22}
+          />
+          {items.map((item, index) => {
+            const length = (item.percentage / 100) * circumference;
+            const currentOffset = items
+              .slice(0, index)
+              .reduce(
+                (total, previous) =>
+                  total + (previous.percentage / 100) * circumference,
+                0,
+              );
+            return (
+              <Circle
+                key={item.category.id}
+                cx={84}
+                cy={84}
+                fill="none"
+                r={radius}
+                rotation={-90}
+                origin={[84, 84]}
+                stroke={colors[index % colors.length]}
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={-currentOffset}
+                strokeWidth={22}
+              />
+            );
+          })}
+        </Svg>
+        <View style={styles.donutCenter}>
+          <Text style={styles.donutCenterLabel}>{t("movement.expense")}</Text>
+          <Text numberOfLines={1} style={styles.donutCenterValue}>
+            {format.format(total)}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.donutLegend}>
+        {items.map((item, index) => (
+          <View key={item.category.id} style={styles.donutLegendRow}>
+            <View
+              style={[
+                styles.donutSwatch,
+                { backgroundColor: colors[index % colors.length] },
+              ]}
+            />
+            <View style={styles.donutLegendText}>
+              <Text numberOfLines={1} style={styles.entryTitle}>
+                {item.category.name}
+              </Text>
+              <Text style={styles.muted}>
+                {format.format(item.amount)} ·{" "}
+                {t("dashboard.categoryShare", {
+                  percentage: new Intl.NumberFormat(i18n.language, {
+                    maximumFractionDigits: 0,
+                  }).format(item.percentage),
+                })}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function CategoryProgressList({
+  balances,
+  format,
+}: {
+  balances: CategoryBalance[];
+  format: Intl.NumberFormat;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.categoryProgressList}>
+      {balances.map((item) => {
+        const overAllocated = item.spent > item.allocated;
+        const progress =
+          item.allocated > 0
+            ? Math.min(100, (item.spent / item.allocated) * 100)
+            : item.spent > 0
+              ? 100
+              : 0;
+        const accessibilityLabel = t("dashboard.categoryProgressAccessible", {
+          category: item.category.name,
+          spent: format.format(item.spent),
+          allocated: format.format(item.allocated),
+          remaining: format.format(item.balance),
+        });
+        return (
+          <View
+            key={item.category.id}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={accessibilityLabel}
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(progress) }}
+            style={styles.categoryProgressItem}
+          >
+            <View style={styles.categoryProgressHeading}>
+              <Text style={styles.entryTitle}>{item.category.name}</Text>
+              <Text style={styles.entryAmount}>
+                {t("dashboard.balance")}: {format.format(item.balance)}
+              </Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  overAllocated && styles.progressFillOver,
+                  { width: `${progress}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.muted}>
+              {t("dashboard.spent")}: {format.format(item.spent)} ·{" "}
+              {t("dashboard.allocated")}: {format.format(item.allocated)}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function AnnualBarChart({ months }: { months: MonthlySummary[] }) {
   const { t, i18n } = useTranslation();
   const language = i18n.language;
@@ -2563,7 +2810,71 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   monthSummaryRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  statisticsMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  statisticsMetric: {
+    flex: 1,
+    minWidth: 145,
+    gap: 5,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#f4f7f4",
+  },
   inlineAction: { alignSelf: "flex-start", paddingTop: 12 },
+  donutLayout: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 18,
+  },
+  donutGraphic: {
+    width: 168,
+    height: 168,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  donutCenter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  donutCenterLabel: { color: "#627168", fontSize: 12 },
+  donutCenterValue: {
+    maxWidth: 112,
+    color: "#18291f",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  donutLegend: { flex: 1, minWidth: 190, gap: 10 },
+  donutLegendRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  donutLegendText: { flex: 1, gap: 2 },
+  donutSwatch: { width: 12, height: 12, borderRadius: 3 },
+  categoryProgressList: { gap: 12 },
+  categoryProgressItem: {
+    gap: 5,
+    paddingVertical: 9,
+    borderBottomColor: "#edf1ed",
+    borderBottomWidth: 1,
+  },
+  categoryProgressHeading: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  progressTrack: {
+    height: 8,
+    overflow: "hidden",
+    borderRadius: 4,
+    backgroundColor: "#e7eee8",
+  },
+  progressFill: { height: "100%", backgroundColor: "#43805a" },
+  progressFillOver: { backgroundColor: "#a33024" },
   chartLegend: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2610,13 +2921,6 @@ const styles = StyleSheet.create({
   },
   annualInput: { gap: 4, width: 140 },
   yearInput: { width: 100 },
-  annualBreakdown: { gap: 8 },
-  annualMonthRow: {
-    gap: 3,
-    paddingVertical: 9,
-    borderBottomColor: "#edf1ed",
-    borderBottomWidth: 1,
-  },
   list: { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 14 },
   scheduleList: { marginTop: 8, borderTopColor: "#edf1ed", borderTopWidth: 1 },
   scheduleItem: {

@@ -15,6 +15,12 @@ export type CategoryBalance = {
   balance: number;
 };
 
+export type ExpenseCategoryShare = {
+  category: BudgetCategory;
+  amount: number;
+  percentage: number;
+};
+
 export type AnnualSummary = {
   income: number;
   expense: number;
@@ -98,6 +104,26 @@ export function calculatePeriodCategoryBalances(
       balance: allocated + correctionAllocated - spent + adjusted,
     };
   });
+}
+
+export function calculateExpenseCategoryShares(
+  balances: CategoryBalance[],
+): ExpenseCategoryShare[] {
+  const totalExpenses = balances.reduce((total, item) => total + item.spent, 0);
+  if (totalExpenses <= 0) return [];
+
+  return balances
+    .filter((item) => item.spent > 0)
+    .map((item) => ({
+      category: item.category,
+      amount: item.spent,
+      percentage: (item.spent / totalExpenses) * 100,
+    }))
+    .sort(
+      (left, right) =>
+        right.amount - left.amount ||
+        left.category.name.localeCompare(right.category.name),
+    );
 }
 
 export function periodsOverlappingYear(

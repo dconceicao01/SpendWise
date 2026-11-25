@@ -30,7 +30,7 @@ import pt.spendwise.api.budget.IncomeEntryResponse;
 public class SupabaseBudgetMovementRepository implements BudgetMovementRepository {
 
     private static final String SELECT_INCOME =
-            "id,budget_id,period_id,income_member_id,recorded_by_member_id,allocation_set_id,schedule_id,scheduled_for,amount,occurred_on,created_at";
+            "id,budget_id,period_id,income_member_id,recorded_by_member_id,allocation_set_id,schedule_id,scheduled_for,amount,occurred_on,description,created_at";
     private static final String SELECT_SNAPSHOT =
             "income_entry_id,category_id,percentage_basis_points,allocated_amount";
     private static final String SELECT_EXPENSE =
@@ -78,11 +78,12 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
         body.put("p_period_id", request.periodId());
         body.put("p_amount", request.amount());
         body.put("p_occurred_on", request.occurredOn().toString());
+        body.put("p_description", request.description());
         body.put("p_schedule_id", null);
         body.put("p_scheduled_for", null);
         body.put("p_recorder_member_id", null);
         UUID incomeId = dataApiClient.callFunction(
-                "record_income", body, UUID_RESULT);
+                "record_income_with_description", body, UUID_RESULT);
         if (incomeId == null) {
             return Optional.empty();
         }
@@ -279,12 +280,13 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
             @JsonProperty("scheduled_for") LocalDate scheduledFor,
             BigDecimal amount,
             @JsonProperty("occurred_on") LocalDate occurredOn,
+            String description,
             @JsonProperty("created_at") Instant createdAt) {
 
         private IncomeEntryResponse toResponse(List<IncomeAllocationSnapshotResponse> snapshot) {
             return new IncomeEntryResponse(
                     id, budgetId, periodId, incomeMemberId, recordedByMemberId, allocationSetId,
-                    scheduleId, scheduledFor, amount, occurredOn, createdAt, List.copyOf(snapshot));
+                    scheduleId, scheduledFor, amount, occurredOn, description, createdAt, List.copyOf(snapshot));
         }
     }
 
