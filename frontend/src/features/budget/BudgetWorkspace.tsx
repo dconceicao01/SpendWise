@@ -1203,6 +1203,16 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           </Text>
         ) : null}
 
+        {!isNative &&
+        !isCreatingBudget &&
+        !budgetLoadFailed &&
+        workspaceView !== "dashboard" ? (
+          <BackToDashboardButton
+            label={t("dashboard.backToDashboard")}
+            onPress={() => setWorkspaceView("dashboard")}
+          />
+        ) : null}
+
         {budgetLoadFailed ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>{t("budget.apiErrorTitle")}</Text>
@@ -1217,12 +1227,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           <View style={styles.budgetHub}>
             <Text style={styles.sectionTitle}>{t("budget.title")}</Text>
             <Text style={styles.muted}>{t("budget.select")}</Text>
-            {!isNative ? (
-              <SecondaryActionButton
-                label={t("dashboard.backToDashboard")}
-                onPress={() => setWorkspaceView("dashboard")}
-              />
-            ) : null}
             {budgets.length ? (
               budgets.map((budget) => (
                 <Pressable
@@ -1363,17 +1367,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             ) : null}
             {workspaceView !== "dashboard" ? (
               <View style={styles.detailHeader}>
-                {!isNative ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setWorkspaceView("dashboard")}
-                    style={styles.formBack}
-                  >
-                    <Text style={styles.link}>
-                      {t("dashboard.backToDashboard")}
-                    </Text>
-                  </Pressable>
-                ) : null}
                 <Text style={styles.sectionTitle}>
                   {workspaceView === "statistics"
                     ? t("dashboard.statisticsTitle")
@@ -2088,14 +2081,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                 </Pressable>
                                 {correctionEntryId === income.id ? (
                                   <View style={styles.correctionForm}>
-                                    <Pressable
-                                      accessibilityRole="button"
+                                    <CancelActionButton
+                                      label={t("common.cancel")}
                                       onPress={() => setCorrectionEntryId(null)}
-                                    >
-                                      <Text style={styles.link}>
-                                        {t("common.cancel")}
-                                      </Text>
-                                    </Pressable>
+                                    />
                                     <View style={styles.rowWrap}>
                                       <Choice
                                         label={t("movement.addToIncome")}
@@ -2383,7 +2372,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           </>
         ) : isCreatingBudget ? (
           <View style={styles.card}>
-            <SecondaryActionButton
+            <CancelActionButton
               label={t("common.cancel")}
               onPress={() => {
                 setIsCreatingBudget(false);
@@ -2779,6 +2768,45 @@ function SecondaryActionButton({
       style={styles.secondaryAction}
     >
       <Text style={styles.secondaryActionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function BackToDashboardButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={styles.backToDashboardAction}
+    >
+      <Text style={styles.backToDashboardArrow}>←</Text>
+      <Text style={styles.backToDashboardText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function CancelActionButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={styles.cancelAction}
+    >
+      <Text style={styles.cancelActionText}>{label}</Text>
     </Pressable>
   );
 }
@@ -3194,6 +3222,33 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   secondaryActionText: { color: "#285c3c", fontSize: 15, fontWeight: "700" },
+  backToDashboardAction: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignSelf: "flex-start",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#9fb8a4",
+    borderRadius: 10,
+    backgroundColor: "#e6f0e7",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  backToDashboardArrow: { color: "#285c3c", fontSize: 19, lineHeight: 22 },
+  backToDashboardText: { color: "#285c3c", fontSize: 15, fontWeight: "700" },
+  cancelAction: {
+    minHeight: 42,
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#c4cbc6",
+    borderRadius: 9,
+    backgroundColor: "#f5f6f5",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  cancelActionText: { color: "#4d5851", fontSize: 14, fontWeight: "600" },
   page: {
     paddingHorizontal: 22,
     paddingTop: 24,
@@ -3297,11 +3352,6 @@ const styles = StyleSheet.create({
   emptyDescription: { color: "#4c5d52", fontSize: 15, lineHeight: 23 },
   emptySteps: { gap: 8, paddingTop: 4 },
   emptyStep: { color: "#365643", fontSize: 14, lineHeight: 21 },
-  formBack: {
-    minHeight: 40,
-    justifyContent: "center",
-    alignSelf: "flex-start",
-  },
   input: {
     minHeight: 46,
     borderColor: "#bdcbbf",
