@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -72,6 +73,14 @@ public class BudgetMovementController {
             @PathVariable UUID budgetId, @Valid @RequestBody CreateExpenseRequest request) {
         ExpenseEntryResponse expense = movementService.recordExpense(budgetId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(expense);
+    }
+
+    @PatchMapping("/expenses/{expenseId}/label")
+    public ExpenseEntryResponse updateExpenseLabel(
+            @PathVariable UUID budgetId,
+            @PathVariable UUID expenseId,
+            @Valid @RequestBody UpdateExpenseLabelRequest request) {
+        return movementService.updateExpenseLabel(budgetId, expenseId, request.labelId());
     }
 
     @GetMapping("/adjustments")

@@ -12,6 +12,8 @@ public record ExportExpense(
         UUID id,
         UUID periodId,
         UUID categoryId,
+        UUID labelId,
+        String labelName,
         BigDecimal amount,
         LocalDate spentOn,
         String description,

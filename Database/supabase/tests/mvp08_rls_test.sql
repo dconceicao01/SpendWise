@@ -30,6 +30,9 @@ insert into public.budget_allocation_items (budget_id, allocation_set_id, catego
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
+select public.create_expense_label(
+    '20000000-0000-0000-0000-000000000001',
+    '50000000-0000-0000-0000-000000000001', 'General');
 select lives_ok(
     $$select public.activate_budget_allocation_set('20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001')$$,
     'Owner can activate a valid allocation'
@@ -67,8 +70,10 @@ select throws_ok($$update public.budgets set owner_member_id = '30000000-0000-00
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000002', true);
 select is((select private.current_budget_member_role('20000000-0000-0000-0000-000000000001')), 'CONTRIBUTOR', 'Contributor role is resolved from active membership');
 select lives_ok(
-    $$insert into public.expense_entries (budget_id, period_id, category_id, recorded_by_member_id, amount, spent_on)
-      values ('20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000002', 5, current_date)$$,
+    $$insert into public.expense_entries (budget_id, period_id, category_id, label_id, recorded_by_member_id, amount, spent_on)
+      values ('20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001',
+        (select id from public.expense_labels where budget_id = '20000000-0000-0000-0000-000000000001' and name = 'General'),
+        '30000000-0000-0000-0000-000000000002', 5, current_date)$$,
     'Contributor can record an expense as themselves'
 );
 with updated as (
@@ -84,8 +89,10 @@ select throws_ok(
 
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000003', true);
 select throws_ok(
-    $$insert into public.expense_entries (budget_id, period_id, category_id, recorded_by_member_id, amount, spent_on)
-      values ('20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000003', 5, current_date)$$,
+    $$insert into public.expense_entries (budget_id, period_id, category_id, label_id, recorded_by_member_id, amount, spent_on)
+      values ('20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001',
+        (select id from public.expense_labels where budget_id = '20000000-0000-0000-0000-000000000001' and name = 'General'),
+        '30000000-0000-0000-0000-000000000003', 5, current_date)$$,
     '42501', null, 'Viewer cannot record an expense'
 );
 with updated as (

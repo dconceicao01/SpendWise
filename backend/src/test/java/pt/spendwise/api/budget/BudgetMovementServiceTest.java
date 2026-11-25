@@ -49,7 +49,8 @@ class BudgetMovementServiceTest {
     void recordsIncomeAndExpenseOnlyAfterMovementAuthorization() {
         CreateIncomeRequest incomeRequest = new CreateIncomeRequest(PERIOD_ID, new BigDecimal("900.00"), LocalDate.of(2026, 11, 1), null);
         CreateExpenseRequest expenseRequest = new CreateExpenseRequest(
-                PERIOD_ID, CATEGORY_ID, new BigDecimal("12.50"), LocalDate.of(2026, 11, 2), "Lunch");
+                PERIOD_ID, CATEGORY_ID, UUID.fromString("eea3f961-1f03-4608-a248-a0fd9fd321f0"),
+                new BigDecimal("12.50"), LocalDate.of(2026, 11, 2), "Lunch");
         when(repository.recordIncome(BUDGET_ID, incomeRequest)).thenReturn(Optional.of(income()));
         when(repository.recordExpense(BUDGET_ID, expenseRequest)).thenReturn(Optional.of(expense()));
 
@@ -125,6 +126,8 @@ class BudgetMovementServiceTest {
                 BUDGET_ID,
                 PERIOD_ID,
                 CATEGORY_ID,
+                UUID.fromString("eea3f961-1f03-4608-a248-a0fd9fd321f0"),
+                new ExpenseEntryResponse.ExpenseLabelDetails("Almoço", false),
                 UUID.fromString("5988f040-a1f5-492f-a2ab-4e7b6d93c8c3"),
                 new BigDecimal("12.50"),
                 LocalDate.of(2026, 11, 2),

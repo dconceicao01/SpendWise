@@ -19,6 +19,8 @@ public interface BudgetMovementRepository {
 
     Optional<ExpenseEntryResponse> recordExpense(UUID budgetId, CreateExpenseRequest request);
 
+    Optional<ExpenseEntryResponse> updateExpenseLabel(UUID budgetId, UUID expenseId, UUID labelId);
+
     List<BudgetAdjustmentResponse> findAdjustments(UUID budgetId, UUID periodId, int limit, int offset);
 
     Optional<BudgetAdjustmentResponse> recordAdjustment(UUID budgetId, CreateBudgetAdjustmentRequest request);

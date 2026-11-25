@@ -18,11 +18,13 @@ import {
   calculateAnnualSummary,
   calculateMonthlySummaries,
   calculateExpenseCategoryShares,
+  calculateExpenseLabelShares,
   calculatePeriodCategoryBalances,
   periodsOverlappingYear,
   type AnnualSummary,
   type CategoryBalance,
   type ExpenseCategoryShare,
+  type ExpenseLabelShare,
   type MonthlySummary,
 } from "@/features/budget/budget-summary";
 import { AccountSettings } from "@/features/profile/AccountSettings";
@@ -36,6 +38,7 @@ import {
   type BudgetPeriod,
   type AllocationSet,
   type ExpenseEntry,
+  type ExpenseLabel,
   type IncomeCorrection,
   type IncomeEntry,
   type IncomeSchedule,
@@ -132,6 +135,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [allocationSets, setAllocationSets] = useState<AllocationSet[]>([]);
   const [periods, setPeriods] = useState<BudgetPeriod[]>([]);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
+  const [expenseLabelsByCategory, setExpenseLabelsByCategory] = useState<
+    Record<string, ExpenseLabel[]>
+  >({});
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [incomes, setIncomes] = useState<IncomeEntry[]>([]);
   const [incomeCorrections, setIncomeCorrections] = useState<
@@ -203,6 +209,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [incomeRecurring, setIncomeRecurring] = useState(false);
   const [incomeDescription, setIncomeDescription] = useState("");
   const [movementCategoryId, setMovementCategoryId] = useState("");
+  const [movementLabelId, setMovementLabelId] = useState("");
+  const [newExpenseLabelName, setNewExpenseLabelName] = useState("");
+  const [isAddingExpenseLabel, setIsAddingExpenseLabel] = useState(false);
+  const [reclassifyingExpenseId, setReclassifyingExpenseId] = useState<
+    string | null
+  >(null);
   const [description, setDescription] = useState("");
   const [adjustmentSign, setAdjustmentSign] = useState<1 | -1>(1);
   const [reason, setReason] = useState("");
@@ -254,6 +266,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   );
   const expenseCategoryShares =
     calculateExpenseCategoryShares(categoryBalances);
+  const expenseLabelShares = calculateExpenseLabelShares(categories, expenses);
   const periodIncomeTotal =
     incomes.reduce((total, item) => total + item.amount, 0) +
     incomeCorrections.reduce((total, item) => total + item.amount_delta, 0);
@@ -312,9 +325,23 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             ),
             spendwiseApi.listAllocationSets(accessToken, budgetId),
           ]);
+        const labelGroups = await Promise.all(
+          nextCategories.map(
+            async (category) =>
+              [
+                category.id,
+                await spendwiseApi.listExpenseLabels(
+                  accessToken,
+                  budgetId,
+                  category.id,
+                ),
+              ] as const,
+          ),
+        );
         if (requestId !== workspaceRequestId.current) return;
         setPeriods(nextPeriods);
         setCategories(nextCategories);
+        setExpenseLabelsByCategory(Object.fromEntries(labelGroups));
         setIncomeSchedules(nextSchedules);
         setAllocationSets(nextAllocationSets);
         setBudgetAllocationSummaries((current) => ({
@@ -683,6 +710,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     if (tab !== "income" && !movementCategoryId) {
       nextFieldErrors.movementCategory = t("movement.categoryRequired");
     }
+    if (tab === "expense" && !movementLabelId) {
+      nextFieldErrors.movementLabel = t("movement.labelRequired");
+    }
     if (tab === "adjustment" && !reason.trim()) {
       nextFieldErrors.movementReason = t("movement.reasonRequired");
     }
@@ -726,6 +756,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         await spendwiseApi.createExpense(accessToken, selectedBudgetId, {
           period_id: selectedPeriodId,
           category_id: movementCategoryId,
+          label_id: movementLabelId,
           amount: parsedAmount,
           spent_on: movementDate,
           description: description.trim() || null,
@@ -757,6 +788,71 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           ? t("movement.savedRefreshError")
           : t("movement.saveError"),
       );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function addExpenseLabel() {
+    const name = newExpenseLabelName.trim();
+    if (!selectedBudgetId || !movementCategoryId || !name) {
+      setFieldErrors((current) => ({
+        ...current,
+        newExpenseLabel: t("movement.labelNameRequired"),
+      }));
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const created = await spendwiseApi.createExpenseLabel(
+        accessToken,
+        selectedBudgetId,
+        movementCategoryId,
+        name,
+      );
+      setExpenseLabelsByCategory((current) => ({
+        ...current,
+        [movementCategoryId]: [
+          ...(current[movementCategoryId] ?? []),
+          created,
+        ].sort((left, right) => left.name.localeCompare(right.name)),
+      }));
+      setMovementLabelId(created.id);
+      setNewExpenseLabelName("");
+      setIsAddingExpenseLabel(false);
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next.movementLabel;
+        delete next.newExpenseLabel;
+        return next;
+      });
+    } catch {
+      setFieldErrors((current) => ({
+        ...current,
+        newExpenseLabel: t("movement.labelCreateError"),
+      }));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function reclassifyExpense(expense: ExpenseEntry, labelId: string) {
+    if (!selectedBudgetId) return;
+    setIsSaving(true);
+    try {
+      const updated = await spendwiseApi.updateExpenseLabel(
+        accessToken,
+        selectedBudgetId,
+        expense.id,
+        labelId,
+      );
+      setExpenses((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setReclassifyingExpenseId(null);
+    } catch {
+      setIsError(true);
+      setNotice(t("movement.labelUpdateError"));
     } finally {
       setIsSaving(false);
     }
@@ -2085,12 +2181,82 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                 selected={movementCategoryId === category.id}
                                 onPress={() => {
                                   setMovementCategoryId(category.id);
+                                  setMovementLabelId("");
                                   clearFieldError("movementCategory");
                                 }}
                               />
                             ))}
                           </View>
                           <FieldError message={fieldErrors.movementCategory} />
+                          {tab === "expense" ? (
+                            <>
+                              <Text style={styles.label}>
+                                {t("movement.label")}
+                              </Text>
+                              <View style={styles.rowWrap}>
+                                {(
+                                  expenseLabelsByCategory[movementCategoryId] ??
+                                  []
+                                ).map((label) => (
+                                  <Choice
+                                    key={label.id}
+                                    label={label.name}
+                                    selected={movementLabelId === label.id}
+                                    onPress={() => {
+                                      setMovementLabelId(label.id);
+                                      clearFieldError("movementLabel");
+                                    }}
+                                  />
+                                ))}
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() =>
+                                    setIsAddingExpenseLabel(
+                                      (current) => !current,
+                                    )
+                                  }
+                                >
+                                  <Text style={styles.link}>
+                                    {t("movement.addLabel")}
+                                  </Text>
+                                </Pressable>
+                              </View>
+                              <FieldError message={fieldErrors.movementLabel} />
+                              {isAddingExpenseLabel ? (
+                                <View>
+                                  <TextInput
+                                    accessibilityLabel={t("movement.newLabel")}
+                                    maxLength={80}
+                                    onChangeText={(value) => {
+                                      setNewExpenseLabelName(value);
+                                      clearFieldError("newExpenseLabel");
+                                    }}
+                                    placeholder={t(
+                                      "movement.newLabelPlaceholder",
+                                    )}
+                                    style={[
+                                      styles.input,
+                                      fieldErrors.newExpenseLabel &&
+                                        styles.inputInvalid,
+                                    ]}
+                                    value={newExpenseLabelName}
+                                  />
+                                  <FieldError
+                                    message={fieldErrors.newExpenseLabel}
+                                  />
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    disabled={isSaving}
+                                    onPress={() => void addExpenseLabel()}
+                                  >
+                                    <Text style={styles.link}>
+                                      {t("movement.saveLabel")}
+                                    </Text>
+                                  </Pressable>
+                                </View>
+                              ) : null}
+                            </>
+                          ) : null}
                         </>
                       )}
                       <Text style={styles.label}>
@@ -2468,22 +2634,77 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                           {t("movement.incomeEmpty")}
                         </Text>
                       )
+                    ) : tab === "expense" ? (
+                      expenses.length ? (
+                        <View style={styles.list}>
+                          {expenses.map((item) => (
+                            <View key={item.id} style={styles.entry}>
+                              <View style={styles.entryText}>
+                                <Text style={styles.entryTitle}>
+                                  {categories.find(
+                                    (category) =>
+                                      category.id === item.category_id,
+                                  )?.name ?? t("movement.expense")}{" "}
+                                  ·{" "}
+                                  {item.label?.name ??
+                                    t("movement.unclassifiedLabel")}
+                                </Text>
+                                <Text style={styles.muted}>
+                                  {item.spent_on}
+                                  {item.description
+                                    ? ` · ${item.description}`
+                                    : ""}
+                                </Text>
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() =>
+                                    setReclassifyingExpenseId((current) =>
+                                      current === item.id ? null : item.id,
+                                    )
+                                  }
+                                >
+                                  <Text style={styles.link}>
+                                    {t("movement.changeLabel")}
+                                  </Text>
+                                </Pressable>
+                                {reclassifyingExpenseId === item.id ? (
+                                  <View style={styles.rowWrap}>
+                                    {(
+                                      expenseLabelsByCategory[
+                                        item.category_id
+                                      ] ?? []
+                                    ).map((label) => (
+                                      <Choice
+                                        key={label.id}
+                                        label={label.name}
+                                        selected={item.label_id === label.id}
+                                        onPress={() =>
+                                          void reclassifyExpense(item, label.id)
+                                        }
+                                      />
+                                    ))}
+                                  </View>
+                                ) : null}
+                              </View>
+                              <Text style={styles.entryAmount}>
+                                {formatAmount.format(-item.amount)}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={styles.muted}>
+                          {t("movement.expenseEmpty")}
+                        </Text>
+                      )
                     ) : (
                       <EntryList
                         empty={t(`movement.${tab}Empty`)}
-                        items={
-                          tab === "expense"
-                            ? expenses.map((item) => ({
-                                label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.expense")} · ${item.description ?? ""}`,
-                                date: item.spent_on,
-                                amount: -item.amount,
-                              }))
-                            : adjustments.map((item) => ({
-                                label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.adjustment")} · ${item.reason}`,
-                                date: item.occurred_on,
-                                amount: item.amount_delta,
-                              }))
-                        }
+                        items={adjustments.map((item) => ({
+                          label: `${categories.find((category) => category.id === item.category_id)?.name ?? t("movement.adjustment")} · ${item.reason}`,
+                          date: item.occurred_on,
+                          amount: item.amount_delta,
+                        }))}
                         format={formatAmount}
                       />
                     )}
@@ -2537,6 +2758,19 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       ) : (
                         <Text style={styles.muted}>
                           {t("dashboard.noCategoryExpenses")}
+                        </Text>
+                      )}
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.expenseByLabel")}
+                      </Text>
+                      {expenseLabelShares.length ? (
+                        <ExpenseLabelBreakdown
+                          items={expenseLabelShares}
+                          format={formatAmount}
+                        />
+                      ) : (
+                        <Text style={styles.muted}>
+                          {t("dashboard.noLabelExpenses")}
                         </Text>
                       )}
                       <Text style={styles.sectionTitle}>
@@ -3356,6 +3590,59 @@ function CategoryProgressList({
   );
 }
 
+function ExpenseLabelBreakdown({
+  items,
+  format,
+}: {
+  items: ExpenseLabelShare[];
+  format: Intl.NumberFormat;
+}) {
+  const { i18n } = useTranslation();
+  const percentageFormat = new Intl.NumberFormat(i18n.language, {
+    maximumFractionDigits: 1,
+  });
+  const categories = [
+    ...new Map(items.map((item) => [item.category.id, item.category])).values(),
+  ];
+  return (
+    <View style={styles.categoryProgressList}>
+      {categories.map((category) => {
+        const categoryItems = items.filter(
+          (item) => item.category.id === category.id,
+        );
+        return (
+          <View key={category.id} style={styles.categoryProgressItem}>
+            <Text style={styles.entryTitle}>{category.name}</Text>
+            {categoryItems.map((item) => (
+              <View
+                key={`${category.id}:${item.label}`}
+                style={styles.labelBreakdownRow}
+              >
+                <View style={styles.categoryProgressHeading}>
+                  <Text style={styles.muted}>
+                    {item.label} · {percentageFormat.format(item.percentage)}%
+                  </Text>
+                  <Text style={styles.entryAmount}>
+                    {format.format(item.amount)}
+                  </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.min(100, item.percentage)}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function AnnualBarChart({ months }: { months: MonthlySummary[] }) {
   const { t, i18n } = useTranslation();
   const language = i18n.language;
@@ -3859,6 +4146,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#edf1ed",
     borderBottomWidth: 1,
   },
+  labelBreakdownRow: { gap: 4, paddingTop: 5 },
   categoryProgressHeading: {
     flexDirection: "row",
     flexWrap: "wrap",

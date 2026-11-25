@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(23);
 
 insert into auth.users (id, aud, role, email) values
     ('17000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'mvp17-owner@example.invalid'),
@@ -9,17 +9,17 @@ insert into auth.users (id, aud, role, email) values
 select is(
     (select count(*)::integer from pg_proc p
       where p.oid in (
-          'public.record_expense(uuid,uuid,uuid,numeric,date,text)'::regprocedure,
+          'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)'::regprocedure,
           'public.record_budget_adjustment(uuid,uuid,uuid,numeric,text,date,uuid)'::regprocedure
       ) and not p.prosecdef),
     2,
     'Expense and adjustment RPCs run as the authenticated caller'
 );
-select ok(not has_function_privilege('anon', 'public.record_expense(uuid,uuid,uuid,numeric,date,text)', 'execute'),
+select ok(not has_function_privilege('anon', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)', 'execute'),
     'Anonymous users cannot record expenses');
 select ok(not has_function_privilege('anon', 'public.record_budget_adjustment(uuid,uuid,uuid,numeric,text,date,uuid)', 'execute'),
     'Anonymous users cannot record adjustments');
-select ok(has_function_privilege('authenticated', 'public.record_expense(uuid,uuid,uuid,numeric,date,text)', 'execute'),
+select ok(has_function_privilege('authenticated', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)', 'execute'),
     'Authenticated users can execute the expense RPC');
 select ok(has_function_privilege('authenticated', 'public.record_budget_adjustment(uuid,uuid,uuid,numeric,text,date,uuid)', 'execute'),
     'Authenticated users can execute the adjustment RPC');
@@ -96,14 +96,22 @@ select is(
     'Income records the allocation active when it is registered'
 );
 select lives_ok(
+    $$select public.create_expense_label(
+        (select id from public.budgets where name = 'MVP-17 movement test'),
+        (select id from public.budget_categories where name = 'General'), 'Lunch')$$,
+    'Contributor can create an expense label'
+);
+select lives_ok(
     $$select public.record_expense(
         (select id from public.budgets where name = 'MVP-17 movement test'),
         (select id from public.budget_periods where budget_id =
             (select id from public.budgets where name = 'MVP-17 movement test')),
         (select id from public.budget_categories where name = 'General'),
+        (select id from public.expense_labels where budget_id =
+            (select id from public.budgets where name = 'MVP-17 movement test') and name = 'Lunch'),
         12.50, current_date, 'Lunch'
     )$$,
-    'Contributor can record an expense'
+    'Contributor can record a labeled expense'
 );
 select is(
     (select recorded_by_member_id
@@ -162,6 +170,8 @@ select throws_ok(
         (select id from public.budget_periods where budget_id =
             (select id from public.budgets where name = 'MVP-17 movement test')),
         (select id from public.budget_categories where name = 'General'),
+        (select id from public.expense_labels where budget_id =
+            (select id from public.budgets where name = 'MVP-17 movement test') and name = 'Lunch'),
         10, current_date + 31, null
     )$$,
     '23514', null,
@@ -175,6 +185,8 @@ select throws_ok(
         (select id from public.budget_periods where budget_id =
             (select id from public.budgets where name = 'MVP-17 movement test')),
         (select id from public.budget_categories where name = 'General'),
+        (select id from public.expense_labels where budget_id =
+            (select id from public.budgets where name = 'MVP-17 movement test') and name = 'Lunch'),
         10, current_date, null
     )$$,
     '42501', null,

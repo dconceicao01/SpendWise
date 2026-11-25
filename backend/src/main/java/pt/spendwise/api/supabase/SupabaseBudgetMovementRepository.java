@@ -34,7 +34,7 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
     private static final String SELECT_SNAPSHOT =
             "income_entry_id,category_id,percentage_basis_points,allocated_amount";
     private static final String SELECT_EXPENSE =
-            "id,budget_id,period_id,category_id,recorded_by_member_id,amount,spent_on,description,created_at";
+            "id,budget_id,period_id,category_id,label_id,recorded_by_member_id,amount,spent_on,description,created_at,label:expense_labels(name,is_system)";
     private static final String SELECT_ADJUSTMENT =
             "id,budget_id,period_id,category_id,corrected_expense_entry_id,recorded_by_member_id,amount_delta,reason,occurred_on,created_at";
     private static final String SELECT_INCOME_CORRECTION =
@@ -137,11 +137,21 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
         body.put("p_budget_id", budgetId);
         body.put("p_period_id", request.periodId());
         body.put("p_category_id", request.categoryId());
+        body.put("p_label_id", request.labelId());
         body.put("p_amount", request.amount());
         body.put("p_spent_on", request.spentOn().toString());
         body.put("p_description", request.description());
         UUID expenseId = dataApiClient.callFunction("record_expense", body, UUID_RESULT);
         return expenseId == null ? Optional.empty() : findExpense(budgetId, expenseId);
+    }
+
+    @Override
+    public Optional<ExpenseEntryResponse> updateExpenseLabel(UUID budgetId, UUID expenseId, UUID labelId) {
+        dataApiClient.callFunction("update_expense_label", Map.of(
+                "p_budget_id", budgetId,
+                "p_expense_id", expenseId,
+                "p_label_id", labelId), UUID_RESULT);
+        return findExpense(budgetId, expenseId);
     }
 
     @Override

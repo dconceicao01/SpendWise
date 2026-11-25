@@ -18,6 +18,7 @@ import pt.spendwise.api.budget.BudgetType;
 import pt.spendwise.api.budget.IncomeScheduleService;
 import pt.spendwise.api.budget.IncomeCorrectionAllocationResponse;
 import pt.spendwise.api.budget.IncomeCorrectionResponse;
+import pt.spendwise.api.budget.ExpenseLabelService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -35,6 +36,7 @@ class PersonalDataExportServiceTest {
     private AllocationSetService allocationService;
     private BudgetMovementService movementService;
     private IncomeScheduleService scheduleService;
+    private ExpenseLabelService expenseLabelService;
     private PersonalDataExportService service;
 
     @BeforeEach
@@ -46,8 +48,9 @@ class PersonalDataExportServiceTest {
         allocationService = mock(AllocationSetService.class);
         movementService = mock(BudgetMovementService.class);
         scheduleService = mock(IncomeScheduleService.class);
+        expenseLabelService = mock(ExpenseLabelService.class);
         service = new PersonalDataExportService(exportRepository, budgetService, periodService, categoryService,
-                allocationService, movementService, scheduleService);
+                allocationService, movementService, scheduleService, expenseLabelService);
     }
 
     @Test

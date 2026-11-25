@@ -26,6 +26,15 @@ export type BudgetCategory = {
   archived_at: string | null;
 };
 
+export type ExpenseLabel = {
+  id: string;
+  budget_id: string;
+  category_id: string;
+  name: string;
+  is_system: boolean;
+  created_at: string;
+};
+
 export type AllocationSet = {
   id: string;
   budgetId: string;
@@ -65,6 +74,8 @@ export type ExpenseEntry = {
   id: string;
   period_id: string;
   category_id: string;
+  label_id: string;
+  label: { name: string; is_system: boolean };
   amount: number;
   spent_on: string;
   description: string | null;
@@ -257,6 +268,22 @@ export const spendwiseApi = {
       `/budgets/${budgetId}/categories`,
       jsonBody({ name }),
     ),
+  listExpenseLabels: (token: string, budgetId: string, categoryId: string) =>
+    request<ExpenseLabel[]>(
+      token,
+      `/budgets/${budgetId}/categories/${categoryId}/expense-labels`,
+    ),
+  createExpenseLabel: (
+    token: string,
+    budgetId: string,
+    categoryId: string,
+    name: string,
+  ) =>
+    request<ExpenseLabel>(
+      token,
+      `/budgets/${budgetId}/categories/${categoryId}/expense-labels`,
+      jsonBody({ name }),
+    ),
   renameCategory: (
     token: string,
     budgetId: string,
@@ -392,6 +419,7 @@ export const spendwiseApi = {
     input: {
       period_id: string;
       category_id: string;
+      label_id: string;
       amount: number;
       spent_on: string;
       description: string | null;
@@ -401,6 +429,20 @@ export const spendwiseApi = {
       token,
       `/budgets/${budgetId}/expenses`,
       jsonBody(input),
+    ),
+  updateExpenseLabel: (
+    token: string,
+    budgetId: string,
+    expenseId: string,
+    labelId: string,
+  ) =>
+    request<ExpenseEntry>(
+      token,
+      `/budgets/${budgetId}/expenses/${expenseId}/label`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ label_id: labelId }),
+      },
     ),
   listAdjustments: (
     token: string,

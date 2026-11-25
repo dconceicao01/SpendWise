@@ -44,7 +44,7 @@ Esta página traduz requisitos em controlos de produto e engenharia; não certif
 
 ## Exportação de dados pessoais
 
-O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados do perfil próprio e dos orçamentos que a pessoa consegue ler naquele momento. A API encaminha o JWT original à Data API; RLS continua a filtrar perfil e orçamento e a autorização do domínio valida cada orçamento. O pacote contém configuração, períodos, categorias, alocações, rendimentos com snapshots, despesas, ajustes e agendamentos recorrentes. Em dados partilhados, os IDs de membro que identificam a autoria de movimentos e agendamentos são omitidos. A resposta define `Cache-Control: no-store`; tokens e segredos não integram o ficheiro. A exportação não substitui um processo operacional para verificar, registar e responder aos pedidos de titulares.
+O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados do perfil próprio e dos orçamentos que a pessoa consegue ler naquele momento. A API encaminha o JWT original à Data API; RLS continua a filtrar perfil e orçamento e a autorização do domínio valida cada orçamento. O pacote contém configuração, períodos, categorias, labels de despesa, alocações, rendimentos com snapshots, despesas com label, ajustes e agendamentos recorrentes. Em dados partilhados, os IDs de membro que identificam a autoria de movimentos e agendamentos são omitidos. A resposta define `Cache-Control: no-store`; tokens e segredos não integram o ficheiro. A exportação não substitui um processo operacional para verificar, registar e responder aos pedidos de titulares.
 
 ## Autenticação e sessão
 

@@ -21,6 +21,13 @@ export type ExpenseCategoryShare = {
   percentage: number;
 };
 
+export type ExpenseLabelShare = {
+  category: BudgetCategory;
+  label: string;
+  amount: number;
+  percentage: number;
+};
+
 export type AnnualSummary = {
   income: number;
   expense: number;
@@ -124,6 +131,33 @@ export function calculateExpenseCategoryShares(
         right.amount - left.amount ||
         left.category.name.localeCompare(right.category.name),
     );
+}
+
+export function calculateExpenseLabelShares(
+  categories: BudgetCategory[],
+  expenses: ExpenseEntry[],
+): ExpenseLabelShare[] {
+  return categories.flatMap((category) => {
+    const totals = new Map<string, number>();
+    for (const expense of expenses) {
+      if (expense.category_id !== category.id) continue;
+      const name = expense.label?.name || "Por classificar";
+      totals.set(name, (totals.get(name) ?? 0) + expense.amount);
+    }
+    const total = [...totals.values()].reduce((sum, amount) => sum + amount, 0);
+    if (total <= 0) return [];
+    return [...totals.entries()]
+      .map(([label, amount]) => ({
+        category,
+        label,
+        amount,
+        percentage: (amount / total) * 100,
+      }))
+      .sort(
+        (left, right) =>
+          right.amount - left.amount || left.label.localeCompare(right.label),
+      );
+  });
 }
 
 export function periodsOverlappingYear(
