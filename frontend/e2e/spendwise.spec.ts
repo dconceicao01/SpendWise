@@ -19,6 +19,19 @@ type MovementState = {
       allocated_amount: number;
     }[];
   }[];
+  incomeCorrections: {
+    id: string;
+    income_entry_id: string;
+    period_id: string;
+    amount_delta: number;
+    reason: string;
+    occurred_on: string;
+    allocation_snapshot: {
+      category_id: string;
+      percentage_basis_points: number;
+      allocated_amount: number;
+    }[];
+  }[];
   expenses: {
     id: string;
     period_id: string;
@@ -154,7 +167,12 @@ async function mockBudgetApi(page: Page) {
     budgets: [],
     periods: [],
     categories: [],
-    movements: { incomes: [], expenses: [], adjustments: [] },
+    movements: {
+      incomes: [],
+      incomeCorrections: [],
+      expenses: [],
+      adjustments: [],
+    },
     invitations: [],
     profile: {
       user_id: accountId,
@@ -240,7 +258,7 @@ async function mockBudgetApi(page: Page) {
     }
 
     const resource = path.match(
-      /^\/budgets\/[^/]+\/(periods|categories|allocation-sets|income-schedules|incomes|expenses|adjustments|invitations)(?:\/(.*))?$/,
+      /^\/budgets\/[^/]+\/(periods|categories|allocation-sets|income-schedules|incomes|income-corrections|expenses|adjustments|invitations)(?:\/(.*))?$/,
     );
     if (!resource) return respond({ error: "Unexpected test request" }, 404);
     const [, name, resourceId] = resource;
@@ -375,8 +393,37 @@ async function mockBudgetApi(page: Page) {
       );
     }
     if (name === "income-schedules" && method === "GET") return respond([]);
+    if (name === "income-corrections" && method === "GET")
+      return respond(state.movements.incomeCorrections);
     if (name === "incomes" && method === "GET")
       return respond(state.movements.incomes);
+    if (
+      name === "incomes" &&
+      method === "POST" &&
+      resourceId?.endsWith("/corrections")
+    ) {
+      const input = request.postDataJSON() as Omit<
+        MovementState["incomeCorrections"][number],
+        "id" | "income_entry_id" | "allocation_snapshot"
+      >;
+      const incomeCorrection = {
+        id: "iiiiiiii-iiii-4iii-8iii-iiiiiiiiiiii",
+        income_entry_id: resourceId.slice(0, -"/corrections".length),
+        ...input,
+        allocation_snapshot: [
+          {
+            category_id: categoryId,
+            percentage_basis_points: 10000,
+            allocated_amount: input.amount_delta,
+          },
+        ],
+      };
+      state.movements.incomeCorrections = [
+        ...state.movements.incomeCorrections,
+        incomeCorrection,
+      ];
+      return respond(incomeCorrection, 201);
+    }
     if (name === "incomes" && method === "POST") {
       const input = request.postDataJSON() as {
         period_id: string;
@@ -511,6 +558,15 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByLabel("Date (YYYY-MM-DD)").fill(`${year}-06-01`);
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Income recorded.")).toBeVisible();
+  await page.getByText("Correct income").click();
+  await page.getByLabel("Correction amount").fill("100");
+  await page.getByLabel("Correction date (YYYY-MM-DD)").fill(`${year}-06-05`);
+  await page
+    .getByLabel("Correction description")
+    .fill("June income adjustment");
+  await page.getByRole("button", { name: "Save correction" }).click();
+  await expect(page.getByText("Income correction recorded.")).toBeVisible();
+  await expect(page.getByText("June income adjustment")).toBeVisible();
 
   await page.getByRole("button", { name: "Expenses" }).click();
   await page.getByRole("button", { name: "General" }).click();
@@ -525,11 +581,12 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByRole("button", { name: "View all statistics" }).click();
   await expect(page.getByText("Statistics")).toBeVisible();
   await page.getByRole("button", { name: "View summary" }).click();
-  await expect(page.getByText(/900\.00/).last()).toBeVisible();
+  await expect(page.getByText(/1,000\.00/).last()).toBeVisible();
   await expect(page.getByText(/200\.00/).last()).toBeVisible();
   expect(state.budgets).toHaveLength(1);
   expect(state.periods).toHaveLength(1);
   expect(state.movements.incomes).toHaveLength(1);
+  expect(state.movements.incomeCorrections).toHaveLength(1);
   expect(state.movements.expenses).toHaveLength(1);
 
   await page.getByRole("button", { name: "Profile and privacy" }).click();
