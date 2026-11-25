@@ -593,8 +593,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     const year = Number(annualYear);
     const relevantPeriods = periodsOverlappingYear(periods, year);
     setIsLoadingAnnual(true);
-    setIsError(false);
-    setNotice("");
     try {
       const annualIncomes: IncomeEntry[] = [];
       const annualExpenses: ExpenseEntry[] = [];
@@ -684,6 +682,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       setIsError(false);
       return;
     }
+    setIsError(false);
+    setNotice("");
     void loadAnnualSummary();
   };
 
