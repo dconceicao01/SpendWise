@@ -1,6 +1,7 @@
 import { getRuntimeConfig } from "@/lib/runtime-config";
 
 export type BudgetType = "PERSONAL" | "SHARED";
+export type BudgetRole = "OWNER" | "CONTRIBUTOR" | "VIEWER";
 
 export type Budget = {
   id: string;
@@ -8,6 +9,7 @@ export type Budget = {
   budget_type: BudgetType;
   currency_code: string;
   archived_at: string | null;
+  current_user_role: BudgetRole;
 };
 
 export type BudgetPeriod = {
@@ -222,6 +224,15 @@ export const spendwiseApi = {
       { method: "POST" },
     ),
   listBudgets: (token: string) => request<Budget[]>(token, "/budgets"),
+  renameBudget: (token: string, budgetId: string, name: string) =>
+    request<Budget>(token, `/budgets/${budgetId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  archiveBudget: (token: string, budgetId: string) =>
+    request<Budget>(token, `/budgets/${budgetId}/archive`, { method: "POST" }),
+  restoreBudget: (token: string, budgetId: string) =>
+    request<Budget>(token, `/budgets/${budgetId}/restore`, { method: "POST" }),
   createBudget: (
     token: string,
     input: { name: string; budgetType: BudgetType; currencyCode: string },
@@ -245,6 +256,23 @@ export const spendwiseApi = {
       token,
       `/budgets/${budgetId}/categories`,
       jsonBody({ name }),
+    ),
+  renameCategory: (
+    token: string,
+    budgetId: string,
+    categoryId: string,
+    name: string,
+  ) =>
+    request<BudgetCategory>(
+      token,
+      `/budgets/${budgetId}/categories/${categoryId}`,
+      { method: "PATCH", body: JSON.stringify({ name }) },
+    ),
+  archiveCategory: (token: string, budgetId: string, categoryId: string) =>
+    request<BudgetCategory>(
+      token,
+      `/budgets/${budgetId}/categories/${categoryId}/archive`,
+      { method: "POST" },
     ),
   listAllocationSets: (token: string, budgetId: string) =>
     request<AllocationSet[]>(token, `/budgets/${budgetId}/allocation-sets`),

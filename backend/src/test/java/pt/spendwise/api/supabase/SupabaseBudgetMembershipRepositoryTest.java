@@ -1,6 +1,7 @@
 package pt.spendwise.api.supabase;
 
 import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +75,21 @@ class SupabaseBudgetMembershipRepositoryTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThat(repository.findCurrentUserActiveRole(BUDGET_ID)).isEmpty();
+        mockServer.verify();
+    }
+
+    @Test
+    void listsOnlyTheAuthenticatedUsersActiveBudgetRoles() {
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budget_members?select=budget_id,role&user_id=eq."
+                        + CURRENT_USER_ID + "&removed_at=is.null"))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
+                .andExpect(queryParam("user_id", "eq." + CURRENT_USER_ID))
+                .andExpect(queryParam("removed_at", "is.null"))
+                .andRespond(withSuccess("[{\"budget_id\":\"" + BUDGET_ID
+                        + "\",\"role\":\"OWNER\"}]", MediaType.APPLICATION_JSON));
+
+        assertThat(repository.findCurrentUserActiveRoles()).containsExactly(Map.entry(BUDGET_ID, BudgetRole.OWNER));
         mockServer.verify();
     }
 

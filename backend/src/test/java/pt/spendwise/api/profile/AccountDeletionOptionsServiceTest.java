@@ -65,7 +65,7 @@ class AccountDeletionOptionsServiceTest {
 
     private BudgetResponse budget(UUID id, String name, BudgetType type) {
         Instant now = Instant.parse("2026-11-23T10:00:00Z");
-        return new BudgetResponse(id, name, type, "EUR", now, null);
+        return new BudgetResponse(id, name, type, "EUR", now, null, null);
     }
 
     private BudgetMemberResponse member(UUID id, BudgetRole role, String name) {

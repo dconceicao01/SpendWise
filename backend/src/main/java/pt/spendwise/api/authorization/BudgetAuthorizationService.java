@@ -1,6 +1,7 @@
 package pt.spendwise.api.authorization;
 
 import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -30,5 +31,9 @@ public class BudgetAuthorizationService {
 
     public Optional<BudgetRole> currentRole(UUID budgetId) {
         return membershipRepository.findCurrentUserActiveRole(budgetId);
+    }
+
+    public Map<UUID, BudgetRole> currentRoles() {
+        return membershipRepository.findCurrentUserActiveRoles();
     }
 }

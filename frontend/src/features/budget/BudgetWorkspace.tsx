@@ -44,7 +44,11 @@ import {
 } from "@/lib/spendwise-api";
 
 type Props = { accessToken: string; onSignOut: () => void; userEmail?: string };
-type DraftCategory = { name: string; percentage: string };
+type DraftCategory = {
+  categoryId?: string;
+  name: string;
+  percentage: string;
+};
 type MovementTab = "income" | "expense" | "adjustment";
 type WorkspaceView = "budgets" | "dashboard" | "movement" | "statistics";
 type MobileDestination = WorkspaceView | "profile";
@@ -119,6 +123,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const isCompact = width < 600;
   const isNative = Platform.OS !== "web";
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [archivedBudgets, setArchivedBudgets] = useState<Budget[]>([]);
   const [budgetAllocationSummaries, setBudgetAllocationSummaries] = useState<
     Record<string, BudgetAllocationSummary>
   >({});
@@ -163,6 +168,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [budgetLoadFailed, setBudgetLoadFailed] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [isCreatingBudget, setIsCreatingBudget] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [confirmArchiveBudgetId, setConfirmArchiveBudgetId] = useState<
+    string | null
+  >(null);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [isError, setIsError] = useState(false);
@@ -277,11 +286,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
   const loadBudgets = useCallback(async () => {
     const nextBudgets = await spendwiseApi.listBudgets(accessToken);
-    setBudgets(nextBudgets.filter((budget) => !budget.archived_at));
+    const activeBudgets = nextBudgets.filter((budget) => !budget.archived_at);
+    setBudgets(activeBudgets);
+    setArchivedBudgets(nextBudgets.filter((budget) => budget.archived_at));
     setSelectedBudgetId((current) =>
-      nextBudgets.some((budget) => budget.id === current && !budget.archived_at)
+      activeBudgets.some((budget) => budget.id === current)
         ? current
-        : (nextBudgets.find((budget) => !budget.archived_at)?.id ?? ""),
+        : (activeBudgets[0]?.id ?? ""),
     );
   }, [accessToken]);
 
@@ -394,6 +405,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
         if (!active) return;
         const visible = nextBudgets.filter((budget) => !budget.archived_at);
         setBudgets(visible);
+        setArchivedBudgets(nextBudgets.filter((budget) => budget.archived_at));
         setSelectedBudgetId((current) =>
           visible.some((budget) => budget.id === current)
             ? current
@@ -531,6 +543,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       const nextBudgets = await spendwiseApi.listBudgets(accessToken);
       const visible = nextBudgets.filter((budget) => !budget.archived_at);
       setBudgets(visible);
+      setArchivedBudgets(nextBudgets.filter((budget) => budget.archived_at));
       setSelectedBudgetId((current) =>
         visible.some((budget) => budget.id === current)
           ? current
@@ -1018,6 +1031,200 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     void loadAnnualSummary();
   };
 
+  async function startEditingBudget(budget: Budget) {
+    if (budget.current_user_role !== "OWNER") return;
+    setIsSaving(true);
+    setNotice("");
+    setIsError(false);
+    try {
+      const [nextCategories, nextAllocationSets] = await Promise.all([
+        spendwiseApi.listCategories(accessToken, budget.id),
+        spendwiseApi.listAllocationSets(accessToken, budget.id),
+      ]);
+      const activeSet = nextAllocationSets.find(
+        (allocationSet) => allocationSet.status === "ACTIVE",
+      );
+      const percentages = new Map(
+        activeSet?.items.map((item) => [item.categoryId, item.percentage]) ??
+          [],
+      );
+      const activeBudgetCategories = nextCategories.filter(
+        (category) => !category.archived_at,
+      );
+      setSelectedBudgetId(budget.id);
+      setCategories(nextCategories);
+      setAllocationSets(nextAllocationSets);
+      setBudgetName(budget.name);
+      setDraftCategories(
+        activeBudgetCategories.length
+          ? activeBudgetCategories.map((category) => ({
+              categoryId: category.id,
+              name: category.name,
+              percentage: String(percentages.get(category.id) ?? 0),
+            }))
+          : [{ name: "", percentage: "100" }],
+      );
+      setCategoryNameErrors([]);
+      setCategoryPercentageErrors([]);
+      setAllocationTotalError(false);
+      setFieldErrors({});
+      setEditingBudgetId(budget.id);
+    } catch {
+      setIsError(true);
+      setNotice(t("budget.manageLoadError"));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveBudgetChanges() {
+    if (!editingBudgetId) return;
+    const missingCategoryNames = draftCategories.flatMap((category, index) =>
+      category.name.trim() ? [] : [index],
+    );
+    const invalidCategoryPercentages = draftCategories.flatMap(
+      (category, index) =>
+        Number(category.percentage.replace(",", ".")) > 0 ? [] : [index],
+    );
+    const nextFieldErrors: Record<string, string> = {};
+    if (!budgetName.trim()) {
+      nextFieldErrors.budgetName = t("budget.nameRequired");
+    }
+    setCategoryNameErrors(missingCategoryNames);
+    setCategoryPercentageErrors(invalidCategoryPercentages);
+    const invalidAllocationTotal = Math.abs(percentageTotal - 100) > 0.0001;
+    setAllocationTotalError(invalidAllocationTotal);
+    setFieldErrors(nextFieldErrors);
+    if (
+      missingCategoryNames.length ||
+      invalidCategoryPercentages.length ||
+      invalidAllocationTotal ||
+      Object.keys(nextFieldErrors).length
+    ) {
+      setIsError(false);
+      setNotice("");
+      return;
+    }
+
+    setIsSaving(true);
+    setIsError(false);
+    setNotice("");
+    try {
+      const currentCategories = categories.filter(
+        (category) => !category.archived_at,
+      );
+      const selectedCategoryIds = new Set<string>();
+      const configuredCategories: BudgetCategory[] = [];
+      for (const draft of draftCategories) {
+        const name = draft.name.trim();
+        const currentCategory = draft.categoryId
+          ? currentCategories.find(
+              (category) => category.id === draft.categoryId,
+            )
+          : undefined;
+        const savedCategory = currentCategory
+          ? currentCategory.name === name
+            ? currentCategory
+            : await spendwiseApi.renameCategory(
+                accessToken,
+                editingBudgetId,
+                currentCategory.id,
+                name,
+              )
+          : await spendwiseApi.createCategory(
+              accessToken,
+              editingBudgetId,
+              name,
+            );
+        selectedCategoryIds.add(savedCategory.id);
+        configuredCategories.push(savedCategory);
+      }
+
+      const nextAllocationSet = await spendwiseApi.createAllocationSet(
+        accessToken,
+        editingBudgetId,
+        configuredCategories.map((category, index) => ({
+          categoryId: category.id,
+          percentage: Number(
+            draftCategories[index].percentage.replace(",", "."),
+          ),
+        })),
+      );
+      await spendwiseApi.activateAllocationSet(
+        accessToken,
+        editingBudgetId,
+        nextAllocationSet.id,
+      );
+
+      for (const category of currentCategories) {
+        if (!selectedCategoryIds.has(category.id)) {
+          await spendwiseApi.archiveCategory(
+            accessToken,
+            editingBudgetId,
+            category.id,
+          );
+        }
+      }
+      await spendwiseApi.renameBudget(
+        accessToken,
+        editingBudgetId,
+        budgetName.trim(),
+      );
+      await Promise.all([loadBudgets(), loadWorkspace(editingBudgetId)]);
+      setEditingBudgetId(null);
+      setCategoryNameErrors([]);
+      setCategoryPercentageErrors([]);
+      setAllocationTotalError(false);
+      setNotice(t("budget.manageSaved"));
+    } catch {
+      setIsError(true);
+      setNotice(t("budget.manageSaveError"));
+      await Promise.all([
+        loadBudgets().catch(() => undefined),
+        loadWorkspace(editingBudgetId).catch(() => undefined),
+      ]);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function archiveBudget() {
+    if (!confirmArchiveBudgetId) return;
+    setIsSaving(true);
+    setIsError(false);
+    setNotice("");
+    try {
+      await spendwiseApi.archiveBudget(accessToken, confirmArchiveBudgetId);
+      if (selectedBudgetId === confirmArchiveBudgetId) {
+        setWorkspaceView("budgets");
+      }
+      await loadBudgets();
+      setConfirmArchiveBudgetId(null);
+      setNotice(t("budget.archived"));
+    } catch {
+      setIsError(true);
+      setNotice(t("budget.archiveError"));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function restoreBudget(budgetId: string) {
+    setIsSaving(true);
+    setIsError(false);
+    setNotice("");
+    try {
+      await spendwiseApi.restoreBudget(accessToken, budgetId);
+      await loadBudgets();
+      setNotice(t("budget.restored"));
+    } catch {
+      setIsError(true);
+      setNotice(t("budget.restoreError"));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const canRecordMovements = Boolean(
     selectedPeriodId && activeCategories.length,
   );
@@ -1158,7 +1365,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             ]}
           >
             <LanguageSwitcher />
-            {!isNative && budgets.length > 0 ? (
+            {!isNative && budgets.length > 0 && !editingBudgetId ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setIsCreatingBudget(true)}
@@ -1205,6 +1412,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
 
         {!isNative &&
         !isCreatingBudget &&
+        !editingBudgetId &&
         !budgetLoadFailed &&
         workspaceView !== "dashboard" ? (
           <BackToDashboardButton
@@ -1223,66 +1431,99 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               onPress={() => void retryBudgetLoad()}
             />
           </View>
-        ) : workspaceView === "budgets" && !isCreatingBudget ? (
+        ) : workspaceView === "budgets" &&
+          !isCreatingBudget &&
+          !editingBudgetId ? (
           <View style={styles.budgetHub}>
             <Text style={styles.sectionTitle}>{t("budget.title")}</Text>
             <Text style={styles.muted}>{t("budget.select")}</Text>
             {budgets.length ? (
               budgets.map((budget) => (
-                <Pressable
-                  key={budget.id}
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    selected: budget.id === selectedBudgetId,
-                  }}
-                  onPress={() => {
-                    selectBudget(budget.id);
-                    setWorkspaceView("dashboard");
-                  }}
-                  style={[
-                    styles.budgetHubItem,
-                    budget.id === selectedBudgetId &&
-                      styles.budgetHubItemSelected,
-                  ]}
-                >
-                  <View style={styles.entryText}>
-                    <Text style={styles.entryTitle}>{budget.name}</Text>
-                    <Text style={styles.muted}>
-                      {budget.budget_type === "SHARED"
-                        ? t("budget.shared")
-                        : t("budget.personal")}{" "}
-                      · {budget.currency_code}
-                    </Text>
-                    {budgetAllocationSummaries[budget.id]?.loading ? (
-                      <Text style={styles.budgetAllocationHint}>
-                        {t("common.loading")}
+                <View key={budget.id} style={styles.budgetHubEntry}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected: budget.id === selectedBudgetId,
+                    }}
+                    onPress={() => {
+                      selectBudget(budget.id);
+                      setWorkspaceView("dashboard");
+                    }}
+                    style={[
+                      styles.budgetHubItem,
+                      budget.id === selectedBudgetId &&
+                        styles.budgetHubItemSelected,
+                    ]}
+                  >
+                    <View style={styles.entryText}>
+                      <Text style={styles.entryTitle}>{budget.name}</Text>
+                      <Text style={styles.muted}>
+                        {budget.budget_type === "SHARED"
+                          ? t("budget.shared")
+                          : t("budget.personal")}{" "}
+                        · {budget.currency_code}
                       </Text>
-                    ) : budgetAllocationSummaries[budget.id]?.failed ? (
-                      <Text style={styles.budgetAllocationHint}>
-                        {t("budget.summaryLoadError")}
+                      {budgetAllocationSummaries[budget.id]?.loading ? (
+                        <Text style={styles.budgetAllocationHint}>
+                          {t("common.loading")}
+                        </Text>
+                      ) : budgetAllocationSummaries[budget.id]?.failed ? (
+                        <Text style={styles.budgetAllocationHint}>
+                          {t("budget.summaryLoadError")}
+                        </Text>
+                      ) : budgetAllocationSummaries[budget.id]?.items.length ? (
+                        <View style={styles.budgetAllocationTags}>
+                          {budgetAllocationSummaries[budget.id].items.map(
+                            (item) => (
+                              <Text
+                                key={item.categoryId}
+                                style={styles.budgetAllocationTag}
+                              >
+                                {item.name} ·{" "}
+                                {percentageFormat.format(item.percentage)}%
+                              </Text>
+                            ),
+                          )}
+                        </View>
+                      ) : (
+                        <Text style={styles.budgetAllocationHint}>
+                          {t("budget.noAllocation")}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.budgetHubArrow}>›</Text>
+                  </Pressable>
+                  {budget.current_user_role === "OWNER" ? (
+                    <View style={styles.budgetManageActions}>
+                      <SecondaryActionButton
+                        label={t("budget.edit")}
+                        onPress={() => void startEditingBudget(budget)}
+                      />
+                      <ArchiveActionButton
+                        label={t("budget.archive")}
+                        onPress={() => setConfirmArchiveBudgetId(budget.id)}
+                      />
+                    </View>
+                  ) : null}
+                  {confirmArchiveBudgetId === budget.id ? (
+                    <View style={styles.archiveConfirmation}>
+                      <Text style={styles.muted}>
+                        {t("budget.archiveConfirm", { name: budget.name })}
                       </Text>
-                    ) : budgetAllocationSummaries[budget.id]?.items.length ? (
-                      <View style={styles.budgetAllocationTags}>
-                        {budgetAllocationSummaries[budget.id].items.map(
-                          (item) => (
-                            <Text
-                              key={item.categoryId}
-                              style={styles.budgetAllocationTag}
-                            >
-                              {item.name} ·{" "}
-                              {percentageFormat.format(item.percentage)}%
-                            </Text>
-                          ),
-                        )}
+                      <View style={styles.budgetManageActions}>
+                        <CancelActionButton
+                          label={t("common.cancel")}
+                          onPress={() => setConfirmArchiveBudgetId(null)}
+                        />
+                        <ArchiveActionButton
+                          disabled={isSaving}
+                          label={t("budget.confirmArchive")}
+                          onPress={() => void archiveBudget()}
+                        />
                       </View>
-                    ) : (
-                      <Text style={styles.budgetAllocationHint}>
-                        {t("budget.noAllocation")}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={styles.budgetHubArrow}>›</Text>
-                </Pressable>
+                    </View>
+                  ) : null}
+                </View>
               ))
             ) : (
               <View
@@ -1304,8 +1545,32 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 onPress={() => setIsCreatingBudget(true)}
               />
             ) : null}
+            {archivedBudgets.length ? (
+              <View style={styles.archivedBudgetSection}>
+                <Text style={styles.sectionTitle}>
+                  {t("budget.archivedTitle")}
+                </Text>
+                {archivedBudgets.map((budget) => (
+                  <View key={budget.id} style={styles.archivedBudgetItem}>
+                    <View style={styles.entryText}>
+                      <Text style={styles.entryTitle}>{budget.name}</Text>
+                      <Text style={styles.muted}>
+                        {t("budget.archivedStatus")} · {budget.currency_code}
+                      </Text>
+                    </View>
+                    {budget.current_user_role === "OWNER" ? (
+                      <ActionButton
+                        disabled={isSaving}
+                        label={t("budget.restore")}
+                        onPress={() => void restoreBudget(budget.id)}
+                      />
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
-        ) : budgets.length > 0 && !isCreatingBudget ? (
+        ) : budgets.length > 0 && !isCreatingBudget && !editingBudgetId ? (
           <>
             <Text style={styles.sectionTitle}>{t("budget.select")}</Text>
             {isNative ? (
@@ -2370,20 +2635,27 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               </>
             ) : null}
           </>
-        ) : isCreatingBudget ? (
+        ) : isCreatingBudget || editingBudgetId ? (
           <View style={styles.card}>
             <CancelActionButton
               label={t("common.cancel")}
               onPress={() => {
                 setIsCreatingBudget(false);
+                setEditingBudgetId(null);
                 setFieldErrors({});
                 setCategoryNameErrors([]);
                 setCategoryPercentageErrors([]);
                 setAllocationTotalError(false);
               }}
             />
-            <Text style={styles.sectionTitle}>{t("budget.setupTitle")}</Text>
-            <Text style={styles.muted}>{t("budget.setupDescription")}</Text>
+            <Text style={styles.sectionTitle}>
+              {editingBudgetId ? t("budget.editTitle") : t("budget.setupTitle")}
+            </Text>
+            <Text style={styles.muted}>
+              {editingBudgetId
+                ? t("budget.editDescription")
+                : t("budget.setupDescription")}
+            </Text>
             <Text style={styles.label}>{t("budget.name")}</Text>
             <TextInput
               accessibilityLabel={t("budget.name")}
@@ -2400,62 +2672,69 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               value={budgetName}
             />
             <FieldError message={fieldErrors.budgetName} />
-            <Text style={styles.label}>{t("budget.type")}</Text>
-            <View style={styles.rowWrap}>
-              <Choice
-                label={t("budget.personal")}
-                selected={budgetType === "PERSONAL"}
-                onPress={() => setBudgetType("PERSONAL")}
-              />
-              <Choice
-                label={t("budget.shared")}
-                selected={budgetType === "SHARED"}
-                onPress={() => setBudgetType("SHARED")}
-              />
-            </View>
-            <Text style={styles.label}>{t("budget.currency")}</Text>
-            <TextInput
-              accessibilityLabel={t("budget.currency")}
-              autoCapitalize="characters"
-              maxLength={3}
-              onChangeText={(value) => {
-                setCurrency(value);
-                clearFieldError("currency");
-              }}
-              style={[
-                styles.input,
-                fieldErrors.currency && styles.inputInvalid,
-              ]}
-              value={currency}
-            />
-            <FieldError message={fieldErrors.currency} />
-            <Text style={styles.label}>{t("budget.period")}</Text>
-            <TextInput
-              accessibilityLabel={t("budget.startsOn")}
-              onChangeText={(value) => {
-                setStartsOn(value);
-                clearFieldError("startsOn");
-                clearFieldError("endsOn");
-              }}
-              placeholder={t("budget.startsOn")}
-              style={[
-                styles.input,
-                fieldErrors.startsOn && styles.inputInvalid,
-              ]}
-              value={startsOn}
-            />
-            <FieldError message={fieldErrors.startsOn} />
-            <TextInput
-              accessibilityLabel={t("budget.endsOn")}
-              onChangeText={(value) => {
-                setEndsOn(value);
-                clearFieldError("endsOn");
-              }}
-              placeholder={t("budget.endsOn")}
-              style={[styles.input, fieldErrors.endsOn && styles.inputInvalid]}
-              value={endsOn}
-            />
-            <FieldError message={fieldErrors.endsOn} />
+            {!editingBudgetId ? (
+              <>
+                <Text style={styles.label}>{t("budget.type")}</Text>
+                <View style={styles.rowWrap}>
+                  <Choice
+                    label={t("budget.personal")}
+                    selected={budgetType === "PERSONAL"}
+                    onPress={() => setBudgetType("PERSONAL")}
+                  />
+                  <Choice
+                    label={t("budget.shared")}
+                    selected={budgetType === "SHARED"}
+                    onPress={() => setBudgetType("SHARED")}
+                  />
+                </View>
+                <Text style={styles.label}>{t("budget.currency")}</Text>
+                <TextInput
+                  accessibilityLabel={t("budget.currency")}
+                  autoCapitalize="characters"
+                  maxLength={3}
+                  onChangeText={(value) => {
+                    setCurrency(value);
+                    clearFieldError("currency");
+                  }}
+                  style={[
+                    styles.input,
+                    fieldErrors.currency && styles.inputInvalid,
+                  ]}
+                  value={currency}
+                />
+                <FieldError message={fieldErrors.currency} />
+                <Text style={styles.label}>{t("budget.period")}</Text>
+                <TextInput
+                  accessibilityLabel={t("budget.startsOn")}
+                  onChangeText={(value) => {
+                    setStartsOn(value);
+                    clearFieldError("startsOn");
+                    clearFieldError("endsOn");
+                  }}
+                  placeholder={t("budget.startsOn")}
+                  style={[
+                    styles.input,
+                    fieldErrors.startsOn && styles.inputInvalid,
+                  ]}
+                  value={startsOn}
+                />
+                <FieldError message={fieldErrors.startsOn} />
+                <TextInput
+                  accessibilityLabel={t("budget.endsOn")}
+                  onChangeText={(value) => {
+                    setEndsOn(value);
+                    clearFieldError("endsOn");
+                  }}
+                  placeholder={t("budget.endsOn")}
+                  style={[
+                    styles.input,
+                    fieldErrors.endsOn && styles.inputInvalid,
+                  ]}
+                  value={endsOn}
+                />
+                <FieldError message={fieldErrors.endsOn} />
+              </>
+            ) : null}
             <Text style={styles.sectionTitle}>{t("budget.categories")}</Text>
             {draftCategories.map((category, index) => (
               <View key={index} style={styles.categoryItem}>
@@ -2557,8 +2836,18 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             </Pressable>
             <ActionButton
               disabled={isSaving}
-              label={isSaving ? t("common.saving") : t("budget.setup")}
-              onPress={createBudgetAndSetup}
+              label={
+                isSaving
+                  ? t("common.saving")
+                  : editingBudgetId
+                    ? t("budget.saveChanges")
+                    : t("budget.setup")
+              }
+              onPress={() =>
+                editingBudgetId
+                  ? void saveBudgetChanges()
+                  : void createBudgetAndSetup()
+              }
             />
           </View>
         ) : (
@@ -2583,7 +2872,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           </View>
         )}
       </ScrollView>
-      {isNative && !isCreatingBudget ? (
+      {isNative && !isCreatingBudget && !editingBudgetId ? (
         <MobileNavigation
           current={workspaceView}
           onSelect={(destination) => {
@@ -2807,6 +3096,27 @@ function CancelActionButton({
       style={styles.cancelAction}
     >
       <Text style={styles.cancelActionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function ArchiveActionButton({
+  label,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.archiveAction, disabled && styles.disabled]}
+    >
+      <Text style={styles.archiveActionText}>{label}</Text>
     </Pressable>
   );
 }
@@ -3176,6 +3486,7 @@ const styles = StyleSheet.create({
   },
   mobileTabTextSelected: { color: "#285c3c", fontWeight: "800" },
   budgetHub: { gap: 12 },
+  budgetHubEntry: { gap: 8 },
   budgetHubItem: {
     minHeight: 76,
     flexDirection: "row",
@@ -3191,6 +3502,27 @@ const styles = StyleSheet.create({
   },
   budgetHubItemSelected: { borderColor: "#285c3c", backgroundColor: "#f7faf7" },
   budgetHubArrow: { color: "#285c3c", fontSize: 28, lineHeight: 30 },
+  budgetManageActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  archiveConfirmation: {
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#fff8ed",
+    borderWidth: 1,
+    borderColor: "#ead2af",
+  },
+  archivedBudgetSection: { gap: 10, marginTop: 8 },
+  archivedBudgetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#dce5dd",
+    borderRadius: 12,
+    backgroundColor: "#f8f9f8",
+  },
   budgetAllocationTags: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -3249,6 +3581,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   cancelActionText: { color: "#4d5851", fontSize: 14, fontWeight: "600" },
+  archiveAction: {
+    minHeight: 44,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#b66b56",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  archiveActionText: { color: "#843b2a", fontSize: 15, fontWeight: "700" },
   page: {
     paddingHorizontal: 22,
     paddingTop: 24,
