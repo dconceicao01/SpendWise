@@ -11,6 +11,11 @@
     "languageEnglish": "inglês",
     "error": "Não foi possível concluir esta operação. Tenta novamente."
   },
+  "mobileNav": {
+    "home": "Início",
+    "movements": "Movimentos",
+    "statistics": "Estatísticas"
+  },
   "auth": {
     "eyebrow": "ORÇAMENTO EM CONJUNTO",
     "signIn": "Iniciar sessão",
@@ -117,6 +122,10 @@
     "setupTitle": "Configura o teu orçamento",
     "setupDescription": "Podes ajustar estas escolhas mais tarde. Os valores servem apenas para orientação e não representam dinheiro real.",
     "sessionError": "A API rejeitou a tua sessão. Termina a sessão e inicia novamente. Se voltar a acontecer, o ambiente de testes precisa de ser verificado.",
+    "apiUnavailable": "Não foi possível ligar à API. Verifica a ligação à Internet e tenta novamente.",
+    "apiError": "A API respondeu com um erro ao carregar os orçamentos. Tenta novamente mais tarde.",
+    "apiOperationError": "A API respondeu com um erro ao carregar os dados. Tenta novamente mais tarde.",
+    "apiErrorTitle": "Não foi possível carregar os teus dados",
     "name": "Nome do orçamento",
     "nameRequired": "Indica o nome do orçamento.",
     "namePlaceholder": "Ex.: Orçamento da casa",
