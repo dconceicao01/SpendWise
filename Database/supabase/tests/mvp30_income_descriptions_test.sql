@@ -40,7 +40,7 @@ select lives_ok($$insert into public.budget_periods (budget_id, starts_on, ends_
     'Owner can create a matching period');
 select lives_ok($$select public.record_income_with_description(
     (select id from public.budgets where name = 'MVP-30 income description test'),
-    (select id from public.budget_periods p join public.budgets b on b.id = p.budget_id
+    (select p.id from public.budget_periods p join public.budgets b on b.id = p.budget_id
       where b.name = 'MVP-30 income description test'),
     900, current_date, ' Salary ', null, null, null)$$,
     'Owner can record a one-off income with a description');
