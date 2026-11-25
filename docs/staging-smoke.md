@@ -13,6 +13,7 @@ Quando presentes na branch selecionada, usar os ficheiros `frontend/vercel.json`
 3. Configurar os valores de staging nos ambientes Preview dos projetos Vercel. O projeto web recebe `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `EXPO_PUBLIC_SPENDWISE_API_URL`. O projeto API recebe `PORT=8080`, `SUPABASE_ISSUER_URI`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SPENDWISE_CORS_ALLOWED_ORIGINS` com a origem HTTPS exata do web staging e `SPENDWISE_INVITATION_BASE_URL` no domínio web.
 4. Manter qualquer `SUPABASE_SERVICE_ROLE_KEY` apenas como variável secreta server-side do projeto API, e só se o fluxo Auth Admin de eliminação a exigir. Nunca a definir no projeto web, em variáveis `EXPO_PUBLIC_*`, ou nos previews com valores de produção.
 5. Em GitHub, criar/usar o Environment `staging` e definir as variáveis não secretas `STAGING_WEB_URL` e `STAGING_API_URL` com as origens HTTPS atribuídas aos deployments de staging. Não incluir caminho, credenciais, query string ou fragmento.
+6. Configurar o SMTP Brevo, o remetente verificado, os callbacks e os templates no projeto Supabase de staging conforme o [runbook de email Auth](email-auth-brevo.md). Usa apenas destinatários de teste e não reutilizes a SMTP key de produção.
 
 Os passos de criação de projetos, configuração da integração Vercel e introdução de variáveis são ações nos dashboards dos fornecedores; não são efetuados por este repositório. Não ativar faturação nem exceder quotas do plano gratuito aprovado.
 

@@ -44,7 +44,8 @@
     "recoverError": "Não foi possível pedir a recuperação. Tenta novamente mais tarde.",
     "confirmed": "E-mail confirmado. Já podes iniciar sessão.",
     "expired": "A ligação expirou ou já foi utilizada. Pede uma nova ligação.",
-    "passwordChanged": "Palavra-passe atualizada. Já podes iniciar sessão."
+    "passwordChanged": "Palavra-passe atualizada. Já podes iniciar sessão.",
+    "callbackLoading": "A validar a ligação de segurança…"
   },
   "reset": {
     "title": "Criar nova palavra-passe",

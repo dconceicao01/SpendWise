@@ -31,7 +31,7 @@ A migration MVP-08 revoga os grants herdados de `anon` e concede a `authenticate
 
 Num orçamento partilhado, as alocações e saldos pertencem ao fundo comum, mantendo-se a origem de cada rendimento para histórico. Configuração local de Auth não deve ser copiada para um projeto de produção sem revisão.
 
-O Auth local exige confirmação de e-mail, usa palavra-passe mínima de 8 caracteres e aceita redirects locais `http://localhost:8081/auth/callback`, `http://127.0.0.1:8081/auth/callback` e `spendwise://auth/callback`. Os e-mails locais são capturados pelo servidor SMTP de teste e podem ser consultados na interface Mailpit. Em projetos alojados, configurar URLs explícitos por ambiente e validar SMTP, templates, limites e política de sessão antes de lançar.
+O Auth local exige confirmação de e-mail, usa palavra-passe mínima de 8 caracteres e aceita redirects locais `http://localhost:8081/auth/callback`, `http://127.0.0.1:8081/auth/callback` e `spendwise://auth/callback`. Os e-mails locais são capturados pelo servidor SMTP de teste e podem ser consultados na interface Mailpit. Em projetos alojados, usar SMTP Brevo, configurar URLs explícitos por ambiente e validar templates, limites e política de sessão antes de lançar; seguir o [runbook de email](../docs/email-auth-brevo.md).
 
 A CLI 3 usa a stack local por defeito; operações em projetos alojados precisam de `--remote` e aprovação. Não guardar tokens, passwords, chaves, dados pessoais reais nem cópias de produção nesta pasta.
 

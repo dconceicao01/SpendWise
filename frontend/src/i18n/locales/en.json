@@ -44,7 +44,8 @@
     "recoverError": "We couldn't request account recovery. Try again later.",
     "confirmed": "Email confirmed. You can now sign in.",
     "expired": "The link expired or has already been used. Request a new one.",
-    "passwordChanged": "Password updated. You can now sign in."
+    "passwordChanged": "Password updated. You can now sign in.",
+    "callbackLoading": "Verifying your secure link…"
   },
   "reset": {
     "title": "Create a new password",

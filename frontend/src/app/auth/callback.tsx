@@ -3,33 +3,77 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
+import { useTranslation } from "react-i18next";
+
+const emailOtpTypes = [
+  "signup",
+  "magiclink",
+  "recovery",
+  "invite",
+  "email_change",
+  "email",
+] as const;
+type EmailOtpType = (typeof emailOtpTypes)[number];
+
+function isEmailOtpType(value: unknown): value is EmailOtpType {
+  return (
+    typeof value === "string" &&
+    emailOtpTypes.includes(value as EmailOtpType)
+  );
+}
 
 export default function AuthCallbackScreen() {
-  const { code, flow } = useLocalSearchParams<{
+  const { code, flow, token_hash: tokenHash, type } = useLocalSearchParams<{
     code?: string;
     flow?: string;
+    token_hash?: string;
+    type?: string;
   }>();
+  const { t } = useTranslation();
 
   useEffect(() => {
     let isMounted = true;
-    async function exchangeCode() {
-      if (!supabase || typeof code !== "string") {
+    async function completeEmailCallback() {
+      if (!supabase) {
         if (isMounted) router.replace("/?authError=1");
         return;
       }
 
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      let hasError = false;
+      let callbackType: string | undefined;
+      try {
+        if (typeof code === "string" && code) {
+          const result = await supabase.auth.exchangeCodeForSession(code);
+          hasError = Boolean(result.error);
+        } else if (
+          typeof tokenHash === "string" &&
+          tokenHash &&
+          isEmailOtpType(type)
+        ) {
+          const result = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type,
+          });
+          hasError = Boolean(result.error);
+          callbackType = type;
+        } else {
+          hasError = true;
+        }
+      } catch {
+        hasError = true;
+      }
+
       if (!isMounted) return;
       router.replace(
-        error
+        hasError
           ? "/?authError=1"
-          : flow === "recovery"
+          : flow === "recovery" || callbackType === "recovery"
             ? "/auth/reset-password"
             : "/?confirmed=1",
       );
     }
 
-    void exchangeCode();
+    void completeEmailCallback();
     return () => {
       isMounted = false;
     };
@@ -41,7 +85,7 @@ export default function AuthCallbackScreen() {
         <Text style={styles.brand}>SpendWise</Text>
         <ActivityIndicator color="#35684b" style={styles.indicator} />
         <Text style={styles.description}>
-          A validar a ligação de segurança…
+          {t("auth.callbackLoading")}
         </Text>
       </View>
     </SafeAreaView>
