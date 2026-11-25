@@ -584,12 +584,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       !selectedBudgetId ||
       !/^\d{4}$/.test(annualYear) ||
       Number(annualYear) < 1
-    ) {
-      setFieldErrors({ annualYear: t("dashboard.invalidYear") });
-      setNotice("");
-      setIsError(false);
+    )
       return;
-    }
+
+    // Defer state updates to the async continuation when this loader is
+    // triggered by the dashboard effect.
+    await Promise.resolve();
     const year = Number(annualYear);
     const relevantPeriods = periodsOverlappingYear(periods, year);
     setIsLoadingAnnual(true);
@@ -665,7 +665,27 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     )
       return;
     void loadAnnualSummary();
-  }, [annualRefreshKey, loadAnnualSummary, periods.length, selectedBudgetId]);
+  }, [
+    annualRefreshKey,
+    annualYear,
+    loadAnnualSummary,
+    periods.length,
+    selectedBudgetId,
+  ]);
+
+  const handleLoadAnnualSummary = () => {
+    if (
+      !selectedBudgetId ||
+      !/^\d{4}$/.test(annualYear) ||
+      Number(annualYear) < 1
+    ) {
+      setFieldErrors({ annualYear: t("dashboard.invalidYear") });
+      setNotice("");
+      setIsError(false);
+      return;
+    }
+    void loadAnnualSummary();
+  };
 
   const canRecordMovements = Boolean(
     selectedPeriodId && activeCategories.length,
@@ -1486,7 +1506,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                           ? t("common.loading")
                           : t("dashboard.loadAnnual")
                       }
-                      onPress={() => void loadAnnualSummary()}
+                      onPress={handleLoadAnnualSummary}
                     />
                   </View>
                   {annualSummary &&
