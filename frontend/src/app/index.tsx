@@ -776,15 +776,15 @@ const styles = StyleSheet.create({
     marginTop: 7,
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#e3e9e3" },
-  dividerText: { color: "#68766d", fontSize: 12 },
+  dividerText: { color: "#5e6a61", fontSize: 12 },
   virtualNote: {
-    color: "#68766d",
+    color: "#5e6a61",
     fontSize: 13,
     lineHeight: 20,
     marginTop: 30,
   },
   virtualNoteMobile: {
-    color: "#68766d",
+    color: "#5e6a61",
     fontSize: 12,
     lineHeight: 18,
     marginTop: 25,
