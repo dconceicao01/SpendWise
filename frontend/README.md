@@ -10,7 +10,7 @@ Copiar `frontend/.env.example` para `frontend/.env` e preencher `EXPO_PUBLIC_SUP
 
 O Supabase Auth usa PKCE, confirmação de e-mail e recuperação de palavra-passe. O callback Expo Router aceita códigos PKCE e `token_hash` de templates de email, e envia recuperação para o ecrã de nova palavra-passe. O URL `spendwise://auth/callback` deve constar na allowlist de redirects do Supabase Auth para Android/iOS. Para web, adicionar apenas o URL local/HTTPS de cada ambiente. A configuração local permite `http://localhost:8081/auth/callback` e `http://127.0.0.1:8081/auth/callback`. Para ativar entrega em staging/produção, configurar o Brevo como SMTP personalizado no Supabase conforme o [guia de email Auth](../docs/email-auth-brevo.md); esta configuração de fornecedor não reside no repositório.
 
-O início de sessão com Google e Apple usa callbacks PKCE web e deep links nativos. Configurar providers e credenciais apenas nos projetos Supabase, seguindo o [guia de login social](../docs/social-auth.md); o código não contém segredos desses fornecedores.
+O início de sessão com Google usa callbacks PKCE web e deep links nativos. Configurar o provider e as credenciais apenas nos projetos Supabase, seguindo o [guia de login social](../docs/social-auth.md); o código não contém segredos do fornecedor.
 
 Para testar callbacks de e-mail no telemóvel, usar uma development build que inclua o scheme `spendwise`. O Expo Go usa um endereço `exp://` próprio e não recebe estes callbacks com scheme personalizado.
 
