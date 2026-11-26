@@ -50,7 +50,7 @@ O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados d
 
 - Supabase Auth gere credenciais e recuperação; a aplicação nunca armazena palavras-passe.
 - Spring Security Resource Server valida assinatura usando JWKS oficial, `iss`, `exp` e restantes claims requeridas; rejeita token inválido/expirado. Não implementar criptografia JWT manualmente.
-- Chaves públicas de frontend são identificadores, não segredos; `service_role`/secret keys e passwords de banco são segredo de servidor. Nunca usar prefixo público para segredo.
+- Chaves públicas de frontend são identificadores, não segredos; chaves `service_role`/`sb_secret` e passwords de banco são credenciais elevadas de servidor que contornam RLS. Nunca usar prefixo público para segredo, registar esses valores em logs ou enviar `sb_secret` como Bearer JWT.
 - MFA, recuperação de conta e sessão têm política explícita; exigir MFA em contas de operador/admin e avaliar MFA obrigatório para utilizadores consoante risco. MFA não substitui autorização.
 - A app usa PKCE. iOS/Android guardam a sessão em blocos no Expo SecureStore para respeitar o limite de tamanho por valor, acessível com o dispositivo desbloqueado; a web usa `sessionStorage` para terminar a persistência quando o separador fecha. A sessão web continua acessível a JavaScript e não resiste a XSS; proteger a aplicação e os seus fornecedores de scripts é obrigatório. Nunca guardar palavras-passe.
 - O callback recebe apenas o código PKCE de utilização única, troca-o imediatamente por uma sessão e limpa-o da rota através de navegação substitutiva. Access/refresh tokens não são colocados em URLs, telemetria, crash reports ou logs. Restringir URLs de redirect a cada ambiente.
@@ -92,3 +92,4 @@ O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados d
 ### Identidade em orçamentos partilhados
 
 Membros ativos podem ver apenas o nome de perfil de outros membros ativos no mesmo orçamento, para identificar as pessoas que colaboram no fundo comum. Se o perfil ainda não existir, usa-se apenas o nome do metadata Auth fornecido no registo. Email, telefone, `user_id` e outros campos de perfil não são expostos. A RPC `list_budget_members` exige que o JWT atual tenha membership ativa no orçamento e limita os resultados a esse orçamento; perfis continuam sem acesso direto por RLS. Se a membership for removida, pedidos seguintes deixam de devolver nomes ou permitir acesso.
+

@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClient;
 import pt.spendwise.api.profile.DeleteAccountRequest;
 
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -38,7 +39,7 @@ class SupabaseAccountDeletionRepositoryTest {
         authServer = MockRestServiceServer.bindTo(authBuilder).build();
         repository = new SupabaseAccountDeletionRepository(
                 new SupabaseDataApiClient(dataBuilder.build(), "publishable-test-key"),
-                authBuilder.build(), "server-only-test-key");
+                authBuilder.build(), "sb_secret_server-only-test-key");
         Instant now = Instant.parse("2026-11-23T09:00:00Z");
         Jwt jwt = new Jwt(ACCESS_TOKEN, now, now.plusSeconds(3600), Map.of("alg", "RS256"),
                 Map.of("sub", USER_ID.toString(), "role", "authenticated"));
@@ -65,8 +66,8 @@ class SupabaseAccountDeletionRepositoryTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
         authServer.expect(requestTo("https://spendwise.test/auth/v1/admin/users/" + USER_ID))
                 .andExpect(method(HttpMethod.DELETE))
-                .andExpect(header("apikey", "server-only-test-key"))
-                .andExpect(header("Authorization", "Bearer server-only-test-key"))
+                .andExpect(header("apikey", "sb_secret_server-only-test-key"))
+                .andExpect(headerDoesNotExist("Authorization"))
                 .andRespond(withNoContent());
 
         repository.removeAccountData(new DeleteAccountRequest(List.of(
@@ -77,3 +78,4 @@ class SupabaseAccountDeletionRepositoryTest {
         authServer.verify();
     }
 }
+

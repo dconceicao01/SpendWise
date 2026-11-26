@@ -17,7 +17,7 @@ No PowerShell, a partir de `backend/`:
 $env:SUPABASE_ISSUER_URI = "http://127.0.0.1:54321/auth/v1"
 $env:SUPABASE_URL = "http://127.0.0.1:54321"
 $env:SUPABASE_PUBLISHABLE_KEY = "<chave publishable do projeto>"
-$env:SUPABASE_SERVICE_ROLE_KEY = "<chave secreta apenas no servidor>"
+$env:SUPABASE_SECRET_KEY = "<sb_secret_... apenas no servidor>"
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -25,7 +25,7 @@ Spring Security Resource Server obtém as chaves públicas em `{SUPABASE_ISSUER_
 
 CORS está limitado por omissão às origens locais `http://localhost:8081` e `http://127.0.0.1:8081`. Em staging/produção, define `SPENDWISE_CORS_ALLOWED_ORIGINS` como lista separada por vírgulas de origens HTTPS exatas (scheme, host e porta quando aplicável), por exemplo `https://app.example.com`; não usar `*`. A API não aceita credenciais por cookies e permite apenas os métodos/headers usados pelo cliente. O hosting do frontend deve configurar CSP e restantes cabeçalhos HTTP no documento web, uma vez que estes cabeçalhos não são efetivos quando enviados pela API.
 
-Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados. `SUPABASE_SERVICE_ROLE_KEY` só é usada pelo endpoint de eliminação para a chamada Auth Admin, depois de a limpeza transacional de dados terminar; nunca a configurar no frontend nem em pedidos normais.
+Para pedidos autenticados à Data API, a API encaminha o access token JWT recebido para `Authorization: Bearer` e a publishable key para `apikey`. RLS continua a determinar o acesso aos dados. `SUPABASE_SECRET_KEY` (`sb_secret_...`) só é usada pelo endpoint de eliminação para a chamada Auth Admin, depois de a limpeza transacional de dados terminar. É uma credencial elevada que contorna RLS: manter exclusivamente no ambiente server-side, nunca no frontend, em logs ou em pedidos normais. Como é uma chave opaca e não um JWT, enviar apenas no header `apikey`, nunca como `Authorization: Bearer`.
 
 Para executar os testes:
 
@@ -45,7 +45,7 @@ A imagem usa Java 21 JRE e executa como utilizador sem privilégios. A CI constr
 
 A Vercel pode alojar o piloto pessoal através de dois projetos independentes: um para o frontend web estático e outro para a API Spring Boot. A API usa o runtime de containers da Vercel, que está em beta. O projeto da API deve usar `backend/` como diretório raiz; `backend/vercel.json` seleciona o runtime container na região Paris (`cdg1`) e `Dockerfile.vercel` usa o build Java 21 da imagem local. Configurar `PORT=8080` nas variáveis runtime do projeto API. A aplicação usa 8080 como fallback local.
 
-No projeto da API, selecionar a região Paris (`cdg1`) e definir apenas no ambiente server-side: `SUPABASE_ISSUER_URI`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SPENDWISE_CORS_ALLOWED_ORIGINS` e `SPENDWISE_INVITATION_BASE_URL`. A origem CORS e a URL de convite devem corresponder exatamente ao domínio do projeto web e usar HTTPS. O projeto web recebe `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `EXPO_PUBLIC_SPENDWISE_API_URL` como variáveis de build. Nunca colocar a chave `service_role` em variáveis `EXPO_PUBLIC_*`, no frontend ou em previews.
+No projeto da API, selecionar a região Paris (`cdg1`) e definir apenas no ambiente server-side: `SUPABASE_ISSUER_URI`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SPENDWISE_CORS_ALLOWED_ORIGINS` e `SPENDWISE_INVITATION_BASE_URL`. A origem CORS e a URL de convite devem corresponder exatamente ao domínio do projeto web e usar HTTPS. O projeto web recebe `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `EXPO_PUBLIC_SPENDWISE_API_URL` como variáveis de build. Nunca colocar a chave `sb_secret` em variáveis `EXPO_PUBLIC_*`, no frontend ou em previews web.
 
 O projeto web deve usar a raiz `frontend/`; `frontend/vercel.json` define `pnpm build:web` e publica `dist/`. O `package.json` fixa pnpm 12.20 e Node.js 24. Configurar os URLs de redirecionamento do Supabase Auth para o domínio de piloto e os callbacks realmente usados. Usar um projeto Supabase separado, com contas e dados sintéticos; nunca apontar previews para dados reais. Hobby só é adequado ao uso pessoal não comercial, sem SLA; containers escalam a zero e têm quotas/faturação próprias. Rever limites e termos antes de qualquer utilização fora do piloto. Esta configuração não constitui autorização para produção.
 
@@ -86,3 +86,4 @@ A API valida autenticação JWT Supabase e encaminha o JWT original para a Data 
 ### Convites de orçamento
 
 `GET/POST /api/v1/budgets/{budgetId}/invitations` lista metadados ou cria um convite para `CONTRIBUTOR`/`VIEWER`; apenas o `OWNER` pode gerir convites. A criação devolve o link secreto uma única vez e o trigger de base de dados limita a 10 convites por orçamento por hora, inclusive quando se usa a Data API diretamente. O segredo tem 256 bits aleatórios, só o SHA-256 é guardado e o token segue no fragmento `#token=` para não aparecer nos pedidos HTTP nem nos logs do servidor. Os convites expiram após 7 dias por predefinição; `SPENDWISE_INVITATION_TTL` aceita uma duração ISO-8601 positiva até 30 dias. `POST /api/v1/invitations/accept` aceita JSON `{"token":"..."}` e exige sessão autenticada com email confirmado igual ao endereço convidado. `POST /api/v1/budgets/{budgetId}/invitations/{invitationId}/revoke` revoga um convite ainda pendente. Respostas de token ausente, expirado, revogado, usado, email diferente ou não confirmado são genéricas. A RPC `accept_budget_invitation` cria membership e consome o convite atomicamente e aplica 5 tentativas por utilizador em 15 minutos, sem guardar IP. Email do convite é eliminado na aceitação/revogação; convites expirados são apagados 30 dias após a expiração por um job horário. Configura `SPENDWISE_INVITATION_BASE_URL` para a rota pública de aceitação em cada ambiente; exige HTTPS em staging e produção. O valor local predefinido é `http://localhost:8081/invitations/accept`.
+
