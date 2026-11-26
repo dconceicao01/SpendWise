@@ -326,7 +326,7 @@ export default function HomeScreen() {
             ) : null}
             <View style={[styles.authCard, isWideWeb && styles.authCardWide]}>
               <View style={styles.cardTopActions}>
-                {!isWideWeb ? <Brand /> : <View />}
+                {!isWideWeb ? <Brand compact /> : <View />}
                 <LanguageSwitcher />
               </View>
               {!isWideWeb ? (
@@ -519,13 +519,17 @@ export default function HomeScreen() {
   }
 }
 
-function Brand() {
+function Brand({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
   return (
-    <>
-      <Text style={styles.eyebrow}>{t("auth.eyebrow")}</Text>
-      <Text style={styles.brand}>SpendWise</Text>
-    </>
+    <View style={styles.brandLockup}>
+      <Text style={[styles.eyebrow, compact && styles.eyebrowCompact]}>
+        {t("auth.eyebrow")}
+      </Text>
+      <Text style={[styles.brand, compact && styles.brandCompact]}>
+        SpendWise
+      </Text>
+    </View>
   );
 }
 
@@ -741,6 +745,9 @@ const styles = StyleSheet.create({
     gap: 12,
     minHeight: 40,
   },
+  brandLockup: { alignItems: "flex-start", flexShrink: 1 },
+  eyebrowCompact: { fontSize: 10, letterSpacing: 1.2 },
+  brandCompact: { fontSize: 29, letterSpacing: -0.8 },
   mobileWelcome: { marginTop: 28 },
   mobileWelcomeTitle: {
     color: "#18291f",
