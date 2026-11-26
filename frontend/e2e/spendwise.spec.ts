@@ -576,7 +576,14 @@ test("authentication controls are labeled and keyboard accessible", async ({
   page,
 }) => {
   await enableEnglish(page);
+  await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
+
+  const brand = page.getByText("SpendWise", { exact: true });
+  await expect(brand).toBeVisible();
+  const brandBounds = await brand.boundingBox();
+  if (!brandBounds) throw new Error("SpendWise brand is not visible");
+  expect(brandBounds.x + brandBounds.width).toBeLessThanOrEqual(360);
 
   await expect(page.getByLabel("Email")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
