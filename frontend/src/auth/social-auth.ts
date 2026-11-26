@@ -4,7 +4,7 @@ import * as WebBrowser from "expo-web-browser";
 import type { Provider } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
-export type SocialProvider = Extract<Provider, "apple" | "google">;
+export type SocialProvider = Extract<Provider, "google">;
 
 const codeExchanges = new Map<string, Promise<void>>();
 

@@ -345,16 +345,8 @@ export default function HomeScreen() {
                   <SocialButton
                     disabled={Boolean(socialProvider) || isSubmitting}
                     label={t("auth.continueWithGoogle")}
-                    provider="google"
                     onPress={() => signInWithProvider("google")}
                     pending={socialProvider === "google"}
-                  />
-                  <SocialButton
-                    disabled={Boolean(socialProvider) || isSubmitting}
-                    label={t("auth.continueWithApple")}
-                    provider="apple"
-                    onPress={() => signInWithProvider("apple")}
-                    pending={socialProvider === "apple"}
                   />
                   <View style={styles.divider}>
                     <View style={styles.dividerLine} />
@@ -538,13 +530,11 @@ function SocialButton({
   label,
   onPress,
   pending,
-  provider,
 }: {
   disabled: boolean;
   label: string;
   onPress: () => void | Promise<void>;
   pending: boolean;
-  provider: SocialProvider;
 }) {
   return (
     <Pressable
@@ -555,7 +545,7 @@ function SocialButton({
     >
       {pending ? (
         <ActivityIndicator color="#18291f" />
-      ) : provider === "google" ? (
+      ) : (
         <Svg
           width={20}
           height={20}
@@ -577,18 +567,6 @@ function SocialButton({
           <Path
             fill="#EA4335"
             d="M24 11.9c3 0 5.6 1 7.7 3l5.8-5.8A19.4 19.4 0 0 0 24 4 20 20 0 0 0 5.8 15.1l6.8 5.2c1.6-4.8 6.1-8.4 11.4-8.4Z"
-          />
-        </Svg>
-      ) : (
-        <Svg
-          width={20}
-          height={22}
-          viewBox="0 0 24 24"
-          accessibilityLabel="Apple"
-        >
-          <Path
-            fill="#18291f"
-            d="M17.1 20.3c-1 .9-2 .8-3.1.3-1.1-.4-2.1-.5-3.2 0-1.4.6-2.2.4-3.1-.3C2.6 15.4 3.2 6.7 8.5 6.4c1.3.1 2.1.7 2.9.8 1.1-.3 2.2-.9 3.4-.8 1.5.1 2.6.7 3.3 1.8-3 1.8-2.3 5.8.5 6.9-.5 1.4-1.3 2.9-2.5 4.2ZM11.9 6.4c-.1-2.2 1.6-4 3.7-4.2.3 2.5-2.3 4.4-3.7 4.2Z"
           />
         </Svg>
       )}
