@@ -32,7 +32,7 @@ No ambiente server-side do projeto API, configurar `PORT=8080` e valores própri
 - `SUPABASE_ISSUER_URI`
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` — estritamente server-side; usada apenas pelo fluxo de eliminação Auth Admin já previsto
+- `SUPABASE_SECRET_KEY` — chave `sb_secret_...`, estritamente server-side; usada apenas pelo fluxo Auth Admin de eliminação já previsto. Contorna RLS e nunca deve ser exposta ao frontend, logs ou pedidos normais.
 - `SPENDWISE_CORS_ALLOWED_ORIGINS` — origem HTTPS exata do projeto web, sem `*`
 - `SPENDWISE_INVITATION_BASE_URL` — rota HTTPS de aceitação de convites no domínio web
 
@@ -43,7 +43,7 @@ No projeto web, definir como variáveis de build:
 - `EXPO_PUBLIC_SPENDWISE_API_URL` — fallback inicial da app.
 - `EXPO_PUBLIC_RUNTIME_CONFIG_URL` — URL estável de bootstrap para builds Android/iOS.
 
-Só a chave publishable pode estar no bundle web. Nunca usar `service_role` em `EXPO_PUBLIC_*`, código, logs, previews ou variáveis disponíveis ao projeto web. Não replicar segredos entre projetos/ambientes. Restringir os redirect URLs do Supabase Auth ao domínio do piloto e callbacks necessários.
+Só a chave publishable pode estar no bundle web. Nunca usar uma chave `service_role`/`sb_secret` em `EXPO_PUBLIC_*`, código, logs ou variáveis disponíveis ao projeto web. Não replicar segredos entre projetos/ambientes. Restringir os redirect URLs do Supabase Auth ao domínio do piloto e callbacks necessários.
 
 ## Isolamento e publicação
 
@@ -56,3 +56,4 @@ Os containers são efémeros, podem reiniciar e escalam a zero. O piloto não de
 - [Running Docker on Vercel](https://vercel.com/kb/guide/docker): containers OCI como Functions, `Dockerfile.vercel`, porta HTTP, scale-in e faturação.
 - [Regiões de Functions](https://vercel.com/docs/functions/configuring-functions/region): Hobby permite escolher uma região, incluindo Paris (`cdg1`).
 - [Termos Vercel](https://vercel.com/legal/terms): confirmar as condições de uso pessoal/não comercial e as condições vigentes do plano.
+

@@ -24,15 +24,15 @@ public class SupabaseAccountDeletionRepository implements AccountDeletionReposit
 
     private final SupabaseDataApiClient dataApiClient;
     private final RestClient authAdminRestClient;
-    private final String serviceRoleKey;
+    private final String secretKey;
 
     public SupabaseAccountDeletionRepository(
             SupabaseDataApiClient dataApiClient,
             @Qualifier("supabaseAuthAdminRestClient") RestClient supabaseAuthAdminRestClient,
-            @Value("${SUPABASE_SERVICE_ROLE_KEY:}") String serviceRoleKey) {
+            @Value("${SUPABASE_SECRET_KEY:}") String secretKey) {
         this.dataApiClient = dataApiClient;
         this.authAdminRestClient = supabaseAuthAdminRestClient;
-        this.serviceRoleKey = serviceRoleKey;
+        this.secretKey = secretKey;
     }
 
     @Override
@@ -48,15 +48,15 @@ public class SupabaseAccountDeletionRepository implements AccountDeletionReposit
 
     @Override
     public void deleteAuthIdentity() {
-        if (serviceRoleKey.isBlank()) {
+        if (secretKey.isBlank()) {
             throw new IllegalStateException("Supabase Auth Admin is not configured");
         }
         UUID userId = UUID.fromString(currentJwt().getToken().getSubject());
         try {
             authAdminRestClient.method(HttpMethod.DELETE)
                     .uri(uriBuilder -> uriBuilder.pathSegment("admin", "users", userId.toString()).build())
-                    .header("apikey", serviceRoleKey)
-                    .headers(headers -> headers.setBearerAuth(serviceRoleKey))
+                    // Supabase sb_secret keys are opaque API keys, not JWTs.
+                    .header("apikey", secretKey)
                     .retrieve()
                     .toBodilessEntity();
         } catch (HttpClientErrorException.NotFound alreadyDeleted) {
@@ -74,3 +74,4 @@ public class SupabaseAccountDeletionRepository implements AccountDeletionReposit
         return jwtAuthenticationToken;
     }
 }
+
