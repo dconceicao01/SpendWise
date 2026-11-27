@@ -12,6 +12,8 @@ public interface BudgetRepository {
 
     Optional<BudgetResponse> updateName(UUID budgetId, String name);
 
+    Optional<BudgetResponse> update(UUID budgetId, UpdateBudgetRequest request);
+
     Optional<BudgetResponse> archive(UUID budgetId);
 
     Optional<BudgetResponse> restore(UUID budgetId);

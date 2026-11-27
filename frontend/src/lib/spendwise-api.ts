@@ -2,6 +2,15 @@ import { getRuntimeConfig } from "@/lib/runtime-config";
 
 export type BudgetType = "PERSONAL" | "SHARED";
 export type BudgetRole = "OWNER" | "CONTRIBUTOR" | "VIEWER";
+export type BudgetPeriodFrequency =
+  | "CUSTOM"
+  | "WEEKLY"
+  | "FORTNIGHTLY"
+  | "MONTHLY"
+  | "EVERY_TWO_MONTHS"
+  | "QUARTERLY"
+  | "EVERY_SIX_MONTHS"
+  | "ANNUAL";
 
 export type Budget = {
   id: string;
@@ -9,6 +18,9 @@ export type Budget = {
   budget_type: BudgetType;
   currency_code: string;
   archived_at: string | null;
+  period_frequency: BudgetPeriodFrequency;
+  period_anchor_start: string | null;
+  period_end_on: string | null;
   current_user_role: BudgetRole;
 };
 
@@ -241,6 +253,25 @@ export const spendwiseApi = {
     request<Budget>(token, `/budgets/${budgetId}`, {
       method: "PATCH",
       body: JSON.stringify({ name }),
+    }),
+  updateBudget: (
+    token: string,
+    budgetId: string,
+    input: {
+      name: string;
+      periodFrequency: BudgetPeriodFrequency;
+      periodAnchorStart: string | null;
+      periodEndOn: string | null;
+    },
+  ) =>
+    request<Budget>(token, `/budgets/${budgetId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: input.name,
+        period_frequency: input.periodFrequency,
+        period_anchor_start: input.periodAnchorStart,
+        period_end_on: input.periodEndOn,
+      }),
     }),
   archiveBudget: (token: string, budgetId: string) =>
     request<Budget>(token, `/budgets/${budgetId}/archive`, { method: "POST" }),

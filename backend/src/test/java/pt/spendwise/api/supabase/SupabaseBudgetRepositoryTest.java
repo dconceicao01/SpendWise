@@ -59,7 +59,7 @@ class SupabaseBudgetRepositoryTest {
                 .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
                 .andExpect(content().json("{\"p_name\":\"Travel\",\"p_budget_type\":\"PERSONAL\",\"p_currency_code\":\"EUR\"}"))
                 .andRespond(withSuccess("[{\"budget_id\":\"" + BUDGET_ID + "\"}]", MediaType.APPLICATION_JSON));
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budgets?select=id,name,budget_type,currency_code,created_at,archived_at&id=eq." + BUDGET_ID))
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budgets?select=id,name,budget_type,currency_code,created_at,archived_at,period_frequency,period_anchor_start,period_end_on&id=eq." + BUDGET_ID))
                 .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
                 .andRespond(withSuccess(
                         "[{\"id\":\"" + BUDGET_ID + "\",\"name\":\"Travel\",\"budget_type\":\"PERSONAL\","
@@ -115,7 +115,7 @@ class SupabaseBudgetRepositoryTest {
 
     @Test
     void restoresOnlyAnArchivedBudgetAndClearsItsArchiveTimestamp() {
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budgets?select=id,name,budget_type,currency_code,created_at,archived_at&id=eq."
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/budgets?select=id,name,budget_type,currency_code,created_at,archived_at,period_frequency,period_anchor_start,period_end_on&id=eq."
                         + BUDGET_ID + "&archived_at=not.is.null"))
                 .andExpect(method(org.springframework.http.HttpMethod.PATCH))
                 .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))

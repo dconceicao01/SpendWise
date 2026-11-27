@@ -158,6 +158,17 @@ async function mockBudgetApi(page: Page) {
       budget_type: "PERSONAL" | "SHARED";
       currency_code: string;
       archived_at: null;
+      period_frequency:
+        | "CUSTOM"
+        | "WEEKLY"
+        | "FORTNIGHTLY"
+        | "MONTHLY"
+        | "EVERY_TWO_MONTHS"
+        | "QUARTERLY"
+        | "EVERY_SIX_MONTHS"
+        | "ANNUAL";
+      period_anchor_start: string | null;
+      period_end_on: string | null;
     }[];
     periods: {
       id: string;
@@ -273,9 +284,24 @@ async function mockBudgetApi(page: Page) {
         budget_type: input.budgetType,
         currency_code: input.currencyCode,
         archived_at: null,
+        period_frequency: "CUSTOM" as const,
+        period_anchor_start: null,
+        period_end_on: null,
       };
       state.budgets = [budget];
       return respond(budget, 201);
+    }
+    if (/^\/budgets\/[^/]+$/.test(path) && method === "PATCH") {
+      const input = request.postDataJSON() as {
+        name: string;
+        period_frequency: (typeof state.budgets)[number]["period_frequency"];
+        period_anchor_start: string | null;
+        period_end_on: string | null;
+      };
+      const budget = state.budgets.find((item) => item.id === budgetId);
+      if (!budget) return respond({ error: "Budget not found" }, 404);
+      Object.assign(budget, input);
+      return respond(budget);
     }
 
     const labelPath = path.match(
@@ -648,8 +674,10 @@ test("creates a budget, records virtual movements and reviews annual totals", as
 
   await page.getByLabel("Budget name").fill("Household pilot");
   await page.getByLabel("Currency (ISO code, e.g. EUR)").fill("EUR");
-  await page.getByLabel("Start date (YYYY-MM-DD)").fill(`${year}-01-01`);
-  await page.getByLabel("End date (YYYY-MM-DD)").fill(`${year}-12-31`);
+  await page.getByLabel("Start date").fill(`${year}-01-01`);
+  await page.getByRole("button", { name: "Yearly" }).click();
+  await page.getByRole("button", { name: "Set an end date" }).click();
+  await page.getByLabel("End date (optional)").fill(`${year}-12-31`);
   await page.getByLabel("Category name").fill("General");
   await page.getByRole("button", { name: "Save budget" }).click();
 
@@ -798,8 +826,9 @@ test("creates and revokes a one-time invitation for a shared budget", async ({
   await page.getByLabel("Budget name").fill("Shared pilot");
   await page.getByRole("button", { name: "Shared" }).click();
   await page.getByLabel("Currency (ISO code, e.g. EUR)").fill("EUR");
-  await page.getByLabel("Start date (YYYY-MM-DD)").fill(`${year}-01-01`);
-  await page.getByLabel("End date (YYYY-MM-DD)").fill(`${year}-12-31`);
+  await page.getByLabel("Start date").fill(`${year}-01-01`);
+  await page.getByRole("button", { name: "Set an end date" }).click();
+  await page.getByLabel("End date (optional)").fill(`${year}-12-31`);
   await page.getByLabel("Category name").fill("General");
   await page.getByRole("button", { name: "Save budget" }).click();
 

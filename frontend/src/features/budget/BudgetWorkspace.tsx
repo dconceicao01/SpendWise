@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { DateInput } from "@/components/DateInput";
 import { Circle, default as Svg } from "react-native-svg";
 import {
   calculateAnnualSummary,
@@ -36,6 +37,7 @@ import {
   type BudgetAdjustment,
   type BudgetCategory,
   type BudgetPeriod,
+  type BudgetPeriodFrequency,
   type AllocationSet,
   type ExpenseEntry,
   type ExpenseLabel,
@@ -108,6 +110,60 @@ function isValidDate(value: string) {
     parsed.getUTCMonth() === month - 1 &&
     parsed.getUTCDate() === day
   );
+}
+
+const budgetPeriodFrequencies: Exclude<BudgetPeriodFrequency, "CUSTOM">[] = [
+  "WEEKLY",
+  "FORTNIGHTLY",
+  "MONTHLY",
+  "EVERY_TWO_MONTHS",
+  "QUARTERLY",
+  "EVERY_SIX_MONTHS",
+  "ANNUAL",
+];
+
+function periodEndForFrequency(
+  start: string,
+  frequency: BudgetPeriodFrequency,
+  budgetEnd: string,
+) {
+  const [year, month, day] = start.split("-").map(Number);
+  const startDate = new Date(Date.UTC(year, month - 1, day));
+  let nextStart: Date;
+  if (frequency === "WEEKLY" || frequency === "FORTNIGHTLY") {
+    nextStart = new Date(startDate);
+    nextStart.setUTCDate(
+      nextStart.getUTCDate() + (frequency === "WEEKLY" ? 7 : 14),
+    );
+  } else {
+    const months =
+      frequency === "ANNUAL"
+        ? 12
+        : frequency === "EVERY_SIX_MONTHS"
+          ? 6
+          : frequency === "QUARTERLY"
+            ? 3
+            : frequency === "EVERY_TWO_MONTHS"
+              ? 2
+              : 1;
+    const firstOfTargetMonth = new Date(Date.UTC(year, month - 1 + months, 1));
+    const targetYear = firstOfTargetMonth.getUTCFullYear();
+    const targetMonth = firstOfTargetMonth.getUTCMonth();
+    const lastDay = new Date(
+      Date.UTC(targetYear, targetMonth + 1, 0),
+    ).getUTCDate();
+    nextStart = new Date(
+      Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)),
+    );
+  }
+  const endDate = new Date(nextStart);
+  endDate.setUTCDate(endDate.getUTCDate() - 1);
+  if (budgetEnd) {
+    const [endYear, endMonth, endDay] = budgetEnd.split("-").map(Number);
+    const configuredEnd = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+    if (configuredEnd < endDate) return budgetEnd;
+  }
+  return endDate.toISOString().slice(0, 10);
 }
 
 async function allPages<T>(
@@ -198,7 +254,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   );
   const [currency, setCurrency] = useState("EUR");
   const [startsOn, setStartsOn] = useState(today());
-  const [endsOn, setEndsOn] = useState(today());
+  const [budgetEndOn, setBudgetEndOn] = useState("");
+  const [budgetPeriodFrequency, setBudgetPeriodFrequency] =
+    useState<BudgetPeriodFrequency>("MONTHLY");
   const [additionalPeriodStart, setAdditionalPeriodStart] = useState(today());
   const [additionalPeriodEnd, setAdditionalPeriodEnd] = useState(today());
   const [draftCategories, setDraftCategories] = useState<DraftCategory[]>([
@@ -689,8 +747,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     if (!isValidDate(startsOn)) {
       nextFieldErrors.startsOn = t("budget.invalidPeriod");
     }
-    if (!isValidDate(endsOn) || startsOn > endsOn) {
-      nextFieldErrors.endsOn = t("budget.invalidPeriod");
+    if (budgetEndOn && (!isValidDate(budgetEndOn) || startsOn > budgetEndOn)) {
+      nextFieldErrors.budgetEndOn = t("budget.invalidPeriod");
     }
     setCategoryNameErrors(missingCategoryNames);
     setCategoryPercentageErrors(invalidCategoryPercentages);
@@ -718,10 +776,49 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       setSelectedBudgetId(budget.id);
       setIsCreatingBudget(false);
       try {
-        await spendwiseApi.createPeriod(accessToken, budget.id, {
+        const initialPeriodEnd = periodEndForFrequency(
           startsOn,
-          endsOn,
+          budgetPeriodFrequency,
+          budgetEndOn,
+        );
+        await spendwiseApi.updateBudget(accessToken, budget.id, {
+          name: budgetName.trim(),
+          periodFrequency: budgetPeriodFrequency,
+          periodAnchorStart: startsOn,
+          periodEndOn: budgetEndOn || null,
         });
+        const existingPeriods = await spendwiseApi.listPeriods(
+          accessToken,
+          budget.id,
+        );
+        if (
+          !existingPeriods.some(
+            (period) =>
+              period.starts_on === startsOn &&
+              period.ends_on === initialPeriodEnd,
+          )
+        ) {
+          try {
+            await spendwiseApi.createPeriod(accessToken, budget.id, {
+              startsOn,
+              endsOn: initialPeriodEnd,
+            });
+          } catch (error) {
+            const periodsAfterConflict = await spendwiseApi.listPeriods(
+              accessToken,
+              budget.id,
+            );
+            if (
+              !periodsAfterConflict.some(
+                (period) =>
+                  period.starts_on === startsOn &&
+                  period.ends_on === initialPeriodEnd,
+              )
+            ) {
+              throw error;
+            }
+          }
+        }
         const createdCategories: BudgetCategory[] = [];
         for (const category of draftCategories) {
           createdCategories.push(
@@ -752,7 +849,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       } catch {
         setIsError(true);
         setNotice(t("budget.setupIncomplete"));
-        await loadWorkspace(budget.id).catch(() => undefined);
+        await Promise.all([
+          loadBudgets().catch(() => undefined),
+          loadWorkspace(budget.id).catch(() => undefined),
+        ]);
       }
     } catch (error) {
       setIsError(true);
@@ -1216,6 +1316,20 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     void loadAnnualSummary();
   };
 
+  function startCreatingBudget() {
+    setBudgetName("");
+    setStartsOn(today());
+    setBudgetEndOn("");
+    setBudgetPeriodFrequency("MONTHLY");
+    setDraftCategories([{ name: "", percentage: "100" }]);
+    setFieldErrors({});
+    setCategoryNameErrors([]);
+    setCategoryPercentageErrors([]);
+    setAllocationTotalError(false);
+    setEditingBudgetId(null);
+    setIsCreatingBudget(true);
+  }
+
   async function startEditingBudget(budget: Budget) {
     if (budget.current_user_role !== "OWNER") return;
     setIsSaving(true);
@@ -1240,6 +1354,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       setCategories(nextCategories);
       setAllocationSets(nextAllocationSets);
       setBudgetName(budget.name);
+      setBudgetPeriodFrequency(budget.period_frequency ?? "CUSTOM");
+      setStartsOn(budget.period_anchor_start ?? today());
+      setBudgetEndOn(budget.period_end_on ?? "");
       setDraftCategories(
         activeBudgetCategories.length
           ? activeBudgetCategories.map((category) => ({
@@ -1275,6 +1392,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     if (!budgetName.trim()) {
       nextFieldErrors.budgetName = t("budget.nameRequired");
     }
+    if (
+      budgetPeriodFrequency !== "CUSTOM" &&
+      budgetEndOn &&
+      (!isValidDate(budgetEndOn) || startsOn > budgetEndOn)
+    ) {
+      nextFieldErrors.budgetEndOn = t("budget.invalidPeriod");
+    }
     setCategoryNameErrors(missingCategoryNames);
     setCategoryPercentageErrors(invalidCategoryPercentages);
     const invalidAllocationTotal = Math.abs(percentageTotal - 100) > 0.0001;
@@ -1307,20 +1431,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
               (category) => category.id === draft.categoryId,
             )
           : undefined;
-        const savedCategory = currentCategory
-          ? currentCategory.name === name
+        const savedCategory =
+          currentCategory?.name === name
             ? currentCategory
-            : await spendwiseApi.renameCategory(
+            : await spendwiseApi.createCategory(
                 accessToken,
                 editingBudgetId,
-                currentCategory.id,
                 name,
-              )
-          : await spendwiseApi.createCategory(
-              accessToken,
-              editingBudgetId,
-              name,
-            );
+              );
         selectedCategoryIds.add(savedCategory.id);
         configuredCategories.push(savedCategory);
       }
@@ -1350,11 +1468,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           );
         }
       }
-      await spendwiseApi.renameBudget(
-        accessToken,
-        editingBudgetId,
-        budgetName.trim(),
-      );
+      await spendwiseApi.updateBudget(accessToken, editingBudgetId, {
+        name: budgetName.trim(),
+        periodFrequency: budgetPeriodFrequency,
+        periodAnchorStart: budgetPeriodFrequency === "CUSTOM" ? null : startsOn,
+        periodEndOn:
+          budgetPeriodFrequency === "CUSTOM" ? null : budgetEndOn || null,
+      });
       await Promise.all([loadBudgets(), loadWorkspace(editingBudgetId)]);
       setEditingBudgetId(null);
       setCategoryNameErrors([]);
@@ -1556,7 +1676,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             {!isNative && budgets.length > 0 && !editingBudgetId ? (
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setIsCreatingBudget(true)}
+                onPress={startCreatingBudget}
                 style={styles.headerCreateButton}
               >
                 <Text style={styles.link}>{t("budget.new")}</Text>
@@ -1723,14 +1843,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 </Text>
                 <ActionButton
                   label={t("budget.createFirst")}
-                  onPress={() => setIsCreatingBudget(true)}
+                  onPress={startCreatingBudget}
                 />
               </View>
             )}
             {budgets.length ? (
               <ActionButton
                 label={t("budget.new")}
-                onPress={() => setIsCreatingBudget(true)}
+                onPress={startCreatingBudget}
               />
             ) : null}
             {archivedBudgets.length ? (
@@ -1775,7 +1895,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t("budget.new")}
-                    onPress={() => setIsCreatingBudget(true)}
+                    onPress={startCreatingBudget}
                     style={[styles.choice, styles.newBudgetChoice]}
                   >
                     <Text style={styles.choiceText}>＋</Text>
@@ -1870,14 +1990,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             ) : (
               <View style={styles.card}>
                 <Text style={styles.muted}>{t("budget.noPeriods")}</Text>
-                <TextInput
+                <DateInput
                   accessibilityLabel={t("budget.startsOn")}
                   onChangeText={(value) => {
                     setAdditionalPeriodStart(value);
                     clearFieldError("additionalPeriodStart");
                     clearFieldError("additionalPeriodEnd");
                   }}
-                  placeholder={t("budget.startsOn")}
                   style={[
                     styles.input,
                     fieldErrors.additionalPeriodStart && styles.inputInvalid,
@@ -1885,13 +2004,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   value={additionalPeriodStart}
                 />
                 <FieldError message={fieldErrors.additionalPeriodStart} />
-                <TextInput
+                <DateInput
                   accessibilityLabel={t("budget.endsOn")}
                   onChangeText={(value) => {
                     setAdditionalPeriodEnd(value);
                     clearFieldError("additionalPeriodEnd");
                   }}
-                  placeholder={t("budget.endsOn")}
                   style={[
                     styles.input,
                     fieldErrors.additionalPeriodEnd && styles.inputInvalid,
@@ -2404,7 +2522,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                           ? t("schedule.startDate")
                           : t("movement.date")}
                       </Text>
-                      <TextInput
+                      <DateInput
                         accessibilityLabel={
                           tab === "income" && incomeRecurring
                             ? t("schedule.startDate")
@@ -2415,7 +2533,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                           clearFieldError("movementDate");
                           clearFieldError("scheduleEndDate");
                         }}
-                        placeholder="AAAA-MM-DD"
                         style={[
                           styles.input,
                           fieldErrors.movementDate && styles.inputInvalid,
@@ -2486,19 +2603,31 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                           <Text style={styles.label}>
                             {t("schedule.endDateOptional")}
                           </Text>
-                          <TextInput
-                            accessibilityLabel={t("schedule.endDateOptional")}
-                            onChangeText={(value) => {
-                              setScheduleEndDate(value);
-                              clearFieldError("scheduleEndDate");
-                            }}
-                            placeholder="AAAA-MM-DD"
-                            style={[
-                              styles.input,
-                              fieldErrors.scheduleEndDate &&
-                                styles.inputInvalid,
-                            ]}
-                            value={scheduleEndDate}
+                          {scheduleEndDate ? (
+                            <DateInput
+                              accessibilityLabel={t("schedule.endDateOptional")}
+                              onChangeText={(value) => {
+                                setScheduleEndDate(value);
+                                clearFieldError("scheduleEndDate");
+                              }}
+                              style={[
+                                styles.input,
+                                fieldErrors.scheduleEndDate &&
+                                  styles.inputInvalid,
+                              ]}
+                              value={scheduleEndDate}
+                            />
+                          ) : (
+                            <Choice
+                              label={t("schedule.selectEndDate")}
+                              selected={false}
+                              onPress={() => setScheduleEndDate(today())}
+                            />
+                          )}
+                          <Choice
+                            label={t("schedule.noEndDate")}
+                            selected={!scheduleEndDate}
+                            onPress={() => setScheduleEndDate("")}
                           />
                           <FieldError message={fieldErrors.scheduleEndDate} />
                         </>
@@ -2733,7 +2862,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                     <Text style={styles.muted}>
                                       {t("movement.correctionDateDescription")}
                                     </Text>
-                                    <TextInput
+                                    <DateInput
                                       accessibilityLabel={t(
                                         "movement.correctionDate",
                                       )}
@@ -2741,7 +2870,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                         setCorrectionDate(value);
                                         clearFieldError("incomeCorrectionDate");
                                       }}
-                                      placeholder="AAAA-MM-DD"
                                       style={[
                                         styles.input,
                                         fieldErrors.incomeCorrectionDate &&
@@ -3222,15 +3350,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   value={currency}
                 />
                 <FieldError message={fieldErrors.currency} />
-                <Text style={styles.label}>{t("budget.period")}</Text>
-                <TextInput
+                <Text style={styles.label}>{t("budget.periodStart")}</Text>
+                <DateInput
                   accessibilityLabel={t("budget.startsOn")}
                   onChangeText={(value) => {
                     setStartsOn(value);
                     clearFieldError("startsOn");
-                    clearFieldError("endsOn");
                   }}
-                  placeholder={t("budget.startsOn")}
                   style={[
                     styles.input,
                     fieldErrors.startsOn && styles.inputInvalid,
@@ -3238,20 +3364,89 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   value={startsOn}
                 />
                 <FieldError message={fieldErrors.startsOn} />
-                <TextInput
-                  accessibilityLabel={t("budget.endsOn")}
-                  onChangeText={(value) => {
-                    setEndsOn(value);
-                    clearFieldError("endsOn");
+                <Text style={styles.label}>{t("budget.recurrence")}</Text>
+                <View style={styles.rowWrap}>
+                  {budgetPeriodFrequencies.map((frequency) => (
+                    <Choice
+                      key={frequency}
+                      label={t(`budget.frequencies.${frequency}`)}
+                      selected={budgetPeriodFrequency === frequency}
+                      onPress={() => setBudgetPeriodFrequency(frequency)}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.label}>
+                  {t("budget.budgetEndOptional")}
+                </Text>
+                {budgetEndOn ? (
+                  <DateInput
+                    accessibilityLabel={t("budget.budgetEndOptional")}
+                    onChangeText={(value) => {
+                      setBudgetEndOn(value);
+                      clearFieldError("budgetEndOn");
+                    }}
+                    style={[
+                      styles.input,
+                      fieldErrors.budgetEndOn && styles.inputInvalid,
+                    ]}
+                    value={budgetEndOn}
+                  />
+                ) : (
+                  <Choice
+                    label={t("budget.selectEndDate")}
+                    selected={false}
+                    onPress={() => setBudgetEndOn(today())}
+                  />
+                )}
+                <Choice
+                  label={t("budget.noEndDate")}
+                  selected={!budgetEndOn}
+                  onPress={() => {
+                    setBudgetEndOn("");
+                    clearFieldError("budgetEndOn");
                   }}
-                  placeholder={t("budget.endsOn")}
-                  style={[
-                    styles.input,
-                    fieldErrors.endsOn && styles.inputInvalid,
-                  ]}
-                  value={endsOn}
                 />
-                <FieldError message={fieldErrors.endsOn} />
+                <FieldError message={fieldErrors.budgetEndOn} />
+              </>
+            ) : null}
+            {editingBudgetId && budgetPeriodFrequency !== "CUSTOM" ? (
+              <>
+                <Text style={styles.label}>{t("budget.recurrence")}</Text>
+                <Text style={styles.muted}>
+                  {t(`budget.frequencies.${budgetPeriodFrequency}`)}
+                </Text>
+                <Text style={styles.label}>
+                  {t("budget.budgetEndOptional")}
+                </Text>
+                {budgetEndOn ? (
+                  <DateInput
+                    accessibilityLabel={t("budget.budgetEndOptional")}
+                    onChangeText={(value) => {
+                      setBudgetEndOn(value);
+                      clearFieldError("budgetEndOn");
+                    }}
+                    style={[
+                      styles.input,
+                      fieldErrors.budgetEndOn && styles.inputInvalid,
+                    ]}
+                    value={budgetEndOn}
+                  />
+                ) : (
+                  <Choice
+                    label={t("budget.selectEndDate")}
+                    selected={false}
+                    onPress={() => setBudgetEndOn(today())}
+                  />
+                )}
+                <Choice
+                  label={t("budget.noEndDate")}
+                  selected={!budgetEndOn}
+                  onPress={() => {
+                    setBudgetEndOn("");
+                    clearFieldError("budgetEndOn");
+                  }}
+                />
+                <FieldError message={fieldErrors.budgetEndOn} />
               </>
             ) : null}
             <Text style={styles.sectionTitle}>{t("budget.categories")}</Text>
@@ -3386,7 +3581,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
             </View>
             <ActionButton
               label={t("budget.createFirst")}
-              onPress={() => setIsCreatingBudget(true)}
+              onPress={startCreatingBudget}
             />
           </View>
         )}
