@@ -675,6 +675,7 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByLabel("Budget name").fill("Household pilot");
   await page.getByLabel("Currency (ISO code, e.g. EUR)").fill("EUR");
   await page.getByLabel("Start date").fill(`${year}-01-01`);
+  await page.getByRole("button", { name: "Yearly" }).click();
   await page.getByRole("button", { name: "Set an end date" }).click();
   await page.getByLabel("End date (optional)").fill(`${year}-12-31`);
   await page.getByLabel("Category name").fill("General");
