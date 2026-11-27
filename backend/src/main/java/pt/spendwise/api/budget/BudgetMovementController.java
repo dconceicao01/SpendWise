@@ -68,6 +68,16 @@ public class BudgetMovementController {
         return movementService.listExpenses(budgetId, periodId, limit, offset);
     }
 
+    @GetMapping("/expenses/invoices")
+    public List<ExpenseEntryResponse> listRequestedInvoices(
+            @PathVariable UUID budgetId,
+            @RequestParam int year,
+            @RequestParam int month,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        return movementService.listRequestedInvoices(budgetId, year, month, limit, offset);
+    }
+
     @PostMapping("/expenses")
     public ResponseEntity<ExpenseEntryResponse> recordExpense(
             @PathVariable UUID budgetId, @Valid @RequestBody CreateExpenseRequest request) {

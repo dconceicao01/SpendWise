@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import pt.spendwise.api.budget.ExpenseInvoiceStatus;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record ExportExpense(
@@ -17,5 +18,7 @@ public record ExportExpense(
         BigDecimal amount,
         LocalDate spentOn,
         String description,
+        ExpenseInvoiceStatus invoiceStatus,
+        String supplierNipc,
         Instant createdAt) {
 }

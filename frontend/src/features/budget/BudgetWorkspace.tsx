@@ -53,7 +53,8 @@ type DraftCategory = {
   percentage: string;
 };
 type MovementTab = "income" | "expense" | "adjustment";
-type WorkspaceView = "budgets" | "dashboard" | "movement" | "statistics";
+type WorkspaceView =
+  "budgets" | "dashboard" | "movement" | "statistics" | "invoices";
 type MobileDestination = WorkspaceView | "profile";
 type BudgetAllocationSummary = {
   items: { categoryId: string; name: string; percentage: number }[];
@@ -145,6 +146,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   >([]);
   const [incomeSchedules, setIncomeSchedules] = useState<IncomeSchedule[]>([]);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
+  const [requestedInvoices, setRequestedInvoices] = useState<ExpenseEntry[]>(
+    [],
+  );
+  const [invoiceYear, setInvoiceYear] = useState(
+    String(new Date().getFullYear()),
+  );
+  const [invoiceMonth, setInvoiceMonth] = useState(
+    String(new Date().getMonth() + 1).padStart(2, "0"),
+  );
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [invoiceListFailed, setInvoiceListFailed] = useState(false);
   const [adjustments, setAdjustments] = useState<BudgetAdjustment[]>([]);
   const [annualYear, setAnnualYear] = useState(
     String(new Date().getFullYear()),
@@ -216,6 +228,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     string | null
   >(null);
   const [description, setDescription] = useState("");
+  const [invoiceStatus, setInvoiceStatus] = useState<
+    "NOT_REQUESTED" | "REQUESTED"
+  >("NOT_REQUESTED");
+  const [supplierNipc, setSupplierNipc] = useState("");
   const [adjustmentSign, setAdjustmentSign] = useState<1 | -1>(1);
   const [reason, setReason] = useState("");
   const [correctionEntryId, setCorrectionEntryId] = useState<string | null>(
@@ -228,6 +244,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const workspaceRequestId = useRef(0);
   const movementRequestId = useRef(0);
   const annualRequestId = useRef(0);
+  const invoiceRequestId = useRef(0);
 
   const selectedBudget = budgets.find(
     (budget) => budget.id === selectedBudgetId,
@@ -423,6 +440,58 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       throw error;
     }
   }, [accessToken, selectedBudgetId, selectedPeriodId]);
+
+  const loadRequestedInvoices = useCallback(async () => {
+    if (!selectedBudgetId) return;
+    if (!/^[0-9]{4}$/.test(invoiceYear)) {
+      setFieldErrors((current) => ({
+        ...current,
+        invoiceYear: t("movement.invoiceYearInvalid"),
+      }));
+      return;
+    }
+    const month = Number(invoiceMonth);
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      setFieldErrors((current) => ({
+        ...current,
+        invoiceMonth: t("movement.invoiceMonthRequired"),
+      }));
+      return;
+    }
+
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next.invoiceYear;
+      delete next.invoiceMonth;
+      return next;
+    });
+    const requestId = ++invoiceRequestId.current;
+    setIsLoadingInvoices(true);
+    setInvoiceListFailed(false);
+    try {
+      const entries = await allPages((offset) =>
+        spendwiseApi.listRequestedInvoices(
+          accessToken,
+          selectedBudgetId,
+          Number(invoiceYear),
+          month,
+          offset,
+        ),
+      );
+      if (requestId === invoiceRequestId.current) {
+        setRequestedInvoices(entries);
+      }
+    } catch {
+      if (requestId === invoiceRequestId.current) {
+        setInvoiceListFailed(true);
+        setRequestedInvoices([]);
+      }
+    } finally {
+      if (requestId === invoiceRequestId.current) {
+        setIsLoadingInvoices(false);
+      }
+    }
+  }, [accessToken, invoiceMonth, invoiceYear, selectedBudgetId, t]);
 
   useEffect(() => {
     let active = true;
@@ -713,6 +782,13 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     if (tab === "expense" && !movementLabelId) {
       nextFieldErrors.movementLabel = t("movement.labelRequired");
     }
+    if (
+      tab === "expense" &&
+      invoiceStatus === "REQUESTED" &&
+      !/^[0-9]{9}$/.test(supplierNipc)
+    ) {
+      nextFieldErrors.supplierNipc = t("movement.supplierNipcRequired");
+    }
     if (tab === "adjustment" && !reason.trim()) {
       nextFieldErrors.movementReason = t("movement.reasonRequired");
     }
@@ -760,6 +836,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
           amount: parsedAmount,
           spent_on: movementDate,
           description: description.trim() || null,
+          invoice_status: invoiceStatus,
+          supplier_nipc: invoiceStatus === "REQUESTED" ? supplierNipc : null,
         });
         movementSaved = true;
         setNotice(t("movement.expenseSaved"));
@@ -777,6 +855,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       }
       setAmount("");
       setDescription("");
+      setInvoiceStatus("NOT_REQUESTED");
+      setSupplierNipc("");
       setIncomeDescription("");
       setReason("");
       await loadMovements();
@@ -1381,6 +1461,9 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     setDashboardMonthBudgetId("");
     setDashboardMonthIncomes([]);
     setDashboardMonthExpenses([]);
+    invoiceRequestId.current += 1;
+    setRequestedInvoices([]);
+    setInvoiceListFailed(false);
     setWorkspaceView("dashboard");
   }
 
@@ -1731,10 +1814,14 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 <Text style={styles.sectionTitle}>
                   {workspaceView === "statistics"
                     ? t("dashboard.statisticsTitle")
-                    : t(`movement.${tab}`)}
+                    : workspaceView === "invoices"
+                      ? t("movement.invoiceListTitle")
+                      : t(`movement.${tab}`)}
                 </Text>
                 <Text style={styles.muted}>
-                  {t("dashboard.detailDescription")}
+                  {workspaceView === "invoices"
+                    ? t("movement.invoiceListDescription")
+                    : t("dashboard.detailDescription")}
                 </Text>
               </View>
             ) : null}
@@ -1756,7 +1843,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                   onPress={() => void loadWorkspace().catch(() => undefined)}
                 />
               </View>
-            ) : periods.length ? (
+            ) : workspaceView === "invoices" ? null : periods.length ? (
               <>
                 <Text style={styles.sectionTitle}>{t("budget.period")}</Text>
                 <View style={styles.rowWrap}>
@@ -1810,10 +1897,10 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 />
               </View>
             )}
-            {!activeCategories.length ? (
+            {!activeCategories.length && workspaceView !== "invoices" ? (
               <Text style={styles.muted}>{t("budget.noAllocation")}</Text>
             ) : null}
-            {canRecordMovements ? (
+            {canRecordMovements || workspaceView === "invoices" ? (
               <>
                 {workspaceView === "dashboard" ? (
                   <>
@@ -2012,6 +2099,15 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 ) : null}
                 {workspaceView === "movement" ? (
                   <>
+                    <SecondaryActionButton
+                      label={t("movement.openInvoices")}
+                      onPress={() => {
+                        setRequestedInvoices([]);
+                        setInvoiceListFailed(false);
+                        setWorkspaceView("invoices");
+                        void loadRequestedInvoices();
+                      }}
+                    />
                     {tab === "income" ? (
                       <>
                         <View style={styles.card}>
@@ -2398,6 +2494,60 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                             style={styles.input}
                             value={description}
                           />
+                          <Text style={styles.label}>
+                            {t("movement.invoiceStatus")}
+                          </Text>
+                          <View style={styles.rowWrap}>
+                            <Choice
+                              label={t("movement.invoiceNotRequested")}
+                              selected={invoiceStatus === "NOT_REQUESTED"}
+                              onPress={() => {
+                                setInvoiceStatus("NOT_REQUESTED");
+                                setSupplierNipc("");
+                                setFieldErrors((current) => {
+                                  const next = { ...current };
+                                  delete next.supplierNipc;
+                                  return next;
+                                });
+                              }}
+                            />
+                            <Choice
+                              label={t("movement.invoiceRequested")}
+                              selected={invoiceStatus === "REQUESTED"}
+                              onPress={() => setInvoiceStatus("REQUESTED")}
+                            />
+                          </View>
+                          <Text style={styles.muted}>
+                            {t("movement.invoiceRequestedHelp")}
+                          </Text>
+                          {invoiceStatus === "REQUESTED" ? (
+                            <>
+                              <Text style={styles.label}>
+                                {t("movement.supplierNipc")}
+                              </Text>
+                              <TextInput
+                                accessibilityLabel={t("movement.supplierNipc")}
+                                keyboardType="number-pad"
+                                maxLength={9}
+                                onChangeText={(value) => {
+                                  setSupplierNipc(
+                                    value.replace(/[^0-9]/g, "").slice(0, 9),
+                                  );
+                                  clearFieldError("supplierNipc");
+                                }}
+                                placeholder={t(
+                                  "movement.supplierNipcPlaceholder",
+                                )}
+                                style={[
+                                  styles.input,
+                                  fieldErrors.supplierNipc &&
+                                    styles.inputInvalid,
+                                ]}
+                                value={supplierNipc}
+                              />
+                              <FieldError message={fieldErrors.supplierNipc} />
+                            </>
+                          ) : null}
                         </>
                       ) : null}
                       {tab === "adjustment" ? (
@@ -2655,6 +2805,17 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                                     ? ` · ${item.description}`
                                     : ""}
                                 </Text>
+                                <Text style={styles.muted}>
+                                  {item.invoice_status === "REQUESTED" ? (
+                                    <>
+                                      {t("movement.invoiceRequestedValue")} ·{" "}
+                                      {t("movement.supplierNipc")}:{" "}
+                                      {item.supplier_nipc}
+                                    </>
+                                  ) : (
+                                    t("movement.invoiceNotRequestedValue")
+                                  )}
+                                </Text>
                                 <Pressable
                                   accessibilityRole="button"
                                   onPress={() =>
@@ -2709,6 +2870,108 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       />
                     )}
                   </>
+                ) : null}
+                {workspaceView === "invoices" ? (
+                  <View style={styles.card}>
+                    <Text style={styles.label}>
+                      {t("movement.invoiceYear")}
+                    </Text>
+                    <TextInput
+                      accessibilityLabel={t("movement.invoiceYear")}
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      onChangeText={(value) => {
+                        setInvoiceYear(value);
+                        setFieldErrors((current) => {
+                          const next = { ...current };
+                          delete next.invoiceYear;
+                          return next;
+                        });
+                      }}
+                      style={[
+                        styles.input,
+                        fieldErrors.invoiceYear && styles.inputInvalid,
+                      ]}
+                      value={invoiceYear}
+                    />
+                    <FieldError message={fieldErrors.invoiceYear} />
+                    <Text style={styles.label}>
+                      {t("movement.invoiceMonth")}
+                    </Text>
+                    <TextInput
+                      accessibilityLabel={t("movement.invoiceMonth")}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      onChangeText={(value) => {
+                        setInvoiceMonth(value);
+                        setFieldErrors((current) => {
+                          const next = { ...current };
+                          delete next.invoiceMonth;
+                          return next;
+                        });
+                      }}
+                      style={[
+                        styles.input,
+                        fieldErrors.invoiceMonth && styles.inputInvalid,
+                      ]}
+                      value={invoiceMonth}
+                    />
+                    <FieldError message={fieldErrors.invoiceMonth} />
+                    <ActionButton
+                      disabled={isLoadingInvoices}
+                      label={
+                        isLoadingInvoices
+                          ? t("common.loading")
+                          : t("movement.loadInvoices")
+                      }
+                      onPress={() => void loadRequestedInvoices()}
+                    />
+                    {invoiceListFailed ? (
+                      <Text style={styles.error}>
+                        {t("movement.invoiceListLoadError")}
+                      </Text>
+                    ) : isLoadingInvoices ? (
+                      <Text style={styles.muted}>{t("common.loading")}</Text>
+                    ) : requestedInvoices.length ? (
+                      <View style={styles.list}>
+                        {requestedInvoices.map((item) => (
+                          <View key={item.id} style={styles.entry}>
+                            <View style={styles.entryText}>
+                              <Text style={styles.entryTitle}>
+                                {categories.find(
+                                  (category) =>
+                                    category.id === item.category_id,
+                                )?.name ?? t("movement.expense")}{" "}
+                                ·{" "}
+                                {item.label?.name ??
+                                  t("movement.unclassifiedLabel")}
+                              </Text>
+                              <Text style={styles.muted}>
+                                {[item.spent_on, item.description]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </Text>
+                              <Text style={styles.muted}>
+                                {t("movement.supplierNipc")}:{" "}
+                                {item.supplier_nipc}
+                              </Text>
+                            </View>
+                            <Text style={styles.entryAmount}>
+                              {formatAmount.format(-item.amount)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.muted}>
+                        {t("movement.invoiceListEmpty")}
+                      </Text>
+                    )}
+                    <SecondaryActionButton
+                      label={t("movement.backToMovements")}
+                      onPress={() => setWorkspaceView("movement")}
+                    />
+                  </View>
                 ) : null}
                 {workspaceView === "statistics" ? (
                   <>
@@ -3108,7 +3371,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
       </ScrollView>
       {isNative && !isCreatingBudget && !editingBudgetId ? (
         <MobileNavigation
-          current={workspaceView}
+          current={workspaceView === "invoices" ? "movement" : workspaceView}
           onSelect={(destination) => {
             if (destination === "profile") {
               setShowAccountSettings(true);

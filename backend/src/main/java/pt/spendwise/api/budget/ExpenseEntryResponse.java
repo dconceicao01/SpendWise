@@ -17,6 +17,8 @@ public record ExpenseEntryResponse(
         BigDecimal amount,
         @JsonProperty("spent_on") LocalDate spentOn,
         String description,
+        @JsonProperty("invoice_status") ExpenseInvoiceStatus invoiceStatus,
+        @JsonProperty("supplier_nipc") String supplierNipc,
         @JsonProperty("created_at") Instant createdAt) {
 
     public record ExpenseLabelDetails(String name, @JsonProperty("is_system") boolean isSystem) {}

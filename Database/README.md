@@ -6,6 +6,8 @@ Despesas usam uma label obrigatória, separada da descrição livre, com unicida
 
 ## Preparação local
 
+As despesas também registam invoice_status (NOT_REQUESTED ou REQUESTED) e, se a fatura foi pedida, o NIPC de nove algarismos da empresa emitente em supplier_nipc, como texto para preservar zeros iniciais. O endpoint autenticado GET /api/v1/budgets/{budgetId}/expenses/invoices?year=AAAA&month=M lista despesas com fatura pedida pela data efetiva, respeitando autorização de leitura e RLS. Os metadados têm a mesma visibilidade da despesa para membros ativos, incluindo VIEWER. Não se guardam PDFs nem se integra com a AT/e-Fatura.
+
 Requisitos: Node.js 24 LTS, pnpm 12 e Docker Desktop em execução.
 
 Na pasta `Database/`:
