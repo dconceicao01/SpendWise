@@ -72,7 +72,7 @@ public class BudgetMovementController {
     public List<ExpenseEntryResponse> listRequestedInvoices(
             @PathVariable UUID budgetId,
             @RequestParam int year,
-            @RequestParam int month,
+            @RequestParam(required = false) Integer month,
             @RequestParam(defaultValue = "50") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         return movementService.listRequestedInvoices(budgetId, year, month, limit, offset);

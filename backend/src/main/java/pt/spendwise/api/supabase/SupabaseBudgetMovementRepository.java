@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -150,13 +149,12 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
 
     @Override
     public List<ExpenseEntryResponse> findRequestedInvoices(
-            UUID budgetId, YearMonth yearMonth, int limit, int offset) {
+            UUID budgetId, LocalDate startInclusive, LocalDate endExclusive, int limit, int offset) {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("select", SELECT_EXPENSE);
         query.put("budget_id", "eq." + budgetId);
         query.put("invoice_status", "eq.REQUESTED");
-        query.put("and", "(spent_on.gte." + yearMonth.atDay(1)
-                + ",spent_on.lt." + yearMonth.plusMonths(1).atDay(1) + ")");
+        query.put("and", "(spent_on.gte." + startInclusive + ",spent_on.lt." + endExclusive + ")");
         query.put("order", "spent_on.desc,created_at.desc");
         query.put("limit", Integer.toString(limit));
         query.put("offset", Integer.toString(offset));

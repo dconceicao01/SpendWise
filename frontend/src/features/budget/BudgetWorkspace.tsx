@@ -152,9 +152,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
   const [invoiceYear, setInvoiceYear] = useState(
     String(new Date().getFullYear()),
   );
-  const [invoiceMonth, setInvoiceMonth] = useState(
-    String(new Date().getMonth() + 1).padStart(2, "0"),
-  );
+  const [invoiceMonth, setInvoiceMonth] = useState("");
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [invoiceListFailed, setInvoiceListFailed] = useState(false);
   const [adjustments, setAdjustments] = useState<BudgetAdjustment[]>([]);
@@ -441,57 +439,68 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
     }
   }, [accessToken, selectedBudgetId, selectedPeriodId]);
 
-  const loadRequestedInvoices = useCallback(async () => {
-    if (!selectedBudgetId) return;
-    if (!/^[0-9]{4}$/.test(invoiceYear)) {
-      setFieldErrors((current) => ({
-        ...current,
-        invoiceYear: t("movement.invoiceYearInvalid"),
-      }));
-      return;
-    }
-    const month = Number(invoiceMonth);
-    if (!Number.isInteger(month) || month < 1 || month > 12) {
-      setFieldErrors((current) => ({
-        ...current,
-        invoiceMonth: t("movement.invoiceMonthRequired"),
-      }));
-      return;
-    }
+  const loadRequestedInvoices = useCallback(
+    async (yearValue = invoiceYear, monthValue = invoiceMonth) => {
+      if (!selectedBudgetId) return;
+      if (!/^[0-9]{4}$/.test(yearValue) || Number(yearValue) < 1) {
+        setFieldErrors((current) => ({
+          ...current,
+          invoiceYear: t("movement.invoiceYearInvalid"),
+        }));
+        return;
+      }
+      const trimmedMonth = monthValue.trim();
+      const month = trimmedMonth ? Number(trimmedMonth) : null;
+      if (
+        trimmedMonth &&
+        (!/^[0-9]{1,2}$/.test(trimmedMonth) ||
+          month === null ||
+          !Number.isInteger(month) ||
+          month < 1 ||
+          month > 12)
+      ) {
+        setFieldErrors((current) => ({
+          ...current,
+          invoiceMonth: t("movement.invoiceMonthInvalid"),
+        }));
+        return;
+      }
 
-    setFieldErrors((current) => {
-      const next = { ...current };
-      delete next.invoiceYear;
-      delete next.invoiceMonth;
-      return next;
-    });
-    const requestId = ++invoiceRequestId.current;
-    setIsLoadingInvoices(true);
-    setInvoiceListFailed(false);
-    try {
-      const entries = await allPages((offset) =>
-        spendwiseApi.listRequestedInvoices(
-          accessToken,
-          selectedBudgetId,
-          Number(invoiceYear),
-          month,
-          offset,
-        ),
-      );
-      if (requestId === invoiceRequestId.current) {
-        setRequestedInvoices(entries);
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next.invoiceYear;
+        delete next.invoiceMonth;
+        return next;
+      });
+      const requestId = ++invoiceRequestId.current;
+      setIsLoadingInvoices(true);
+      setInvoiceListFailed(false);
+      try {
+        const entries = await allPages((offset) =>
+          spendwiseApi.listRequestedInvoices(
+            accessToken,
+            selectedBudgetId,
+            Number(yearValue),
+            month,
+            offset,
+          ),
+        );
+        if (requestId === invoiceRequestId.current) {
+          setRequestedInvoices(entries);
+        }
+      } catch {
+        if (requestId === invoiceRequestId.current) {
+          setInvoiceListFailed(true);
+          setRequestedInvoices([]);
+        }
+      } finally {
+        if (requestId === invoiceRequestId.current) {
+          setIsLoadingInvoices(false);
+        }
       }
-    } catch {
-      if (requestId === invoiceRequestId.current) {
-        setInvoiceListFailed(true);
-        setRequestedInvoices([]);
-      }
-    } finally {
-      if (requestId === invoiceRequestId.current) {
-        setIsLoadingInvoices(false);
-      }
-    }
-  }, [accessToken, invoiceMonth, invoiceYear, selectedBudgetId, t]);
+    },
+    [accessToken, invoiceMonth, invoiceYear, selectedBudgetId, t],
+  );
 
   useEffect(() => {
     let active = true;
@@ -1982,6 +1991,28 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                         </Text>
                       </Pressable>
                     </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("dashboard.invoiceCardTitle")}
+                      onPress={() => {
+                        setInvoiceMonth("");
+                        setRequestedInvoices([]);
+                        setInvoiceListFailed(false);
+                        setWorkspaceView("invoices");
+                        void loadRequestedInvoices(invoiceYear, "");
+                      }}
+                      style={[styles.card, styles.invoiceDashboardCard]}
+                    >
+                      <Text style={styles.sectionTitle}>
+                        {t("dashboard.invoiceCardTitle")}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {t("dashboard.invoiceCardDescription")}
+                      </Text>
+                      <Text style={styles.link}>
+                        {t("dashboard.openInvoices")}
+                      </Text>
+                    </Pressable>
                     <View style={styles.card}>
                       <Text style={styles.sectionTitle}>
                         {t("dashboard.periodBalances")}
@@ -2099,15 +2130,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                 ) : null}
                 {workspaceView === "movement" ? (
                   <>
-                    <SecondaryActionButton
-                      label={t("movement.openInvoices")}
-                      onPress={() => {
-                        setRequestedInvoices([]);
-                        setInvoiceListFailed(false);
-                        setWorkspaceView("invoices");
-                        void loadRequestedInvoices();
-                      }}
-                    />
                     {tab === "income" ? (
                       <>
                         <View style={styles.card}>
@@ -2903,7 +2925,7 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       keyboardType="number-pad"
                       maxLength={2}
                       onChangeText={(value) => {
-                        setInvoiceMonth(value);
+                        setInvoiceMonth(value.replace(/[^0-9]/g, ""));
                         setFieldErrors((current) => {
                           const next = { ...current };
                           delete next.invoiceMonth;
@@ -2915,8 +2937,12 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                         fieldErrors.invoiceMonth && styles.inputInvalid,
                       ]}
                       value={invoiceMonth}
+                      placeholder={t("movement.invoiceMonthPlaceholder")}
                     />
                     <FieldError message={fieldErrors.invoiceMonth} />
+                    <Text style={styles.muted}>
+                      {t("movement.invoiceMonthHelp")}
+                    </Text>
                     <ActionButton
                       disabled={isLoadingInvoices}
                       label={
@@ -2968,8 +2994,8 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                       </Text>
                     )}
                     <SecondaryActionButton
-                      label={t("movement.backToMovements")}
-                      onPress={() => setWorkspaceView("movement")}
+                      label={t("dashboard.backToDashboard")}
+                      onPress={() => setWorkspaceView("dashboard")}
                     />
                   </View>
                 ) : null}
@@ -4328,6 +4354,7 @@ const styles = StyleSheet.create({
   },
   summaryItemCompact: { flexBasis: "46%", minWidth: 0, padding: 12 },
   summaryItemWideCompact: { flexBasis: "100%", minWidth: 0, padding: 14 },
+  invoiceDashboardCard: { borderLeftWidth: 4, borderLeftColor: "#43805a" },
   summaryValue: { color: "#18291f", fontSize: 18, fontWeight: "700" },
   cardHint: { color: "#627168", fontSize: 13, lineHeight: 19 },
   cardRecentList: { gap: 5, marginTop: 4 },

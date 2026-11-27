@@ -438,12 +438,12 @@ export const spendwiseApi = {
     token: string,
     budgetId: string,
     year: number,
-    month: number,
+    month: number | null,
     offset = 0,
   ) =>
     request<ExpenseEntry[]>(
       token,
-      `/budgets/${budgetId}/expenses/invoices?year=${year}&month=${month}&limit=100&offset=${offset}`,
+      `/budgets/${budgetId}/expenses/invoices?year=${year}${month === null ? "" : `&month=${month}`}&limit=100&offset=${offset}`,
     ),
   updateExpenseLabel: (
     token: string,
