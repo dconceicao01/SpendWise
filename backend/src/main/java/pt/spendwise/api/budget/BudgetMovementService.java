@@ -1,7 +1,7 @@
 package pt.spendwise.api.budget;
 
 import java.time.DateTimeException;
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -68,16 +68,21 @@ public class BudgetMovementService {
     }
 
     public List<ExpenseEntryResponse> listRequestedInvoices(
-            UUID budgetId, int year, int month, int limit, int offset) {
+            UUID budgetId, int year, Integer month, int limit, int offset) {
         authorizationService.requireAllowed(budgetId, BudgetAction.READ);
-        YearMonth yearMonth;
+        LocalDate startInclusive;
+        LocalDate endExclusive;
         try {
-            yearMonth = YearMonth.of(year, month);
+            if (year < 1 || year > 9999 || (month != null && (month < 1 || month > 12))) {
+                throw new DateTimeException("Invoice year or month is outside the supported range");
+            }
+            startInclusive = LocalDate.of(year, month == null ? 1 : month, 1);
+            endExclusive = month == null ? startInclusive.plusYears(1) : startInclusive.plusMonths(1);
         } catch (DateTimeException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice year and month are invalid");
         }
         return movementRepository.findRequestedInvoices(
-                budgetId, yearMonth, pageSize(limit), pageOffset(offset));
+                budgetId, startInclusive, endExclusive, pageSize(limit), pageOffset(offset));
     }
 
     public ExpenseEntryResponse recordExpense(UUID budgetId, CreateExpenseRequest request) {

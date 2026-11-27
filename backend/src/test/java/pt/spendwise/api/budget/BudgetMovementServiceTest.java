@@ -3,7 +3,6 @@ package pt.spendwise.api.budget;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -82,17 +81,34 @@ class BudgetMovementServiceTest {
     @Test
     void listsRequestedInvoicesForTheSelectedMonthAndRequiresReadAccess() {
         var invoices = List.of(expense());
-        when(repository.findRequestedInvoices(BUDGET_ID, YearMonth.of(2026, 11), 25, 0))
+        when(repository.findRequestedInvoices(
+                BUDGET_ID, LocalDate.of(2026, 11, 1), LocalDate.of(2026, 12, 1), 25, 0))
                 .thenReturn(invoices);
 
         assertThat(service.listRequestedInvoices(BUDGET_ID, 2026, 11, 25, 0)).isEqualTo(invoices);
         verify(authorization).requireAllowed(BUDGET_ID, BudgetAction.READ);
-        verify(repository).findRequestedInvoices(BUDGET_ID, YearMonth.of(2026, 11), 25, 0);
+        verify(repository).findRequestedInvoices(
+                BUDGET_ID, LocalDate.of(2026, 11, 1), LocalDate.of(2026, 12, 1), 25, 0);
+    }
+
+    @Test
+    void listsRequestedInvoicesForTheWholeYearWhenMonthIsNotSelected() {
+        var invoices = List.of(expense());
+        when(repository.findRequestedInvoices(
+                BUDGET_ID, LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1), 25, 0))
+                .thenReturn(invoices);
+
+        assertThat(service.listRequestedInvoices(BUDGET_ID, 2026, null, 25, 0)).isEqualTo(invoices);
+        verify(repository).findRequestedInvoices(
+                BUDGET_ID, LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1), 25, 0);
     }
 
     @Test
     void rejectsInvalidInvoiceMonth() {
         assertThatThrownBy(() -> service.listRequestedInvoices(BUDGET_ID, 2026, 13, 25, 0))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invoice year and month are invalid");
+        assertThatThrownBy(() -> service.listRequestedInvoices(BUDGET_ID, 0, null, 25, 0))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Invoice year and month are invalid");
     }

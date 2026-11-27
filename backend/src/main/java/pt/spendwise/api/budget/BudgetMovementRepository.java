@@ -1,6 +1,6 @@
 package pt.spendwise.api.budget;
 
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,7 +18,8 @@ public interface BudgetMovementRepository {
 
     List<ExpenseEntryResponse> findExpenses(UUID budgetId, UUID periodId, int limit, int offset);
 
-    List<ExpenseEntryResponse> findRequestedInvoices(UUID budgetId, YearMonth yearMonth, int limit, int offset);
+    List<ExpenseEntryResponse> findRequestedInvoices(
+            UUID budgetId, LocalDate startInclusive, LocalDate endExclusive, int limit, int offset);
 
     Optional<ExpenseEntryResponse> recordExpense(UUID budgetId, CreateExpenseRequest request);
 

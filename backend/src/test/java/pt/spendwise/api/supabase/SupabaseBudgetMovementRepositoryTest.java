@@ -109,12 +109,28 @@ class SupabaseBudgetMovementRepositoryTest {
                         + "\"created_at\":\"2026-11-18T17:00:00Z\"}]", MediaType.APPLICATION_JSON));
 
         var invoices = movementRepository.findRequestedInvoices(
-                BUDGET_ID, java.time.YearMonth.of(2026, 11), 100, 0);
+                BUDGET_ID, LocalDate.of(2026, 11, 1), LocalDate.of(2026, 12, 1), 100, 0);
 
         assertThat(invoices).hasSize(1);
         assertThat(invoices.getFirst().invoiceStatus())
                 .isEqualTo(pt.spendwise.api.budget.ExpenseInvoiceStatus.REQUESTED);
         assertThat(invoices.getFirst().supplierNipc()).isEqualTo("509123456");
+        mockServer.verify();
+    }
+
+    @Test
+    void listsRequestedInvoicesForTheSelectedYear() {
+        mockServer.expect(requestTo(org.hamcrest.Matchers.containsString(
+                        "https://spendwise-test.supabase.co/rest/v1/expense_entries?")))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andExpect(queryParam("invoice_status", "eq.REQUESTED"))
+                .andExpect(queryParam("and", "(spent_on.gte.2026-01-01,spent_on.lt.2027-01-01)"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        var invoices = movementRepository.findRequestedInvoices(
+                BUDGET_ID, LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1), 100, 0);
+
+        assertThat(invoices).isEmpty();
         mockServer.verify();
     }
 
