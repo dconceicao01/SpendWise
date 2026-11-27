@@ -711,7 +711,7 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await expect(
     page.getByText(/Invoice requested · Issuing company NIPC: 509123456/),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Back to dashboard" }).click();
+  await page.getByLabel("Back to dashboard").click();
   await page.getByRole("button", { name: "Requested invoices" }).click();
   await expect(
     page.getByText("Requested invoices", { exact: true }),
@@ -722,7 +722,7 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByLabel("Month").fill("6");
   await page.getByRole("button", { name: "View invoices" }).click();
   await expect(page.getByText("509123456")).toBeVisible();
-  await page.getByRole("button", { name: "Back to dashboard" }).click();
+  await page.getByLabel("Back to dashboard").click();
   await page.getByRole("button", { name: "View all statistics" }).click();
   await expect(page.getByText("Statistics")).toBeVisible();
   await page.getByRole("button", { name: "View summary" }).click();
