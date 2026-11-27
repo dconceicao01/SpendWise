@@ -1,5 +1,6 @@
 package pt.spendwise.api.budget;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,7 +45,34 @@ public class BudgetService {
 
     public BudgetResponse rename(UUID budgetId, UpdateBudgetRequest request) {
         authorizationService.requireAllowed(budgetId, BudgetAction.MANAGE);
-        return budgetRepository.updateName(budgetId, request.name())
+        if (request.periodFrequency() == null) {
+            return budgetRepository.updateName(budgetId, request.name())
+                    .orElseThrow(() -> new AccessDeniedException("Budget access denied"))
+                    .withCurrentUserRole(BudgetRole.OWNER);
+        }
+        BudgetResponse existing = budgetRepository.findVisibleById(budgetId)
+                .orElseThrow(() -> new AccessDeniedException("Budget access denied"));
+        BudgetPeriodFrequency requestedFrequency = request.periodFrequency();
+        LocalDate requestedAnchor = request.periodAnchorStart() == null
+                ? existing.periodAnchorStart()
+                : request.periodAnchorStart();
+        LocalDate requestedEnd = request.periodEndOn();
+        if (existing.periodFrequency() != BudgetPeriodFrequency.CUSTOM
+                && requestedFrequency != existing.periodFrequency()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Budget period frequency cannot be changed");
+        }
+        if (existing.periodAnchorStart() != null && requestedAnchor != null
+                && !existing.periodAnchorStart().equals(requestedAnchor)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Budget period start date cannot be changed");
+        }
+        if (requestedFrequency != BudgetPeriodFrequency.CUSTOM && requestedAnchor == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Budget period start date is required");
+        }
+        if (requestedEnd != null && requestedAnchor != null && requestedEnd.isBefore(requestedAnchor)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Budget end date must not precede its start date");
+        }
+        return budgetRepository.update(budgetId, new UpdateBudgetRequest(
+                        request.name(), requestedFrequency, requestedAnchor, requestedEnd))
                 .orElseThrow(() -> new AccessDeniedException("Budget access denied"))
                 .withCurrentUserRole(BudgetRole.OWNER);
     }

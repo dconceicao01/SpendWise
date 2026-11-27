@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.LinkedHashMap;
 import java.util.Collections;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -13,11 +14,12 @@ import org.springframework.stereotype.Repository;
 import pt.spendwise.api.budget.BudgetRepository;
 import pt.spendwise.api.budget.BudgetResponse;
 import pt.spendwise.api.budget.BudgetType;
+import pt.spendwise.api.budget.UpdateBudgetRequest;
 
 @Repository
 public class SupabaseBudgetRepository implements BudgetRepository {
 
-    private static final String SELECT_BUDGET = "id,name,budget_type,currency_code,created_at,archived_at";
+    private static final String SELECT_BUDGET = "id,name,budget_type,currency_code,created_at,archived_at,period_frequency,period_anchor_start,period_end_on";
     private static final ParameterizedTypeReference<List<BudgetResponse>> BUDGET_ROWS =
             new ParameterizedTypeReference<>() {
             };
@@ -59,6 +61,27 @@ public class SupabaseBudgetRepository implements BudgetRepository {
                 "budgets",
                 query,
                 Map.of("name", name.strip()),
+                BUDGET_ROWS);
+        return findFirst(rows);
+    }
+
+    @Override
+    public Optional<BudgetResponse> update(UUID budgetId, UpdateBudgetRequest request) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("select", SELECT_BUDGET);
+        query.put("id", "eq." + budgetId);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", request.name().strip());
+        body.put("period_frequency", request.periodFrequency().name());
+        body.put("period_anchor_start", request.periodAnchorStart() == null
+                ? null : request.periodAnchorStart().toString());
+        body.put("period_end_on", request.periodEndOn() == null
+                ? null : request.periodEndOn().toString());
+        List<BudgetResponse> rows = dataApiClient.requestReturningRepresentation(
+                HttpMethod.PATCH,
+                "budgets",
+                query,
+                body,
                 BUDGET_ROWS);
         return findFirst(rows);
     }
