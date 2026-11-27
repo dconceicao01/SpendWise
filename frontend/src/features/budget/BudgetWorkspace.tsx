@@ -2993,10 +2993,6 @@ export function BudgetWorkspace({ accessToken, onSignOut, userEmail }: Props) {
                         {t("movement.invoiceListEmpty")}
                       </Text>
                     )}
-                    <SecondaryActionButton
-                      label={t("dashboard.backToDashboard")}
-                      onPress={() => setWorkspaceView("dashboard")}
-                    />
                   </View>
                 ) : null}
                 {workspaceView === "statistics" ? (
