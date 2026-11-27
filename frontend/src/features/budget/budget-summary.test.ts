@@ -41,6 +41,8 @@ describe("budget dashboard summaries", () => {
           amount: 20,
           spent_on: "2026-01-01",
           description: null,
+          invoice_status: "NOT_REQUESTED",
+          supplier_nipc: null,
         },
         {
           id: "expense-sport",
@@ -51,6 +53,8 @@ describe("budget dashboard summaries", () => {
           amount: 30,
           spent_on: "2026-01-02",
           description: null,
+          invoice_status: "NOT_REQUESTED",
+          supplier_nipc: null,
         },
       ],
     );
@@ -87,6 +91,8 @@ describe("budget dashboard summaries", () => {
         amount: 500,
         spent_on: "2026-01-02",
         description: null,
+        invoice_status: "NOT_REQUESTED",
+        supplier_nipc: null,
       },
     ];
     const adjustments: BudgetAdjustment[] = [
@@ -266,6 +272,8 @@ describe("budget dashboard summaries", () => {
         amount: 60,
         spent_on: "2026-12-31",
         description: null,
+        invoice_status: "NOT_REQUESTED",
+        supplier_nipc: null,
       },
       {
         id: "expense-2027",
@@ -276,6 +284,8 @@ describe("budget dashboard summaries", () => {
         amount: 30,
         spent_on: "2027-01-01",
         description: null,
+        invoice_status: "NOT_REQUESTED",
+        supplier_nipc: null,
       },
     ];
     const adjustments: BudgetAdjustment[] = [

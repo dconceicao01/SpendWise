@@ -43,6 +43,8 @@ type MovementState = {
     amount: number;
     spent_on: string;
     description: string | null;
+    invoice_status: "NOT_REQUESTED" | "REQUESTED";
+    supplier_nipc: string | null;
   }[];
   adjustments: {
     id: string;
@@ -524,8 +526,22 @@ async function mockBudgetApi(page: Page) {
       state.movements.incomes = [...state.movements.incomes, income];
       return respond(income, 201);
     }
-    if (name === "expenses" && method === "GET")
+    if (name === "expenses" && method === "GET") {
+      if (resourceId === "invoices") {
+        const requestUrl = new URL(request.url());
+        const year = requestUrl.searchParams.get("year");
+        const month = requestUrl.searchParams.get("month")?.padStart(2, "0");
+        const monthKey = year && month ? year + "-" + month : "";
+        return respond(
+          state.movements.expenses.filter(
+            (expense) =>
+              expense.invoice_status === "REQUESTED" &&
+              expense.spent_on.startsWith(monthKey),
+          ),
+        );
+      }
       return respond(state.movements.expenses);
+    }
     if (name === "expenses" && method === "POST") {
       const input = request.postDataJSON() as {
         period_id: string;
@@ -534,6 +550,8 @@ async function mockBudgetApi(page: Page) {
         amount: number;
         spent_on: string;
         description: string | null;
+        invoice_status: "NOT_REQUESTED" | "REQUESTED";
+        supplier_nipc: string | null;
       };
       const expense = {
         id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
@@ -685,9 +703,23 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   await page.getByLabel("Amount").fill("200");
   await page.getByLabel("Date (YYYY-MM-DD)").fill(`${year}-06-10`);
   await page.getByLabel("Description (optional)").fill("Groceries");
+  await page.getByRole("button", { name: "Requested", exact: true }).click();
+  await page.getByLabel("Issuing company NIPC").fill("509123456");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Expense recorded.")).toBeVisible();
   await expect(page.getByText(/General · Groceries/)).toBeVisible();
+  await expect(
+    page.getByText(/Invoice requested · Issuing company NIPC: 509123456/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "View requested invoices" }).click();
+  await expect(
+    page.getByText("Requested invoices", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Year").fill(String(year));
+  await page.getByLabel("Month").fill("6");
+  await page.getByRole("button", { name: "View invoices" }).click();
+  await expect(page.getByText("509123456")).toBeVisible();
+  await page.getByRole("button", { name: "Back to movements" }).click();
 
   await page.getByRole("button", { name: "Back to dashboard" }).click();
   await page.getByRole("button", { name: "View all statistics" }).click();
@@ -713,6 +745,8 @@ test("creates a budget, records virtual movements and reviews annual totals", as
   expect(state.incomeSchedules[0]?.description).toBe("Recurring salary");
   expect(state.movements.incomeCorrections).toHaveLength(1);
   expect(state.movements.expenses).toHaveLength(1);
+  expect(state.movements.expenses[0]?.invoice_status).toBe("REQUESTED");
+  expect(state.movements.expenses[0]?.supplier_nipc).toBe("509123456");
 
   await page.getByRole("button", { name: "Profile and privacy" }).click();
   await expect(page.getByText("My profile")).toBeVisible();

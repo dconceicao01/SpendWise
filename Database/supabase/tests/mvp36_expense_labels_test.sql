@@ -8,7 +8,7 @@ insert into auth.users (id, aud, role, email) values
 select is(
     (select count(*)::integer from pg_proc p where p.oid in (
         'public.create_expense_label(uuid,uuid,text)'::regprocedure,
-        'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)'::regprocedure,
+        'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text,text,text)'::regprocedure,
         'public.update_expense_label(uuid,uuid,uuid)'::regprocedure
     ) and not p.prosecdef),
     3,
@@ -16,13 +16,13 @@ select is(
 );
 select ok(
     not has_function_privilege('anon', 'public.create_expense_label(uuid,uuid,text)', 'execute')
-    and not has_function_privilege('anon', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)', 'execute')
+    and not has_function_privilege('anon', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text,text,text)', 'execute')
     and not has_function_privilege('anon', 'public.update_expense_label(uuid,uuid,uuid)', 'execute'),
     'Anonymous cannot manage or use expense labels'
 );
 select ok(
     has_function_privilege('authenticated', 'public.create_expense_label(uuid,uuid,text)', 'execute')
-    and has_function_privilege('authenticated', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)', 'execute')
+    and has_function_privilege('authenticated', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text,text,text)', 'execute')
     and has_function_privilege('authenticated', 'public.update_expense_label(uuid,uuid,uuid)', 'execute'),
     'Authenticated members can use the narrow expense label RPCs'
 );

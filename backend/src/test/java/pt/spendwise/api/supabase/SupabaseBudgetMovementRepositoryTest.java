@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -65,9 +66,10 @@ class SupabaseBudgetMovementRepositoryTest {
                         + "\",\"p_period_id\":\"" + PERIOD_ID
                         + "\",\"p_category_id\":\"" + CATEGORY_ID
                         + "\",\"p_label_id\":\"eea3f961-1f03-4608-a248-a0fd9fd321f0"
-                        + "\",\"p_amount\":12.50,\"p_spent_on\":\"2026-11-22\",\"p_description\":\"Lunch\"}"))
+                        + "\",\"p_amount\":12.50,\"p_spent_on\":\"2026-11-22\",\"p_description\":\"Lunch\","
+                        + "\"p_invoice_status\":\"REQUESTED\",\"p_supplier_nipc\":\"509123456\"}"))
                 .andRespond(withSuccess("\"" + ENTRY_ID + "\"", MediaType.APPLICATION_JSON));
-        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/expense_entries?select=id,budget_id,period_id,category_id,label_id,recorded_by_member_id,amount,spent_on,description,created_at,label:expense_labels(name,is_system)&budget_id=eq."
+        mockServer.expect(requestTo("https://spendwise-test.supabase.co/rest/v1/expense_entries?select=id,budget_id,period_id,category_id,label_id,recorded_by_member_id,amount,spent_on,description,invoice_status,supplier_nipc,created_at,label:expense_labels(name,is_system)&budget_id=eq."
                         + BUDGET_ID + "&id=eq." + ENTRY_ID + "&limit=1"))
                 .andExpect(header("Authorization", "Bearer " + ACCESS_TOKEN))
                 .andRespond(withSuccess("[{\"id\":\"" + ENTRY_ID + "\",\"budget_id\":\"" + BUDGET_ID
@@ -75,16 +77,44 @@ class SupabaseBudgetMovementRepositoryTest {
                         + "\",\"label_id\":\"eea3f961-1f03-4608-a248-a0fd9fd321f0\",\"label\":{\"name\":\"Lunch\",\"is_system\":false},"
                         + "\"recorded_by_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
                         + "\"amount\":12.50,\"spent_on\":\"2026-11-22\",\"description\":\"Lunch\","
+                        + "\"invoice_status\":\"REQUESTED\",\"supplier_nipc\":\"509123456\","
                         + "\"created_at\":\"2026-11-22T17:00:00Z\"}]", MediaType.APPLICATION_JSON));
 
         var expense = movementRepository.recordExpense(
                 BUDGET_ID,
                 new CreateExpenseRequest(PERIOD_ID, CATEGORY_ID, UUID.fromString("eea3f961-1f03-4608-a248-a0fd9fd321f0"),
-                        new BigDecimal("12.50"), LocalDate.of(2026, 11, 22), "Lunch"));
+                        new BigDecimal("12.50"), LocalDate.of(2026, 11, 22), "Lunch",
+                        pt.spendwise.api.budget.ExpenseInvoiceStatus.REQUESTED, "509123456"));
 
         assertThat(expense).isPresent();
         assertThat(expense.orElseThrow().id()).isEqualTo(ENTRY_ID);
         assertThat(expense.orElseThrow().amount()).isEqualByComparingTo("12.50");
+        mockServer.verify();
+    }
+
+    @Test
+    void listsOnlyRequestedInvoicesWithinTheSelectedCalendarMonth() {
+        mockServer.expect(requestTo(org.hamcrest.Matchers.containsString(
+                        "https://spendwise-test.supabase.co/rest/v1/expense_entries?")))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andExpect(queryParam("invoice_status", "eq.REQUESTED"))
+                .andExpect(queryParam("and", "(spent_on.gte.2026-11-01,spent_on.lt.2026-12-01)"))
+                .andRespond(withSuccess("[{\"id\":\"" + ENTRY_ID + "\",\"budget_id\":\"" + BUDGET_ID
+                        + "\",\"period_id\":\"" + PERIOD_ID + "\",\"category_id\":\"" + CATEGORY_ID
+                        + "\",\"label_id\":\"eea3f961-1f03-4608-a248-a0fd9fd321f0\","
+                        + "\"label\":{\"name\":\"Alimentação\",\"is_system\":false},"
+                        + "\"recorded_by_member_id\":\"5988f040-a1f5-492f-a2ab-4e7b6d93c8c3\","
+                        + "\"amount\":12.50,\"spent_on\":\"2026-11-18\",\"description\":\"Almoço\","
+                        + "\"invoice_status\":\"REQUESTED\",\"supplier_nipc\":\"509123456\","
+                        + "\"created_at\":\"2026-11-18T17:00:00Z\"}]", MediaType.APPLICATION_JSON));
+
+        var invoices = movementRepository.findRequestedInvoices(
+                BUDGET_ID, java.time.YearMonth.of(2026, 11), 100, 0);
+
+        assertThat(invoices).hasSize(1);
+        assertThat(invoices.getFirst().invoiceStatus())
+                .isEqualTo(pt.spendwise.api.budget.ExpenseInvoiceStatus.REQUESTED);
+        assertThat(invoices.getFirst().supplierNipc()).isEqualTo("509123456");
         mockServer.verify();
     }
 

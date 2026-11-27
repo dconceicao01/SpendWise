@@ -79,6 +79,8 @@ export type ExpenseEntry = {
   amount: number;
   spent_on: string;
   description: string | null;
+  invoice_status: "NOT_REQUESTED" | "REQUESTED";
+  supplier_nipc: string | null;
 };
 
 export type BudgetAdjustment = {
@@ -423,12 +425,25 @@ export const spendwiseApi = {
       amount: number;
       spent_on: string;
       description: string | null;
+      invoice_status: "NOT_REQUESTED" | "REQUESTED";
+      supplier_nipc: string | null;
     },
   ) =>
     request<ExpenseEntry>(
       token,
       `/budgets/${budgetId}/expenses`,
       jsonBody(input),
+    ),
+  listRequestedInvoices: (
+    token: string,
+    budgetId: string,
+    year: number,
+    month: number,
+    offset = 0,
+  ) =>
+    request<ExpenseEntry[]>(
+      token,
+      `/budgets/${budgetId}/expenses/invoices?year=${year}&month=${month}&limit=100&offset=${offset}`,
     ),
   updateExpenseLabel: (
     token: string,

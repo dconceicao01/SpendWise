@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,7 +35,7 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
     private static final String SELECT_SNAPSHOT =
             "income_entry_id,category_id,percentage_basis_points,allocated_amount";
     private static final String SELECT_EXPENSE =
-            "id,budget_id,period_id,category_id,label_id,recorded_by_member_id,amount,spent_on,description,created_at,label:expense_labels(name,is_system)";
+            "id,budget_id,period_id,category_id,label_id,recorded_by_member_id,amount,spent_on,description,invoice_status,supplier_nipc,created_at,label:expense_labels(name,is_system)";
     private static final String SELECT_ADJUSTMENT =
             "id,budget_id,period_id,category_id,corrected_expense_entry_id,recorded_by_member_id,amount_delta,reason,occurred_on,created_at";
     private static final String SELECT_INCOME_CORRECTION =
@@ -141,8 +142,27 @@ public class SupabaseBudgetMovementRepository implements BudgetMovementRepositor
         body.put("p_amount", request.amount());
         body.put("p_spent_on", request.spentOn().toString());
         body.put("p_description", request.description());
+        body.put("p_invoice_status", request.invoiceStatus().name());
+        body.put("p_supplier_nipc", request.supplierNipc());
         UUID expenseId = dataApiClient.callFunction("record_expense", body, UUID_RESULT);
         return expenseId == null ? Optional.empty() : findExpense(budgetId, expenseId);
+    }
+
+    @Override
+    public List<ExpenseEntryResponse> findRequestedInvoices(
+            UUID budgetId, YearMonth yearMonth, int limit, int offset) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("select", SELECT_EXPENSE);
+        query.put("budget_id", "eq." + budgetId);
+        query.put("invoice_status", "eq.REQUESTED");
+        query.put("and", "(spent_on.gte." + yearMonth.atDay(1)
+                + ",spent_on.lt." + yearMonth.plusMonths(1).atDay(1) + ")");
+        query.put("order", "spent_on.desc,created_at.desc");
+        query.put("limit", Integer.toString(limit));
+        query.put("offset", Integer.toString(offset));
+        List<ExpenseEntryResponse> rows = dataApiClient.request(
+                HttpMethod.GET, "expense_entries", query, null, EXPENSE_ROWS);
+        return rows == null ? List.of() : List.copyOf(rows);
     }
 
     @Override

@@ -48,6 +48,8 @@ O endpoint autenticado `GET /api/v1/me/export` fornece um anexo JSON dos dados d
 
 ## Autenticação e sessão
 
+As despesas podem indicar apenas “Não pedida” ou “Pedida”; no segundo caso, a aplicação exige o NIPC de nove algarismos da empresa emitente. A lista usa o mês e ano da data da despesa, e os metadados seguem a mesma autorização/RLS da despesa, incluindo orçamento partilhado. Não recolhemos nem armazenamos cópias de faturas e não consultamos a AT/e-Fatura. Os campos de estado e NIPC também fazem parte da exportação JSON de dados pessoais.
+
 - Supabase Auth gere credenciais e recuperação; a aplicação nunca armazena palavras-passe.
 - Spring Security Resource Server valida assinatura usando JWKS oficial, `iss`, `exp` e restantes claims requeridas; rejeita token inválido/expirado. Não implementar criptografia JWT manualmente.
 - Chaves públicas de frontend são identificadores, não segredos; chaves `service_role`/`sb_secret` e passwords de banco são credenciais elevadas de servidor que contornam RLS. Nunca usar prefixo público para segredo, registar esses valores em logs ou enviar `sb_secret` como Bearer JWT.

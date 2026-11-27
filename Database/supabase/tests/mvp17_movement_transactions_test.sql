@@ -9,17 +9,17 @@ insert into auth.users (id, aud, role, email) values
 select is(
     (select count(*)::integer from pg_proc p
       where p.oid in (
-          'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)'::regprocedure,
+          'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text,text,text)'::regprocedure,
           'public.record_budget_adjustment(uuid,uuid,uuid,numeric,text,date,uuid)'::regprocedure
       ) and not p.prosecdef),
     2,
     'Expense and adjustment RPCs run as the authenticated caller'
 );
-select ok(not has_function_privilege('anon', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)', 'execute'),
+select ok(not has_function_privilege('anon', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text,text,text)', 'execute'),
     'Anonymous users cannot record expenses');
 select ok(not has_function_privilege('anon', 'public.record_budget_adjustment(uuid,uuid,uuid,numeric,text,date,uuid)', 'execute'),
     'Anonymous users cannot record adjustments');
-select ok(has_function_privilege('authenticated', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text)', 'execute'),
+select ok(has_function_privilege('authenticated', 'public.record_expense(uuid,uuid,uuid,uuid,numeric,date,text,text,text)', 'execute'),
     'Authenticated users can execute the expense RPC');
 select ok(has_function_privilege('authenticated', 'public.record_budget_adjustment(uuid,uuid,uuid,numeric,text,date,uuid)', 'execute'),
     'Authenticated users can execute the adjustment RPC');

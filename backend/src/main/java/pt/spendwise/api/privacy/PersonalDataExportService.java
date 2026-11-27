@@ -75,7 +75,7 @@ public class PersonalDataExportService {
                 allPages(offset -> movementService.listExpenses(budgetId, null, PAGE_SIZE, offset)).stream()
                         .map(row -> new ExportExpense(row.id(), row.periodId(), row.categoryId(), row.labelId(),
                                 row.label() == null ? null : row.label().name(), row.amount(),
-                                row.spentOn(), row.description(), row.createdAt()))
+                                row.spentOn(), row.description(), row.invoiceStatus(), row.supplierNipc(), row.createdAt()))
                         .toList(),
                 allPages(offset -> movementService.listAdjustments(budgetId, null, PAGE_SIZE, offset)).stream()
                         .map(row -> new ExportAdjustment(row.id(), row.periodId(), row.categoryId(),

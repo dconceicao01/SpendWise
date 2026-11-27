@@ -3,6 +3,7 @@ package pt.spendwise.api.budget;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,7 +51,8 @@ class BudgetMovementServiceTest {
         CreateIncomeRequest incomeRequest = new CreateIncomeRequest(PERIOD_ID, new BigDecimal("900.00"), LocalDate.of(2026, 11, 1), null);
         CreateExpenseRequest expenseRequest = new CreateExpenseRequest(
                 PERIOD_ID, CATEGORY_ID, UUID.fromString("eea3f961-1f03-4608-a248-a0fd9fd321f0"),
-                new BigDecimal("12.50"), LocalDate.of(2026, 11, 2), "Lunch");
+                new BigDecimal("12.50"), LocalDate.of(2026, 11, 2), "Lunch",
+                pt.spendwise.api.budget.ExpenseInvoiceStatus.NOT_REQUESTED, null);
         when(repository.recordIncome(BUDGET_ID, incomeRequest)).thenReturn(Optional.of(income()));
         when(repository.recordExpense(BUDGET_ID, expenseRequest)).thenReturn(Optional.of(expense()));
 
@@ -75,6 +77,24 @@ class BudgetMovementServiceTest {
         assertThatThrownBy(() -> service.listAdjustments(BUDGET_ID, null, 10, -1))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("negative");
+    }
+
+    @Test
+    void listsRequestedInvoicesForTheSelectedMonthAndRequiresReadAccess() {
+        var invoices = List.of(expense());
+        when(repository.findRequestedInvoices(BUDGET_ID, YearMonth.of(2026, 11), 25, 0))
+                .thenReturn(invoices);
+
+        assertThat(service.listRequestedInvoices(BUDGET_ID, 2026, 11, 25, 0)).isEqualTo(invoices);
+        verify(authorization).requireAllowed(BUDGET_ID, BudgetAction.READ);
+        verify(repository).findRequestedInvoices(BUDGET_ID, YearMonth.of(2026, 11), 25, 0);
+    }
+
+    @Test
+    void rejectsInvalidInvoiceMonth() {
+        assertThatThrownBy(() -> service.listRequestedInvoices(BUDGET_ID, 2026, 13, 25, 0))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invoice year and month are invalid");
     }
 
     @Test
@@ -132,6 +152,8 @@ class BudgetMovementServiceTest {
                 new BigDecimal("12.50"),
                 LocalDate.of(2026, 11, 2),
                 "Lunch",
+                pt.spendwise.api.budget.ExpenseInvoiceStatus.NOT_REQUESTED,
+                null,
                 Instant.parse("2026-11-22T10:01:00Z"));
     }
 }
