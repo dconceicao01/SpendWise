@@ -648,8 +648,9 @@ test("creates a budget, records virtual movements and reviews annual totals", as
 
   await page.getByLabel("Budget name").fill("Household pilot");
   await page.getByLabel("Currency (ISO code, e.g. EUR)").fill("EUR");
-  await page.getByLabel("Start date (YYYY-MM-DD)").fill(`${year}-01-01`);
-  await page.getByLabel("End date (YYYY-MM-DD)").fill(`${year}-12-31`);
+  await page.getByLabel("Start date").fill(`${year}-01-01`);
+  await page.getByRole("button", { name: "Set an end date" }).click();
+  await page.getByLabel("End date (optional)").fill(`${year}-12-31`);
   await page.getByLabel("Category name").fill("General");
   await page.getByRole("button", { name: "Save budget" }).click();
 
@@ -797,8 +798,9 @@ test("creates and revokes a one-time invitation for a shared budget", async ({
   await page.getByLabel("Budget name").fill("Shared pilot");
   await page.getByRole("button", { name: "Shared" }).click();
   await page.getByLabel("Currency (ISO code, e.g. EUR)").fill("EUR");
-  await page.getByLabel("Start date (YYYY-MM-DD)").fill(`${year}-01-01`);
-  await page.getByLabel("End date (YYYY-MM-DD)").fill(`${year}-12-31`);
+  await page.getByLabel("Start date").fill(`${year}-01-01`);
+  await page.getByRole("button", { name: "Set an end date" }).click();
+  await page.getByLabel("End date (optional)").fill(`${year}-12-31`);
   await page.getByLabel("Category name").fill("General");
   await page.getByRole("button", { name: "Save budget" }).click();
 
